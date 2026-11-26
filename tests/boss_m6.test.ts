@@ -56,21 +56,22 @@ describe('boss_m6 JUGGERNAUT', () => {
   it('reaches every phase, blows its armour off and dies into a completed mission', () => {
     const { w, bots } = arena();
     const b = bossOf(w)!;
+    for (let i = 0; i < 60 * 4 && !b.introDone; i++) step(w, 1, bots);
+    release();
     const seen = new Set<string>();
     const phases = new Set<number>();
     let pod = false;
     for (let i = 0; i < 60 * 200 && w.state !== 'complete'; i++) {
-      step(w, 1, bots);
+      step(w, 1);
       seen.add(b.state);
       phases.add(b.phase);
       if (w.entities.some((e) => e.constructor.name === 'EscapePod')) pod = true;
-      // Chip damage on a timer so the test does not depend on the autopilot's aim.
-      if (b.introDone && !b.dying && i % 30 === 0) b.damage({ amount: 4, kind: 'bullet', owner: w.players[0], x: b.x, y: b.y - 20 });
+      // Chip damage on a timer (6 dps) so the test does not depend on anyone's aim.
+      if (!b.dying && i % 30 === 0) b.damage({ amount: 3, kind: 'bullet', owner: w.players[0], x: b.x, y: b.y - 20 });
     }
-    release();
     expect([...phases].sort()).toEqual([0, 1, 2]);
     expect(b.armorOn).toBe(false);
-    for (const s of ['walk', 'cannon', 'stomp', 'missiles', 'laser', 'stagger']) expect(seen.has(s), s).toBe(true);
+    for (const s of ['walk', 'laser', 'stagger']) expect(seen.has(s), s).toBe(true);
     expect(pod).toBe(true);
     expect(w.state).toBe('complete');
   });
@@ -86,8 +87,10 @@ describe('boss_m6 JUGGERNAUT', () => {
     let shells = 0;
     let markers = 0;
     let beamChecked = false;
+    const seen = new Set<string>();
     for (let i = 0; i < 60 * 150 && w.state !== 'complete'; i++) {
       step(w, 1); // nobody shoots: the boss cycles through its whole repertoire
+      seen.add(b.state);
       if (b.phase === 0 && i === 60 * 60) b.damage({ amount: JUG_HP * 0.45, kind: 'explosion', owner: w.players[0] });
       for (const e of w.entities) {
         if (e instanceof JugShockwave) {
@@ -121,6 +124,7 @@ describe('boss_m6 JUGGERNAUT', () => {
     expect(markers).toBe(shells);
     expect(maxSpeed).toBeLessThanOrEqual(220);
     expect(beamChecked).toBe(true);
+    for (const s of ['walk', 'cannon', 'stomp', 'missiles', 'laser', 'drones', 'stagger']) expect(seen.has(s), s).toBe(true);
   });
 
   for (const crouch of [true, false]) {
