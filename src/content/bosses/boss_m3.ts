@@ -355,8 +355,8 @@ export class FrostBastion extends BigBoss {
     if (t < INTRO_RISE && this.rumbleT <= 0) {
       this.rumbleT = 0.12;
       w.shake(1.6, 0.15);
-      for (let i = 0; i < 2; i++) puffSnow(w, this.face + fxRng.range(-6, 130), this.G - 1, 4, 55, true);
-      smoke(w, this.face + fxRng.range(0, 120), this.G - 4, { n: 1, color: '#dce4f0', color2: '#9aaac0', size: 3, size2: 9, vy: -30, life: 1.1 });
+      for (let i = 0; i < 3; i++) puffSnow(w, this.face + fxRng.range(-10, 136), this.G - 1, 6, 60, true);
+      for (let i = 0; i < 2; i++) smoke(w, this.face + fxRng.range(-12, 136), this.G - 3, { n: 1, color: '#eef3fa', color2: '#a8b6ca', size: 4, size2: 11, vy: -26, vx: fxRng.range(-14, 8), life: 1.2, front: true });
       if (fxRng.chance(0.5)) {
         const top = this.G - (WALL.H + 6) * this.rise - fxRng.range(60, 140) * (1 - this.rise);
         w.add(new FlyingPart('bm3_plate', 3 + fxRng.int(0, 2), this.face + fxRng.range(-30, 110), Math.min(this.G - 8, top), fxRng.range(-70, 20), fxRng.range(-80, -20), { smoke: false, life: 1.4 }));
@@ -972,9 +972,20 @@ export class FrostBastion extends BigBoss {
     const frame = this.dying ? 2 : Math.min(2, this.phase);
     sprites.get('bm3_wall').draw(g, ox, by, frame, { flip: true, flash: this.wallFlash > 0 });
     this.renderBeacons(g, X, Y);
+    // Turrets pop up out of the deck / drop out of the gallery underside at the end of the intro.
+    g.save();
+    g.beginPath();
+    g.rect(this.face - 140, G - 400, 700, Y(WALL.GALLERY_TOP) + 2 - (G - 400));
+    g.clip();
     this.renderDeck(g, X, Y);
+    g.restore();
     this.renderCore(g, X, Y, shakeX);
+    g.save();
+    g.beginPath();
+    g.rect(this.face - 140, Y(WALL.GALLERY_BOTTOM) - 1, 700, 400);
+    g.clip();
     this.renderMG(g, X, Y);
+    g.restore();
     this.renderIcicles(g, X, Y);
     g.restore();
   }

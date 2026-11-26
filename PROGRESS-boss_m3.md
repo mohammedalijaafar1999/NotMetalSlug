@@ -2,23 +2,27 @@
 
 Branch wave2/boss_m3. Delete this file when done.
 
-## Plan / decisions
-- Wall faces LEFT (sprite authored facing right, flipped). Face F = arenaL + 262 (FACE_X). Boss x = F + (WALL.FACE - WALL.OX).
-- Dynamic terrain solid (owner = boss) from F+2 to far right, G-400..G: blocks players, vehicles, bullets, grenades.
-  Extended core pushes its left edge out (moveSolid) and shoves players.
-- Zones: 'doors' (mul 0, clang) while closed; 'core' (mul 1) while open. Turrets = BossPiece (mg, flak, mortar), hp own, mul 0.6 forwarded.
-- Phases by hpFrac [0.66, 0.33]: P0 lance (crouch) per opening; P1 + spike wave (jump) alternate + faster turrets;
-  P2 doors blown off, core permanently exposed, lance / spikes / boulders.
-- Director: heavy core attacks reserve a window; turrets/icicles do not resolve inside it (fairness).
-- Intro: wall rises out of the snow (~2.6 s), turrets deploy, boss_roar; hittable after. Lock announce 'WARNING! ...' (not world.announce).
-- Bot: doors zone keeps the lowest hurtbox low -> bot stays left quarter, fires forward at the core when open.
+## Decisions
+- Wall faces LEFT (sprite authored facing right, flipped). Face F = arenaL + 248 (FACE_X). Boss x = F + (WALL.FACE - WALL.OX).
+- Static-height dynamic terrain solid (owner = boss) from F+2 rightwards, G-400..G: blocks players, bullets, grenades.
+  Gate frame (F-16..F) and the pushed-out core are blocked by pushOut() at floor level (no solid, so jump shots fly on to the face).
+- Zones: 'frame' (header, mul 0) always; 'doors' (mul 0) while coreK <= 0.3; 'core' (mul 1) when pushed out.
+  Turrets = BossPiece (mg, flak, mortar), own hp, TURRET_MUL 0.6 forwarded to the bar.
+- Phases [0.66, 0.33]: P0 lance (crouch); P1 spikes first then alternate (jump); P2 doors blown off, core always out:
+  boulders, lance, spikes back to back.
+- Director: heavy core attacks reserve windows; turrets/icicles only start if they resolve outside (tests/boss_m3 fairness test).
+- Intro: wall rises out of the snow 2.15 s, turrets pop, boss_roar; hittable at 2.7 s. Lock announce only (no world.announce).
+- Bot fix (src/debug/bot.ts): band hysteresis + only tap toward the enemy when facing away (on foot).
 
 ## Done
-- (prev attempt) art.ts: wall, core, shutters, emitter, beacon, mg, flak, mortar, wrecks, icicle, shard, shells, boulder, crystal, plate, rubble.
+- art.ts (wall reworked: gate frame/recess, smokestack, emblem; door, core, MG 11 angles, flak, spike), parts.ts hazards,
+  boss_m3.ts behaviour, bosstest_m3 level, tests/boss_m3.test.ts (7 tests green), screenshots reviewed.
 
 ## Next
-- boss_m3.ts behaviour, test arena, tests, visual passes.
+- Final visual pass (intro rise, P2, death), registerEntity description + integrationNotes, delete tests/diag*_m3.test.ts,
+  full npm test + typecheck, final commit.
 
 ## Gotchas
 - Boss projectiles must spawn LEFT of the wall solid (x < F) or they hit terrain instantly.
 - Bullets move ~7 px/step: zones must stick out >= 8 px in front of the solid edge.
+- Hit flashes blink (age*30 % 2) so constant fire never hides the art.
