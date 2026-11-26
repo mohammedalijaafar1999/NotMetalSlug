@@ -133,6 +133,7 @@ export class HornetKing extends BigBoss {
   private joltY = 0;
   private crashed = false;
   private seqStep = 0;
+  private burnAfterTear = false;
 
   constructor() {
     super('HORNET KING', HORNET_HP);
@@ -293,7 +294,7 @@ export class HornetKing extends BigBoss {
   onPhase(phase: number, prev: number): void {
     if (phase >= 1 && prev < 1) this.startTear();
     if (phase >= 2 && prev < 2) {
-      if (this.state === 'tear') this.seqStep = 99; // finish the tear first, burn right after
+      if (this.state === 'tear') this.burnAfterTear = true; // finish the tear first, burn right after
       else this.startBurn();
     }
   }
@@ -619,7 +620,8 @@ export class HornetKing extends BigBoss {
         bsfx(this, 'metal_hit', { vol: 0.45, pitch: 0.6 });
       }
     }
-    this.flyTo(dt, this.tx + ex, this.ty + ey, maxV, maxVy);
+    const gx = this.state === 'intro' ? this.tx : clamp(this.tx + ex, this.arenaL + 26, this.arenaR - 26);
+    this.flyTo(dt, gx, this.ty + ey, maxV, maxVy);
     if (this.y > this.groundY - MIN_ALT) {
       this.y = this.groundY - MIN_ALT;
       this.vy = Math.min(0, this.vy);
@@ -791,11 +793,11 @@ export class HornetKing extends BigBoss {
       x: pm.x,
       y: pm.y,
       vx: this.facing * this.world.rng.range(-10, 50),
-      vy: -235,
+      vy: -205,
       tx: x,
       ty: gy,
       sprite: 'bm2_missile',
-      drop: 0.72,
+      drop: 0.56,
       speed: 40,
       topSpeed: Math.min(235, this.shotSpeed(220)),
       accel: 320,
@@ -842,8 +844,15 @@ export class HornetKing extends BigBoss {
       this.world.explode(s.x, s.y, { radius: 30, damage: 0, team: 'enemy', size: 'large', shake: 7, sfx: 'explosion_big' });
       this.world.hitstop(0.12);
       this.world.flash('#ffffff', 0.45);
-      const away = s.x < px ? -1 : 1;
-      this.world.add(new TornRotor(s.x, s.y, away * 95 + this.vx * 0.3, -210, away * 5.5, this.groundY));
+      // It lands inside the arena, well clear of the player (purely cosmetic crash).
+      let away = s.x < px ? -1 : 1;
+      const flight = (210 + Math.sqrt(210 * 210 + 2 * 330 * Math.max(10, this.groundY - 12 - s.y))) / 330;
+      let land = clamp(s.x + away * 70, this.arenaL + 34, this.arenaR - 34);
+      if (Math.abs(land - px) < 70) {
+        away = -away as 1 | -1;
+        land = clamp(px + away * 90, this.arenaL + 34, this.arenaR - 34);
+      }
+      this.world.add(new TornRotor(s.x, s.y, (land - s.x) / flight, -210, away * 5.5, this.groundY));
       this.world.particles.debris(s.x, s.y, 18, ['#7d7343', '#5a522e', '#4c4e5a', '#e8c02a'], 240);
       this.throwPlate(-60, -24, 1, true);
       this.throwPlate(-70, -20, 2, true);
@@ -860,7 +869,8 @@ export class HornetKing extends BigBoss {
     }
     if (t > 2.1) {
       this.rotorSpd = 1.1;
-      const burnNext = this.seqStep === 99 || this.phase >= 2;
+      const burnNext = this.burnAfterTear || (this.phase >= 2 && this.dmgState < 3);
+      this.burnAfterTear = false;
       this.endAttack(this.delay(0.5));
       if (burnNext) this.startBurn();
     }
@@ -976,6 +986,8 @@ export class HornetKing extends BigBoss {
 
   private crash(): void {
     this.crashed = true;
+    this.gunAng = 0.1;
+    this.bayState = 0;
     this.y = this.groundY - WHEELS + 5;
     this.vx = 0;
     this.vy = 0;
@@ -1020,7 +1032,8 @@ export class HornetKing extends BigBoss {
     if (this.pylonOn) sprites.get('bm2_blur').draw(g, hr.x, hr.y, TILT0, { alpha: 0.24 });
     sprites.get('bm2_blur').draw(g, hf.x, hf.y, TILT0, { alpha: 0.28 });
     if (this.pylonOn) sprites.get('bm2_rotor').draw(g, hr.x, hr.y, TILT0 * ROT_N + rf(this.rotorB));
-    sprites.get('bm2_front').draw(g, x, y, this.dmgState, { flash: this.hullFlash > 0 });
+    sprites.get('bm2_front').draw(g, x, y, this.dmgState);
+    if (this.hullFlash > 0) sprites.get('bm2_front').draw(g, x, y, this.dmgState, { flash: true, alpha: 0.4 });
     sprites.get('bm2_rotor').draw(g, hf.x, hf.y, TILT0 * ROT_N + rf(this.rotorA));
     sprites.get('bm2_hub').draw(g, hf.x, hf.y, Math.floor(this.rotorA * 2) % 2);
     if (Math.floor(this.age * 2.2) % 3 === 0) {
@@ -1055,8 +1068,9 @@ export class HornetKing extends BigBoss {
       if (this.pylonOn) sprites.get('bm2_blur').draw(g, hubR.x, hubR.y, ti, { flip, alpha: 0.28 });
     }
     // Hull.
-    const hullFlash = this.hullFlash > 0 && !this.dying;
-    sprites.get('bm2_hull').draw(g, this.x + this.joltX, this.y + this.joltY, this.dmgState * NT + ti, { flip, flash: hullFlash });
+    const hull = sprites.get('bm2_hull');
+    hull.draw(g, this.x + this.joltX, this.y + this.joltY, this.dmgState * NT + ti, { flip });
+    if (this.hullFlash > 0 && !this.dying) hull.draw(g, this.x + this.joltX, this.y + this.joltY, this.dmgState * NT + ti, { flip, flash: true, alpha: 0.4 });
     // Bomb bay, wing pod, chin gun.
     const bay = R(P.bay[0], P.bay[1]);
     sprites.get('bm2_bay').draw(g, bay.x, bay.y, Math.min(BAY_N - 1, this.bayState) * NT + ti, { flip, flash: this.flashing('bay') });
@@ -1077,7 +1091,7 @@ export class HornetKing extends BigBoss {
     }
     // Rotor blades + hubs on top.
     const rf = (a: number) => Math.floor((a / ((Math.PI * 2) / 3)) * ROT_N) % ROT_N;
-    sprites.get('bm2_rotor').draw(g, hubF.x, hubF.y, ti * ROT_N + rf(this.rotorA), { flip });
+    if (!this.crashed) sprites.get('bm2_rotor').draw(g, hubF.x, hubF.y, ti * ROT_N + rf(this.rotorA), { flip });
     sprites.get('bm2_hub').draw(g, hubF.x, hubF.y, Math.floor(this.rotorA * 2) % 2, { flip });
     if (this.pylonOn) {
       sprites.get('bm2_rotor').draw(g, hubR.x, hubR.y, ti * ROT_N + rf(this.rotorB), { flip });

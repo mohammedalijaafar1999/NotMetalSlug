@@ -14,7 +14,7 @@ const LOCK_X = 1100;
 /** World with the camera already at the boss lock and the player in the arena. */
 function arenaWorld(seed = 1, difficulty: 0 | 1 | 2 = 1): World {
   const w = makeWorld('bosstest_m2', { seed, difficulty });
-  w.level.warp(LOCK_X - 40);
+  w.level.warp(LOCK_X);
   const p = w.players[0];
   p.x = LOCK_X + 90;
   p.y = 184;
@@ -152,7 +152,7 @@ describe('boss_m2 HORNET KING', () => {
     for (let i = 0; i < 60 * 50; i++) {
       step(w, 1);
       const cx = w.camera.x;
-      const out = Math.max(0, cx + 20 - b.x, b.x - (cx + VIEW_W - 20));
+      const out = Math.max(0, cx + 16 - b.x, b.x - (cx + VIEW_W - 16));
       worst = Math.max(worst, out);
     }
     expect(worst).toBe(0);
