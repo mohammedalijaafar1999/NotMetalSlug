@@ -162,6 +162,39 @@ describe('boss_m3 FROST BASTION', () => {
   });
 });
 
+describe('boss_m3 fairness director', () => {
+  it('keeps turret fire, shells and icicles away from the player while a core attack demands a crouch or a jump', () => {
+    const { w, boss } = reachBoss(7);
+    release();
+    until(w, () => boss.introDone, 5);
+    const p = w.players[0] as Player;
+    const hazards = new Set(['EnemyBullet', 'Lobbed', 'FlakShell', 'IceFrag', 'FallingIcicle']);
+    const spots = [boss.face - 130, boss.face - 40, boss.face - 200, boss.face - 70];
+    const violations: string[] = [];
+    let heavy = 0;
+    let t = 0;
+    while (t < 150 && !boss.dying) {
+      // Passive player parked at a few spots (god mode: never dies, never shoots).
+      p.x = spots[Math.floor(t / 15) % spots.length];
+      if (t > 45 && boss.phase === 0) boss.hp = boss.maxHp * 0.6;
+      if (t > 95 && boss.phase === 1) boss.hp = boss.maxHp * 0.3;
+      step(w, 1);
+      t += DT;
+      const lance = w.entities.find((e) => e instanceof FrostLance && e.firing);
+      const wave = w.entities.find((e) => e instanceof SpikeWave && e.t > 0.2 && Math.abs((e as SpikeWave).front - p.x) < 50);
+      const rolling = w.entities.find((e) => e.constructor.name === 'Boulder' && Math.abs(e.x - p.x) < 40);
+      if (!lance && !wave && !rolling) continue;
+      heavy++;
+      for (const e of w.entities) {
+        if (e.dead || !hazards.has(e.constructor.name)) continue;
+        if (Math.abs(e.x - p.x) < 40 && e.y > p.y - 70) violations.push(`${t.toFixed(2)} ${e.constructor.name} near player during ${lance ? 'lance' : wave ? 'spikes' : 'boulder'}`);
+      }
+    }
+    expect(heavy).toBeGreaterThan(60);
+    expect([...new Set(violations)].slice(0, 10)).toEqual([]);
+  }, 60_000);
+});
+
 describe('boss_m3 autopilot', () => {
   it('the invincible autopilot beats the boss test arena', () => {
     const r = simulateMission('bosstest_m3', 300);

@@ -63,6 +63,9 @@ const SPIKE_TELE = 0.6;
 const FLAK_BURST_H = 92;
 const FLAK_FLIGHT = 0.85;
 const MORTAR_FLIGHT = 1.35;
+const BOULDER_GAP = 0.95;
+const BOULDER_FLIGHT = 1.05;
+const BOULDER_SPEED = 104;
 const MG_EVERY = [2.9, 2.4, 2.1];
 const FLAK_EVERY = [4.7, 3.9, 3.5];
 const MORTAR_EVERY = [5.6, 4.7, 4.3];
@@ -308,7 +311,13 @@ export class FrostBastion extends BigBoss {
   private attackLength(k: CoreAttack): number {
     if (k === 'lance') return LANCE_CHARGE + LANCE_FIRE + 0.3;
     if (k === 'spikes') return SPIKE_TELE + SPIKE_LEAD + (this.face - this.arenaL) / SPIKE_SPEED + SPIKE_ACTIVE + 0.3;
-    return 3.2;
+    // Boulders: drops BOULDER_GAP apart, flight, then a roll across the floor to the left edge.
+    const roll = (this.face - GALLERY_TIP - 10 - this.arenaL) / BOULDER_SPEED;
+    return 0.2 + (this.boulderCount() - 1) * BOULDER_GAP + BOULDER_FLIGHT + roll + 0.3;
+  }
+
+  private boulderCount(): number {
+    return this.destroyed >= 2 ? 3 : 2;
   }
 
   private chooseAttack(): CoreAttack {
@@ -415,6 +424,15 @@ export class FrostBastion extends BigBoss {
     }
   }
 
+  /** World time the next core attack of the open/close cycle starts (null if none is pending). */
+  private nextCoreAttackAt(): number | null {
+    const now = this.world.time;
+    if (this.mode === 'closed') return now + (this.modeDur - this.modeT) + OPENING + ATTACK_DELAY;
+    if (this.mode === 'opening') return now + (OPENING - this.modeT) + ATTACK_DELAY;
+    if (this.mode === 'open' && !this.attackStarted) return now + Math.max(0, ATTACK_DELAY - this.modeT);
+    return null;
+  }
+
   private attackBusy(): boolean {
     return this.world.time < this.busyUntil || this.spikeT >= 0 || this.boulderLeft > 0 || (this.lance !== null && !this.lance.dead);
   }
@@ -505,8 +523,9 @@ export class FrostBastion extends BigBoss {
       snd(w, 'boss_charge', this.face, 0.8, 0.6);
       this.busyUntil = w.time + this.attackLength('spikes') - 0.4;
     } else {
-      this.boulderLeft = this.destroyed >= 2 ? 3 : 2;
+      this.boulderLeft = this.boulderCount();
       this.boulderT = 0.2;
+      this.busyUntil = w.time + this.attackLength('boulders') - 0.3;
       snd(w, 'boss_roar', this.face, 0.7, 1.25);
       w.shake(2.5, 0.6);
     }
@@ -541,9 +560,9 @@ export class FrostBastion extends BigBoss {
       this.boulderT -= dt;
       if (this.boulderT <= 0) {
         this.boulderLeft--;
-        this.boulderT = 0.95;
+        this.boulderT = BOULDER_GAP;
         const landX = this.fx(GALLERY_TIP + 10 + w.rng.range(0, 30));
-        const b = new Boulder(this, this.face + 70, this.G - 200, landX, this.G, this.arenaL + 4, 1.05, 104 * w.difficulty.enemyShotSpeed);
+        const b = new Boulder(this, this.face + 70, this.G - 200, landX, this.G, this.arenaL + 4, BOULDER_FLIGHT, BOULDER_SPEED * Math.min(1.1, w.difficulty.enemyShotSpeed));
         w.add(b);
         snd(w, 'mortar_whistle', landX, 0.6, 0.6);
       }
@@ -788,11 +807,13 @@ export class FrostBastion extends BigBoss {
     this.reserved = this.reserved.filter(([a]) => a < w.time);
     if (this.lance && !this.lance.dead) this.reserve(w.time, w.time + this.lance.total);
     if (phase >= 2 && !this.broken) this.breakDoors();
-    else if (this.mode === 'closed') {
-      this.modeDur = Math.min(this.modeDur, this.modeT + 1.4);
-      this.pending = this.chooseAttack();
-      const at = w.time + (this.modeDur - this.modeT) + OPENING + ATTACK_DELAY;
-      this.reserve(at, at + this.attackLength(this.pending));
+    else {
+      if (this.mode === 'closed') this.modeDur = Math.min(this.modeDur, this.modeT + 1.4);
+      const at = this.nextCoreAttackAt();
+      if (at !== null) {
+        this.pending = this.chooseAttack();
+        this.reserve(at, at + this.attackLength(this.pending));
+      }
     }
     if (this.allow(1.1)) this.dropIcicles(3);
   }
@@ -807,7 +828,8 @@ export class FrostBastion extends BigBoss {
     w.add(new FlyingPart('bm3_door', 0, gx - 8, gy - 12, -150, -260, { burn: true, life: 2.6 }));
     w.add(new FlyingPart('bm3_door', 1, gx - 8, gy + 8, -90, -170, { burn: false, life: 2.6 }));
     snd(w, 'alarm', this.face, 0.7, 0.9);
-    const busy = this.lance && !this.lance.dead ? this.lance.total - this.lance.t : 0;
+    const lance = this.lance && !this.lance.dead ? this.lance.total - this.lance.t : 0;
+    const busy = Math.max(lance, this.busyUntil - w.time, this.spikeT >= 0 ? this.attackLength('spikes') : 0);
     this.setMode('broken');
     this.nextAttackAt = w.time + Math.max(1.5, busy + 0.8);
     this.reserved = this.reserved.filter(([a]) => a < w.time);
