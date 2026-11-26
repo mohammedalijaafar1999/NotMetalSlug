@@ -617,8 +617,8 @@ export class Juggernaut extends BigBoss {
     for (let k = 0; out.length < n && k < n * 3; k++) {
       const off = (k === 0 ? 0 : Math.ceil(k / 2) * (k % 2 ? 1 : -1)) * 70 * side + rng.range(-6, 6);
       const x = clamp(px + off, this.arenaL + 12, this.arenaR - 12);
-      // never shell its own feet (the player hiding underneath is handled by stomps / the vent)
-      if (Math.abs(x - this.x) < 46) continue;
+      // only in front of the barrels, never onto its own feet (players underneath get stomps / the vent)
+      if ((x - this.x) * this.facing < 46) continue;
       if (out.some((o) => Math.abs(o - x) < 40)) continue;
       out.push(x);
     }
@@ -1016,7 +1016,7 @@ export class Juggernaut extends BigBoss {
       L.x = s.fromX + (s.toX - s.fromX) * e;
       L.lift = Math.sin(Math.PI * k) * s.h;
       L.tilt = 0.4 * Math.sin(Math.PI * 2 * k) * s.dir;
-      if (k > 0.62 && L.lift < 9) this.hurtPlayers({ x: L.x - 17, y: this.y - L.lift - 14, w: 34, h: 14 }, 'crush', 15);
+      if (this.introDone && k > 0.62 && L.lift < 9) this.hurtPlayers({ x: L.x - 17, y: this.y - L.lift - 14, w: 34, h: 14 }, 'crush', 15);
       if (k >= 1) {
         L.step = null;
         L.lift = 0;
