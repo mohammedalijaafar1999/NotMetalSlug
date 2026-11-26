@@ -1,20 +1,23 @@
 // GRINDER art: a steam-diesel war-dozer of the Rustcoat Legion, built from separate sprites so the
 // pieces can animate, recoil and break off. Everything faces RIGHT (front = +x) and is drawn in
-// "local" coordinates: origin (0, 0) = ground under the hull centre, -y = up.
+// "local" coordinates: origin (0, 0) = ground under the hull centre, -y = up. Light from top-left.
 //
-//   grinder_tracks  6 scroll phases + charred      grinder_body   intact / battered / stripped / charred
-//   grinder_stack   normal / hot / cracked / stub  grinder_barrel elevation frames
-//   grinder_hatch   closed / half / open           grinder_blade  raised|mid|lowered x normal|battered|charred
-//   grinder_flame   flame-jet strip (4 flicker)    grinder_shell, grinder_lamp, grinder_parts (debris)
+//   grinder_tracks  6 scroll phases + charred        grinder_body    hull+boiler: intact / battered / stripped / charred
+//   grinder_turret  intact / battered / burning / charred (recoils, blows off at death)
+//   grinder_barrel  elevation frames                 grinder_hatch   closed / half / open
+//   grinder_stack   normal / hot / cracked / stub    grinder_blade   raised|mid|lowered x normal|battered|charred
+//   grinder_drum    toothed grinder roller (6 spin frames + charred)
+//   grinder_piston  pumping engine piston rod        grinder_glow    firebox grate glow (dim / lit / white hot)
+//   grinder_flame   flame-jet strip (4 flicker)      grinder_shell, grinder_lamp, grinder_parts (debris)
 
 import { sprites } from '../../../engine/sprites';
 import { PixelArt } from '../../../engine/pixelart';
 import { Rng } from '../../../engine/rng';
 import { BC, Pen, plate, rivet, rivetRow, hazardStripes, cog, charr } from '../common/kit';
 
-/** Geometry shared by the art and the boss logic (local coordinates). */
+/** Geometry shared by the art and the boss logic (local coordinates, facing right). */
 export const GR = {
-  /** Body sprite canvas. */
+  /** Body sprite canvas (hull, boiler, rear engine). */
   BODY_W: 166,
   BODY_H: 84,
   BODY_OX: 100,
@@ -25,7 +28,14 @@ export const GR = {
   TRACK_OX: 78,
   TRACK_OY: 29,
   TRACK_FRAMES: 6,
-  /** Smoke stack base (centre) on the boiler. */
+  /** Turret sprite: origin = turret ring base centre at local (TURRET_X, TURRET_Y). */
+  TURRET_W: 60,
+  TURRET_H: 44,
+  TURRET_OX: 30,
+  TURRET_OY: 40,
+  TURRET_X: -40,
+  TURRET_Y: -50,
+  /** Smoke stack base (centre) on the boiler, and its crown. */
   STACK_X: 40,
   STACK_Y: -63,
   STACK_TOP: -113,
@@ -49,23 +59,61 @@ export const GR = {
   /** Blade tip (front-most x, local) and height. */
   BLADE_TIP: 86,
   BLADE_H: 38,
+  /** Grinder drum centre relative to the blade's bottom-back corner, radius incl. teeth. */
+  DRUM_DX: 15,
+  DRUM_DY: -9,
+  DRUM_R: 9,
+  DRUM_FRAMES: 6,
   /** Headlamp lens (front of the boiler). */
   LAMP_FX: 60,
   LAMP_FY: -68,
   /** Exhaust pipe mouths (rear). */
   EXHAUST: [
-    [-91, -76],
-    [-83, -73],
+    [-97, -79],
+    [-91, -81],
   ] as [number, number][],
+  /** Engine pistons (housing top centre). */
+  PISTONS: [
+    [-78, -63],
+    [-70, -63],
+  ] as [number, number][],
+  /** Firebox grate (top-left of the glow overlay). */
+  FIREBOX_X: -32,
+  FIREBOX_Y: -47,
   /** Beacon lamp on the turret. */
   LAMP_X: -58,
   LAMP_Y: -84,
-  /** Flame nozzle (relative to the blade's bottom-back corner). */
+  /** Flame jet sprite length. */
   FLAME_LEN: 120,
   /** Extents for hit zones / death area. */
   REAR: -96,
   FRONT: 86,
 } as const;
+
+// ------------------------------------------------------------------ small art helpers
+
+/** Rust streak running down from a rivet / seam. */
+function streak(d: Pen, x: number, y: number, len: number): void {
+  d.rect(x, y, 1, len, BC.rust);
+  d.px(x, y + len - 1, BC.rustD);
+  d.px(x, y, BC.rustL);
+}
+
+function dent(d: Pen, x: number, y: number, r: number, base: string, dark: string, light: string): void {
+  d.circle(x, y, r, dark);
+  d.circle(x + 0.6, y + 0.6, r * 0.65, base);
+  d.px(x + r * 0.6, y + r * 0.6, light);
+}
+
+/** Bullet pock: dark pit with a bright lip below-right. */
+function pock(d: Pen, x: number, y: number, light: string = BC.oliveLL): void {
+  d.px(x, y, BC.ironDD);
+  d.px(x + 1, y + 1, light);
+}
+
+function soot(d: Pen, pts: number[]): void {
+  d.poly(pts, BC.soot);
+}
 
 // ------------------------------------------------------------------ tracks
 
@@ -94,10 +142,8 @@ function beltPath(): { pts: PathPt[]; len: number } {
     for (let i = 1; i <= n; i++) raw.push([x0 + ((x1 - x0) * i) / n, y0 + ((y1 - y0) * i) / n]);
   };
   const D = Math.PI / 180;
-  // Top run: sprocket top -> idler top.
   raw.push([S.x, S.y - S.r]);
   line(S.x, S.y - S.r, I.x, I.y - I.r);
-  // Around the idler front, down to the bottom run.
   arc(I, -90 * D, 55 * D);
   const fx = I.x + Math.cos(55 * D) * I.r;
   const fy = I.y + Math.sin(55 * D) * I.r;
@@ -119,7 +165,6 @@ function beltPath(): { pts: PathPt[]; len: number } {
     const tl = Math.hypot(tx, ty) || 1;
     tx /= tl;
     ty /= tl;
-    // Outward normal for a clockwise loop (screen coords): rotate tangent by -90deg.
     pts.push({ x, y, nx: ty, ny: -tx, s });
   }
   const [lx, ly] = raw[raw.length - 1];
@@ -147,13 +192,12 @@ function drawTracks(p: PixelArt, phase: number, charred: boolean): void {
   const d = new Pen(p, GR.TRACK_OX, GR.TRACK_OY);
   const S = { x: -61, y: -13 };
   const I = { x: 46, y: -14 };
-  // Belt silhouette (thick) then inner window.
   for (const q of BELT.pts) d.circle(q.x, q.y, 2.2, BC.treadD);
   d.poly([S.x, S.y - 10, I.x, I.y - 8, I.x + 6, I.y + 4, 28, -4, -42, -4, S.x - 6, S.y + 6], BC.steelDD);
   // Inner suspension beam.
   d.rect(-52, -20, 96, 4, BC.steel);
   d.rect(-52, -20, 96, 1, BC.steelL);
-  // Belt body.
+  d.rect(-52, -17, 96, 1, BC.steelD);
   for (const q of BELT.pts) d.circle(q.x, q.y, 1.6, BC.tread);
   // Links (move with phase): grouser blocks along the outside + pin highlights.
   const step = 6;
@@ -169,21 +213,26 @@ function drawTracks(p: PixelArt, phase: number, charred: boolean): void {
     d.circle(x, -22.5, 2.6, BC.steelD);
     d.circle(x - 0.5, -23, 1.4, BC.steelL);
   }
-  // Road wheels.
+  // Road wheels (hub bolts turn with the belt).
+  const rot = (phase / step) * (Math.PI / 3);
   for (const x of [-42, -24, -6, 12, 28]) {
     d.circle(x, -9, 7, BC.steelDD);
     d.circle(x, -9, 6, BC.steel);
     d.circle(x - 1, -10, 4.4, BC.steelL);
     d.circle(x, -9, 3.6, BC.steel);
-    d.circle(x, -9, 2, BC.brassD);
-    d.circle(x - 0.5, -9.5, 1.1, BC.brass);
+    for (let k = 0; k < 3; k++) {
+      const a = rot + (k * Math.PI * 2) / 3;
+      d.px(x + Math.cos(a) * 2.6, -9 + Math.sin(a) * 2.6, BC.steelDD);
+    }
+    d.circle(x, -9, 1.6, BC.brassD);
+    d.px(x - 1, -10, BC.brassL);
     d.px(x - 3, -13, BC.steelLL);
   }
   // Drive sprocket (rear) with teeth that turn with the belt.
   const teeth = 14;
-  const rot = (phase / step) * ((Math.PI * 2) / teeth);
+  const srot = (phase / step) * ((Math.PI * 2) / teeth);
   for (let k = 0; k < teeth; k++) {
-    const a = (k / teeth) * Math.PI * 2 + rot;
+    const a = (k / teeth) * Math.PI * 2 + srot;
     d.circle(S.x + Math.cos(a) * 10.5, S.y + Math.sin(a) * 10.5, 1.7, BC.steelD);
   }
   d.circle(S.x, S.y, 10, BC.steelD);
@@ -191,7 +240,7 @@ function drawTracks(p: PixelArt, phase: number, charred: boolean): void {
   d.circle(S.x - 1, S.y - 1, 6.5, BC.steelL);
   d.circle(S.x, S.y, 5.5, BC.steel);
   for (let k = 0; k < 6; k++) {
-    const a = (k / 6) * Math.PI * 2 + rot;
+    const a = (k / 6) * Math.PI * 2 + srot;
     d.px(S.x + Math.cos(a) * 7.2, S.y + Math.sin(a) * 7.2, BC.steelDD);
   }
   d.circle(S.x, S.y, 3, BC.brassD);
@@ -201,6 +250,10 @@ function drawTracks(p: PixelArt, phase: number, charred: boolean): void {
   d.circle(I.x, I.y, 8, BC.steel);
   d.circle(I.x - 1, I.y - 1, 5.5, BC.steelL);
   d.circle(I.x, I.y, 4.5, BC.steel);
+  for (let k = 0; k < 4; k++) {
+    const a = rot * 1.4 + (k * Math.PI) / 2;
+    d.px(I.x + Math.cos(a) * 3.2, I.y + Math.sin(a) * 3.2, BC.steelDD);
+  }
   d.circle(I.x, I.y, 2.4, BC.brassD);
   d.px(I.x - 1, I.y - 1, BC.brassL);
   // Mud caked on the lower run.
@@ -222,29 +275,7 @@ sprites.define({
   draw: (p, f) => drawTracks(p, f < GR.TRACK_FRAMES ? f : 2, f >= GR.TRACK_FRAMES),
 });
 
-// ------------------------------------------------------------------ body
-
-function rustPatch(d: Pen, x: number, y: number, r: number, seed: number): void {
-  const rng = new Rng(seed);
-  for (let i = 0; i < 6; i++) {
-    const px = x + rng.range(-r, r);
-    const py = y + rng.range(-r * 0.6, r * 0.6);
-    d.circle(px, py, rng.range(0.8, r * 0.55), i % 3 === 0 ? BC.rustD : BC.rust);
-  }
-  d.px(x, y + r * 0.7, BC.rustD);
-  d.px(x, y + r * 0.7 + 1, BC.rustD);
-}
-
-function dent(d: Pen, x: number, y: number, r: number, base: string, dark: string, light: string): void {
-  d.circle(x, y, r, dark);
-  d.circle(x + 0.6, y + 0.6, r * 0.65, base);
-  d.px(x + r * 0.6, y + r * 0.6, light);
-}
-
-function pock(d: Pen, x: number, y: number): void {
-  d.px(x, y, BC.ironDD);
-  d.px(x + 1, y + 1, BC.oliveLL);
-}
+// ------------------------------------------------------------------ body (hull, boiler, rear engine)
 
 /** state: 0 intact, 1 battered, 2 stripped, 3 charred wreck. */
 function drawBody(p: PixelArt, state: number): void {
@@ -252,40 +283,45 @@ function drawBody(p: PixelArt, state: number): void {
   const battered = state >= 1;
   const stripped = state >= 2;
 
-  // ---------------- rear engine compartment + exhausts
-  for (const [ex, ey, bx] of [
-    [-86, -58, -91],
-    [-78, -58, -83],
-  ] as const) {
-    d.cap(ex, ey, ex, ey - 12, 2.2, BC.ironD);
-    d.cap(ex, ey - 12, bx, ey - 17, 2.2, BC.ironD);
-    d.cap(ex - 0.6, ey, ex - 0.6, ey - 12, 1.1, BC.ironL);
-    d.circle(bx, ey - 17, 2.2, BC.rustD);
-    d.px(bx - 1, ey - 18, BC.ironDD);
-    d.px(bx, ey - 18, BC.ironDD);
+  // ---------------- rear: exhaust stacks (bent back), engine deck, piston housings
+  for (const [mx, my] of GR.EXHAUST) {
+    const bx = mx + 5;
+    d.cap(bx, -58, bx, my + 4, 2.3, BC.ironD);
+    d.cap(bx, my + 4, mx, my, 2.3, BC.ironD);
+    d.cap(bx - 0.7, -58, bx - 0.7, my + 4, 1.1, BC.ironL);
+    d.circle(mx, my, 2.3, BC.rustD);
+    d.px(mx - 1, my - 1, BC.ironDD);
+    d.px(mx, my - 1, BC.ironDD);
+    d.rect(bx - 2, -66, 5, 2, BC.brassD);
+    d.rect(bx - 2, -66, 5, 1, BC.brass);
   }
   d.poly([-96, -26, -96, -52, -90, -59, -64, -59, -64, -26], BC.oliveD);
   d.poly([-95, -52, -90, -58, -66, -58, -66, -56, -90, -56], BC.olive);
   d.rect(-90, -57, 24, 1, BC.oliveL);
-  // Radiator grille.
-  d.rect(-93, -52, 12, 22, BC.ironDD);
-  for (let y = -51; y < -31; y += 2) {
-    d.rect(-92, y, 10, 1, battered && y > -40 ? BC.rustD : BC.ironL);
+  // Radiator grille on the rear face.
+  d.rect(-94, -52, 11, 22, BC.ironDD);
+  for (let y = -51; y < -31; y += 2) d.rect(-93, y, 9, 1, battered && y > -40 ? BC.rustD : BC.ironL);
+  d.rect(-94, -52, 11, 1, BC.oliveL);
+  d.rect(-83, -52, 1, 22, BC.oliveDD);
+  // Piston housings (the rods are a separate sprite drawn behind the body).
+  for (const [hx, hy] of GR.PISTONS) {
+    d.rect(hx - 3, hy, 7, 5, BC.ironD);
+    d.rect(hx - 3, hy, 7, 1, BC.ironL);
+    d.rect(hx - 3, hy, 1, 5, BC.ironL);
+    d.rect(hx - 3, hy - 1, 7, 1, BC.brassD);
+    d.px(hx - 2, hy - 1, BC.brass);
+    d.rect(hx - 1, hy + 1, 3, 1, BC.ironDD);
   }
-  d.rect(-93, -52, 12, 1, BC.oliveL);
-  // Jerrycan strapped to the back.
-  plate(d, -76, -72, 9, 13, BC.olive, BC.oliveL, BC.oliveDD);
-  d.line(-75, -71, -69, -61, BC.oliveD);
-  d.line(-69, -71, -75, -61, BC.oliveD);
-  d.rect(-74, -74, 4, 2, BC.oliveD);
-  d.rect(-77, -66, 11, 1, BC.ironD);
 
   // ---------------- hull side
   d.poly([-86, -24, -86, -50, 40, -50, 58, -36, 58, -24], BC.olive);
   d.rect(-86, -51, 126, 2, BC.oliveL);
   d.rect(-86, -51, 126, 1, BC.oliveLL);
   d.poly([40, -51, 58, -37, 58, -35, 40, -49], BC.oliveL);
+  d.rect(-86, -40, 126, 1, BC.oliveL);
+  d.rect(-86, -39, 126, 1, BC.oliveD);
   d.rect(-86, -27, 144, 3, BC.oliveD);
+  d.rect(-86, -25, 144, 1, BC.oliveDD);
   // Panel seams.
   for (const x of [-52, -14, 22]) {
     d.rect(x, -49, 1, 22, BC.oliveDD);
@@ -298,29 +334,49 @@ function drawBody(p: PixelArt, state: number): void {
     const x = 44 + i * 4;
     d.poly([x, -46 + i * 3, x + 2, -46 + i * 3, x + 5, -42 + i * 3, x + 3, -42 + i * 3], i % 2 ? BC.black : BC.hazard);
   }
-  rustPatch(d, -30, -34, 4, 2);
-  rustPatch(d, 8, -40, 3, 5);
-  rustPatch(d, -70, -40, 3, 7);
+  // Rust streaks under rivets.
+  for (const [x, y, l] of [
+    [-76, -46, 5],
+    [-58, -46, 3],
+    [-40, -28, 3],
+    [6, -46, 4],
+    [30, -46, 6],
+    [-10, -28, 3],
+  ] as const)
+    streak(d, x, y, l);
   // Stencilled cog (symmetric, reads the same when flipped).
-  d.ring(-38, -41, 4, BC.oliveLL, 1);
-  for (let i = 0; i < 6; i++) d.px(-38 + Math.cos((i * Math.PI) / 3) * 5.4, -41 + Math.sin((i * Math.PI) / 3) * 5.4, BC.oliveLL);
+  d.ring(-66, -44, 3.5, BC.oliveLL, 1);
+  for (let i = 0; i < 6; i++) d.px(-66 + Math.cos((i * Math.PI) / 3) * 4.8, -44 + Math.sin((i * Math.PI) / 3) * 4.8, BC.oliveLL);
+
+  // Firebox door (its grate glow is the grinder_glow overlay).
+  const fx = GR.FIREBOX_X;
+  const fy = GR.FIREBOX_Y;
+  d.rect(fx - 2, fy - 2, 14, 11, BC.ironD);
+  d.rect(fx - 2, fy - 2, 14, 1, BC.ironL);
+  d.rect(fx - 2, fy - 2, 1, 11, BC.ironL);
+  d.rect(fx - 1, fy - 1, 12, 9, BC.ironDD);
+  for (const y of [0, 3, 6]) d.rect(fx, fy + y, 10, 2, BC.rustD);
+  d.rect(fx + 11, fy + 1, 2, 2, BC.brassD);
+  d.rect(fx + 11, fy + 5, 2, 2, BC.brassD);
+  d.px(fx + 11, fy + 1, BC.brassL);
 
   if (stripped) {
     // Torn-off side plates expose glowing machinery.
-    d.poly([-48, -46, -20, -47, -18, -30, -50, -29], BC.ironDD);
-    d.rect(-46, -44, 24, 3, BC.steelD);
-    d.cap(-46, -38, -22, -38, 1.6, BC.brassD);
-    d.cap(-44, -33, -24, -35, 1.2, BC.rustD);
-    d.circle(-34, -40, 4, BC.hot);
-    d.circle(-34, -40, 2.4, BC.hotL);
-    d.circle(-34, -40, 1, BC.white);
-    d.poly([-48, -46, -44, -47, -47, -43], BC.oliveL);
-    d.poly([-20, -47, -18, -44, -22, -46], BC.oliveL);
-    d.poly([10, -46, 28, -46, 30, -32, 12, -31], BC.ironDD);
-    d.rect(12, -44, 16, 2, BC.steelD);
-    d.circle(20, -38, 3, BC.hot);
-    d.circle(20, -38, 1.6, BC.hotL);
-    d.cap(12, -34, 28, -34, 1.2, BC.steel);
+    d.poly([-62, -48, -40, -49, -38, -30, -64, -29], BC.ironDD);
+    d.rect(-60, -46, 20, 3, BC.steelD);
+    d.cap(-60, -40, -42, -40, 1.6, BC.brassD);
+    d.cap(-58, -34, -42, -36, 1.2, BC.rustD);
+    d.circle(-50, -40, 4, BC.hot);
+    d.circle(-50, -40, 2.4, BC.hotL);
+    d.circle(-50, -40, 1, BC.white);
+    d.poly([-62, -48, -58, -49, -61, -45], BC.oliveL);
+    d.poly([-40, -49, -38, -46, -42, -48], BC.oliveL);
+    d.poly([6, -47, 26, -47, 28, -31, 8, -30], BC.ironDD);
+    d.rect(8, -45, 18, 2, BC.steelD);
+    d.circle(17, -38, 3, BC.hot);
+    d.circle(17, -38, 1.6, BC.hotL);
+    d.cap(8, -34, 26, -34, 1.2, BC.steel);
+    d.line(9, -44, 12, -40, BC.hotL);
   }
 
   // ---------------- skirt plates (over the top of the tracks)
@@ -334,12 +390,14 @@ function drawBody(p: PixelArt, state: number): void {
     if (battered && i === 1) return;
     plate(d, x0, -36, x1 - x0, 13, BC.olive, BC.oliveL, BC.oliveDD);
     d.rect(x0 + 1, -35, x1 - x0 - 2, 1, BC.oliveLL);
+    d.rect(x0 + 1, -27, x1 - x0 - 2, 1, BC.oliveD);
     rivet(d, x0 + 2, -34);
     rivet(d, x1 - 4, -34);
     rivet(d, x0 + 2, -27);
     rivet(d, x1 - 4, -27);
     d.rect(x0 + 1, -25, x1 - x0 - 2, 1, BC.oliveD);
-    rustPatch(d, x0 + 12 + i * 5, -28, 2.5, 11 + i);
+    streak(d, x0 + 10 + i * 4, -33, 4);
+    streak(d, x1 - 12, -33, 3);
     if (battered) {
       dent(d, x0 + 20, -31, 2.5, BC.olive, BC.oliveDD, BC.oliveL);
       pock(d, x0 + 8, -30);
@@ -358,43 +416,16 @@ function drawBody(p: PixelArt, state: number): void {
     for (const x of [-60, -30, 0, 26]) d.cap(x, -34, x + 6, -24, 1.2, BC.steelD);
   }
   if (battered && !stripped) {
-    // Hanging bent bracket where the middle skirt was.
+    // Hanging bent brackets where the middle skirt was torn off.
     d.cap(-44, -36, -40, -30, 1, BC.steelD);
     d.cap(-6, -36, -9, -31, 1, BC.steelD);
+    d.rect(-43, -36, 36, 1, BC.oliveDD);
   }
-
-  // ---------------- turret
-  d.poly([-66, -50, -66, -72, -60, -80, -30, -83, -20, -79, -14, -69, -14, -56, -18, -50], BC.olive);
-  d.poly([-65, -72, -60, -79, -30, -82, -21, -78, -24, -76, -31, -79, -59, -77], BC.oliveL);
-  d.poly([-60, -80, -30, -83, -29, -82, -59, -79], BC.oliveLL);
-  d.poly([-66, -56, -14, -56, -14, -55, -18, -50, -66, -50], BC.oliveD);
-  d.rect(-66, -70, 52, 3, BC.rust);
-  d.rect(-66, -70, 52, 1, BC.rustL);
-  d.rect(-66, -68, 52, 1, BC.rustD);
-  cog(d, -42, -61, 4.6);
-  rivetRow(d, -62, -22, -74, 8);
-  rivetRow(d, -62, -22, -53, 8);
-  // Vision block + periscope.
-  d.rect(-28, -86, 6, 4, BC.ironD);
-  d.rect(-27, -85, 4, 1, BC.glass);
-  d.px(-26, -85, BC.glassL);
-  // Commander hatch ring (lid is a separate sprite).
-  d.rect(GR.HATCH_X, -84, 15, 2, BC.ironD);
-  d.rect(GR.HATCH_X, -84, 15, 1, BC.ironL);
-  // Mantlet.
-  d.ellipse(-16, -64, 5.5, 8, BC.ironD);
-  d.ellipse(-17, -65, 4, 6.5, BC.iron);
-  d.px(-19, -69, BC.ironLL);
-  d.px(-19, -68, BC.ironL);
   if (battered) {
-    dent(d, -56, -60, 2.2, BC.olive, BC.oliveDD, BC.oliveL);
-    pock(d, -30, -64);
-    pock(d, -48, -56);
-    d.poly([-34, -79, -26, -80, -24, -74, -30, -72], BC.soot);
-  }
-  if (stripped) {
-    d.poly([-64, -66, -50, -64, -52, -56, -64, -57], BC.ironDD);
-    d.cap(-62, -60, -54, -61, 1, BC.hot);
+    dent(d, -28, -32, 2, BC.olive, BC.oliveDD, BC.oliveL);
+    pock(d, -70, -44);
+    pock(d, -2, -45);
+    pock(d, 18, -31);
   }
 
   // ---------------- boiler
@@ -402,6 +433,7 @@ function drawBody(p: PixelArt, state: number): void {
   d.rect(-12, by0, 68, 26, BC.iron);
   d.rect(-12, by0, 68, 1, BC.ironLL);
   d.rect(-12, by0 + 1, 68, 6, BC.ironL);
+  d.rect(-12, by0 + 2, 68, 1, BC.ironLL);
   d.rect(-12, by0 + 18, 68, 5, BC.ironD);
   d.rect(-12, by0 + 23, 68, 3, BC.ironDD);
   // Smokebox (front end): rounded cap behind a brass rim, headlamp on top.
@@ -436,6 +468,10 @@ function drawBody(p: PixelArt, state: number): void {
   d.rect(25, -70, 2, 7, BC.brassD);
   d.rect(24, -73, 4, 3, BC.brass);
   d.px(24, -73, BC.brassL);
+  // Pressure gauge.
+  d.circle(-6, -55, 2.6, BC.brassD);
+  d.circle(-6, -55, 1.8, BC.white);
+  d.line(-6, -55, -5, -57, BC.red);
   // Feed pipe along the boiler.
   d.cap(-10, -43, 52, -43, 1.1, BC.rustD);
   d.cap(-10, -43.5, 52, -43.5, 0.5, BC.rustL);
@@ -444,16 +480,12 @@ function drawBody(p: PixelArt, state: number): void {
     d.px(x, -45, BC.brassL);
   }
   // Saddles.
-  for (const x of [2, 30]) {
-    d.poly([x - 6, -38, x + 6, -38, x + 8, -50, x - 8, -50], BC.oliveD);
-  }
+  for (const x of [2, 30]) d.poly([x - 6, -38, x + 6, -38, x + 8, -50, x - 8, -50], BC.oliveD);
   if (battered) {
-    // Soot streaks behind the stack and pocks.
-    d.poly([30, -63, 50, -63, 46, -56, 34, -58], BC.soot);
-    d.px(12, -52, BC.ironDD);
-    d.px(13, -51, BC.ironLL);
-    d.px(-6, -55, BC.ironDD);
-    d.px(-5, -54, BC.ironLL);
+    soot(d, [30, -63, 50, -63, 46, -56, 34, -58]);
+    pock(d, 12, -52, BC.ironLL);
+    pock(d, -6, -49, BC.ironLL);
+    pock(d, 44, -48, BC.ironLL);
     dent(d, 26, -50, 2.4, BC.iron, BC.ironDD, BC.ironLL);
   }
   if (stripped) {
@@ -477,6 +509,75 @@ sprites.define({
   oy: GR.BODY_OY,
   frames: 4,
   draw: (p, f) => drawBody(p, f),
+});
+
+// ------------------------------------------------------------------ turret
+
+/** state: 0 intact, 1 battered, 2 burning (holed), 3 charred. Drawn in body-local coordinates. */
+function drawTurret(p: PixelArt, state: number): void {
+  const d = new Pen(p, GR.TURRET_OX - GR.TURRET_X, GR.TURRET_OY - GR.TURRET_Y);
+  // Ring skirt.
+  d.rect(-64, -52, 48, 3, BC.ironD);
+  d.rect(-64, -52, 48, 1, BC.ironL);
+  // Dome.
+  d.poly([-66, -51, -66, -72, -60, -80, -30, -83, -20, -79, -14, -69, -14, -56, -18, -51], BC.olive);
+  d.poly([-65, -72, -60, -79, -30, -82, -21, -78, -24, -76, -31, -79, -59, -77], BC.oliveL);
+  d.poly([-60, -80, -30, -83, -29, -82, -59, -79], BC.oliveLL);
+  d.poly([-66, -57, -14, -57, -14, -56, -18, -51, -66, -51], BC.oliveD);
+  d.rect(-66, -58, 52, 1, BC.oliveDD);
+  // Highlight on the upper-left shoulder.
+  d.poly([-64, -71, -59, -77, -50, -78, -60, -73], BC.oliveLL);
+  // Rust band with the Legion cog.
+  d.rect(-66, -70, 52, 3, BC.rust);
+  d.rect(-66, -70, 52, 1, BC.rustL);
+  d.rect(-66, -68, 52, 1, BC.rustD);
+  cog(d, -42, -62, 4.6);
+  rivetRow(d, -62, -22, -74, 8);
+  rivetRow(d, -62, -22, -54, 8);
+  streak(d, -54, -66, 4);
+  streak(d, -28, -66, 3);
+  // Vision block + periscope.
+  d.rect(-28, -86, 6, 4, BC.ironD);
+  d.rect(-27, -85, 4, 1, BC.glass);
+  d.px(-26, -85, BC.glassL);
+  // Commander hatch ring (lid is a separate sprite).
+  d.rect(GR.HATCH_X, -84, 15, 2, BC.ironD);
+  d.rect(GR.HATCH_X, -84, 15, 1, BC.ironL);
+  // Mantlet.
+  d.ellipse(-16, -64, 5.5, 8, BC.ironD);
+  d.ellipse(-17, -65, 4, 6.5, BC.iron);
+  d.px(-19, -69, BC.ironLL);
+  d.px(-19, -68, BC.ironL);
+  // Grab rail.
+  d.rect(-62, -76, 1, 3, BC.ironD);
+  d.rect(-62, -77, 10, 1, BC.ironD);
+  d.rect(-53, -76, 1, 3, BC.ironD);
+  if (state >= 1) {
+    dent(d, -56, -61, 2.2, BC.olive, BC.oliveDD, BC.oliveL);
+    pock(d, -30, -64);
+    pock(d, -48, -56);
+    pock(d, -24, -74);
+    soot(d, [-34, -79, -26, -80, -24, -74, -30, -72]);
+  }
+  if (state >= 2) {
+    // Shell hole with glowing innards, scorched plating.
+    d.poly([-64, -66, -50, -64, -52, -56, -64, -57], BC.ironDD);
+    d.cap(-62, -60, -54, -61, 1, BC.hot);
+    d.px(-57, -62, BC.hotL);
+    soot(d, [-66, -68, -46, -68, -48, -64, -60, -62]);
+    soot(d, [-40, -84, -30, -84, -32, -80, -40, -79]);
+  }
+  if (state === 3) charr(p, 6);
+}
+
+sprites.define({
+  name: 'grinder_turret',
+  w: GR.TURRET_W,
+  h: GR.TURRET_H,
+  ox: GR.TURRET_OX,
+  oy: GR.TURRET_OY,
+  frames: 4,
+  draw: (p, f) => drawTurret(p, f),
 });
 
 // ------------------------------------------------------------------ smoke stack
@@ -593,10 +694,15 @@ export function bladeBottomRel(lower: number): number {
   return GR.BLADE_RAISED - GR.BLADE_PY + lower * (GR.BLADE_LOWERED - GR.BLADE_RAISED);
 }
 
+/** Blade bottom (relative to the pivot) of baked blade position frame 0 raised, 1 mid, 2 lowered. */
+export function bladeFrameBottomRel(pos: number): number {
+  return bladeBottomRel(pos / 2);
+}
+
 function drawBlade(p: PixelArt, pos: number, cond: number): void {
   const d = new Pen(p, 5, 40);
   const bx = GR.BLADE_BX;
-  const by = bladeBottomRel(pos / 2);
+  const by = bladeFrameBottomRel(pos);
   const P = (x: number, y: number) => [bx + x, by + y];
   const poly = (pts: number[][], c: string) => d.poly(pts.flat(), c);
   // Hydraulic ram from the hull front to the top of the blade back.
@@ -611,7 +717,7 @@ function drawBlade(p: PixelArt, pos: number, cond: number): void {
   d.circle(0, 0, 4.2, BC.ironDD);
   d.circle(0, 0, 2.8, BC.iron);
   d.circle(-0.5, -0.5, 1.4, BC.brass);
-  // Blade slab: raked back face, curled top lip, concave moldboard, cutting edge.
+  // Blade slab: raked back face, curled top lip, concave moldboard.
   poly([P(-2, -36), P(9, -39), P(16, -37), P(13, -32), P(9, -26), P(7, -17), P(8, -10), P(12, -4), P(20, -1), P(20, 0), P(0, 0)], BC.steel);
   poly([P(13, -32), P(9, -26), P(7, -17), P(8, -10), P(12, -4), P(18, -2), P(10, -3), P(4, -10), P(3, -18), P(6, -27)], BC.steelD);
   poly([P(-2, -36), P(4, -37), P(4, 0), P(0, 0)], BC.steelL);
@@ -619,26 +725,25 @@ function drawBlade(p: PixelArt, pos: number, cond: number): void {
   // Hazard band across the upper back.
   hazardStripes(d, bx - 1, by - 34, 6, 24);
   d.rect(bx - 1, by - 34, 6, 1, BC.hazardL);
-  // Wear: bright strip along the cutting edge, rust streaks.
-  poly([P(8, -3), P(20, -1), P(20, 0), P(7, 0)], BC.chrome);
-  d.cap(bx + 9, by - 29, bx + 8, by - 22, 0.6, BC.rustD);
-  d.px(bx + 7, by - 13, BC.rust);
-  d.px(bx + 7, by - 12, BC.rustD);
-  // Saw teeth.
-  for (const tx of [1, 6, 11, 16]) poly([P(tx, 0), P(tx + 4, 0), P(tx + 3, 4)], BC.steelL);
-  poly([P(18, -2), P(24, 0), P(19, 2)], BC.steelLL);
+  // Drum side bracket (the drum itself is a separate spinning sprite).
+  poly([P(3, -20), P(10, -21), P(GR.DRUM_DX + 3, GR.DRUM_DY - 2), P(GR.DRUM_DX, GR.DRUM_DY + 3), P(4, -6)], BC.steelD);
+  poly([P(4, -19), P(9, -20), P(GR.DRUM_DX + 1, GR.DRUM_DY - 3), P(6, -12)], BC.steel);
+  // Rust streaks.
+  d.cap(bx + 9, by - 29, bx + 8, by - 24, 0.6, BC.rustD);
+  d.px(bx + 1, by - 6, BC.rust);
+  d.px(bx + 1, by - 5, BC.rustD);
   // Flame vents in the moldboard.
-  for (const vy of [-22, -14]) {
-    d.rect(bx + 6, by + vy, 3, 3, BC.ironDD);
-    d.px(bx + 7, by + vy + 1, cond === 0 ? BC.rustD : BC.hot);
+  for (const vy of [-26, -18]) {
+    d.rect(bx + 7, by + vy, 3, 3, BC.ironDD);
+    d.px(bx + 8, by + vy + 1, cond === 0 ? BC.rustD : BC.hot);
   }
   // Bolts on the back.
-  for (const vy of [-30, -19, -6]) rivet(d, bx + 1, by + vy, BC.steelLL, BC.steelDD);
+  for (const vy of [-30, -19, -8]) rivet(d, bx + 1, by + vy, BC.steelLL, BC.steelDD);
   if (cond >= 1) {
     d.circle(bx + 8, by - 31, 1.6, BC.steelDD);
     d.px(bx + 9, by - 30, BC.steelLL);
     d.line(bx + 1, by - 17, bx + 3, by - 12, BC.steelLL);
-    d.circle(bx + 10, by - 6, 1.3, BC.steelDD);
+    d.circle(bx + 11, by - 24, 1.3, BC.steelDD);
     d.poly([P(15, -37), P(16, -37), P(13, -33)].flat(), BC.steelDD);
   }
   if (cond === 2) charr(p, 7);
@@ -654,40 +759,116 @@ sprites.define({
   draw: (p, f) => drawBlade(p, f % 3, Math.floor(f / 3)),
 });
 
+// ------------------------------------------------------------------ grinder drum
+
+/** Toothed grinder roller. Frames 0..5 spin (15 deg steps, period 90 deg), frame 6 charred. Origin = axle. */
+function drawDrum(p: PixelArt, rot: number, charred: boolean): void {
+  const d = new Pen(p, 11, 11);
+  const R = 6.5;
+  // Teeth hooked against the spin direction.
+  for (let k = 0; k < 8; k++) {
+    const a = rot + (k * Math.PI) / 4;
+    const a0 = a - 0.26;
+    const a1 = a + 0.24;
+    const at = a - 0.14;
+    d.tri(Math.cos(a0) * (R - 0.5), Math.sin(a0) * (R - 0.5), Math.cos(a1) * (R - 0.5), Math.sin(a1) * (R - 0.5), Math.cos(at) * GR.DRUM_R, Math.sin(at) * GR.DRUM_R, BC.steelL);
+    d.px(Math.cos(at) * (GR.DRUM_R - 1), Math.sin(at) * (GR.DRUM_R - 1), BC.chrome);
+  }
+  d.circle(0, 0, R, BC.steelD);
+  d.circle(-0.6, -0.6, R - 1, BC.steel);
+  d.circle(-1.6, -1.6, R - 3.4, BC.steelL);
+  d.circle(0, 0, 3.2, BC.ironD);
+  // Hub with 4 spokes.
+  for (let k = 0; k < 4; k++) {
+    const a = rot + (k * Math.PI) / 2;
+    d.cap(0, 0, Math.cos(a) * 4.6, Math.sin(a) * 4.6, 0.8, BC.ironDD);
+  }
+  d.circle(0, 0, 2.2, BC.brass);
+  d.px(-1, -1, BC.brassL);
+  d.px(0, 0, BC.brassD);
+  if (charred) charr(p, 9);
+}
+
+sprites.define({
+  name: 'grinder_drum',
+  w: 22,
+  h: 22,
+  ox: 11,
+  oy: 11,
+  frames: GR.DRUM_FRAMES + 1,
+  draw: (p, f) => drawDrum(p, f < GR.DRUM_FRAMES ? -f * (Math.PI / 12) : 0.2, f >= GR.DRUM_FRAMES),
+});
+
+// ------------------------------------------------------------------ engine piston + firebox glow
+
+sprites.define({
+  name: 'grinder_piston',
+  w: 5,
+  h: 13,
+  ox: 2,
+  oy: 13,
+  draw: (p) => {
+    p.rect(1, 3, 2, 10, BC.chrome);
+    p.rect(2, 3, 1, 10, BC.steelL);
+    p.rect(0, 0, 5, 3, BC.brass);
+    p.rect(0, 0, 5, 1, BC.brassL);
+    p.rect(4, 1, 1, 2, BC.brassD);
+  },
+});
+
+sprites.define({
+  name: 'grinder_glow',
+  w: 10,
+  h: 8,
+  ox: 0,
+  oy: 0,
+  frames: 3,
+  outline: null,
+  draw: (p, f) => {
+    const base = [BC.amberD, BC.hot, BC.hotL][f];
+    const core = [BC.rust, BC.hotL, BC.white][f];
+    for (const y of [0, 3, 6]) {
+      p.rect(0, y, 10, 2, base);
+      p.rect(2, y, 6, 1, core);
+    }
+  },
+});
+
 // ------------------------------------------------------------------ flame jet (from the blade vents)
 
 sprites.define({
   name: 'grinder_flame',
   w: GR.FLAME_LEN,
-  h: 30,
+  h: 32,
   ox: 0,
   oy: 13,
   frames: 4,
   outline: null,
   draw: (p, f) => {
-    const rng = new Rng(100 + f * 17);
-    const cols = ['#8a2418', '#d8402a', '#ff8a2a', '#ffd060', '#fff6c0'];
-    const puffs: { x: number; y: number; r: number }[] = [];
-    for (let i = 0; i < 15; i++) {
-      const t = i / 14;
-      const x = 3 + t * (GR.FLAME_LEN - 12) + rng.range(-2, 2);
-      // Jet dips toward the ground (oy 13 = nozzle; ground about 13 px below at the far end).
-      const y = 13 + t * 7 + rng.range(-1.5, 1.5);
-      const r = 2.5 + t * 7.5 + rng.range(-1, 1);
-      puffs.push({ x, y: Math.min(y, 29 - r * 0.6), r });
-    }
-    cols.forEach((c, layer) => {
-      const k = [1, 0.82, 0.62, 0.42, 0.22][layer];
-      for (const q of puffs) {
-        if (layer >= 3 && q.x > GR.FLAME_LEN * (layer === 3 ? 0.75 : 0.4)) continue;
-        p.circle(q.x, q.y, q.r * k, c);
+    const L = GR.FLAME_LEN - 12;
+    const layers: [string, number, number][] = [
+      ['#8a2418', 1, 1],
+      ['#d8402a', 0.84, 1],
+      ['#ff8a2a', 0.64, 0.95],
+      ['#ffd060', 0.42, 0.7],
+      ['#fff6c0', 0.22, 0.35],
+    ];
+    for (const [c, k, reach] of layers) {
+      for (let x = 1; x <= L * reach; x += 1.5) {
+        const t = x / L;
+        const r = (1.8 + t * 8.2 + Math.sin(x * 0.33 + f * 1.7) * (0.5 + t * 1.2)) * k;
+        const y = 13 + t * 6 + Math.sin(x * 0.19 - f * 2.3) * t * 1.6;
+        p.circle(x, Math.min(y, 30 - r * 0.5), r, c);
       }
-    });
-    // Ragged tips.
-    for (let i = 0; i < 8; i++) {
-      const x = rng.range(GR.FLAME_LEN * 0.5, GR.FLAME_LEN - 4);
-      p.circle(x, rng.range(4, 20), rng.range(1, 2.5), cols[rng.int(1, 2)]);
     }
+    // Rolling head of the jet + licks and embers.
+    const rng = new Rng(100 + f * 17);
+    for (let i = 0; i < 7; i++) {
+      const x = L * rng.range(0.55, 1.02);
+      const y = rng.range(5, 24);
+      p.circle(x, y, rng.range(1.2, 2.8), i % 3 === 0 ? '#ffd060' : '#ff8a2a');
+    }
+    for (let i = 0; i < 6; i++) p.px(rng.range(L * 0.3, L + 10), rng.range(2, 26), rng.chance(0.5) ? '#ffe070' : '#ff8a2a');
   },
 });
 
@@ -725,14 +906,17 @@ sprites.define({
   },
 });
 
-/** Debris pieces: 0 skirt plate, 1 stack crown, 2 hatch lid, 3 armour plate, 4 barrel, 5 jerrycan. */
+/**
+ * Debris pieces: 0 skirt plate, 1 stack crown, 2 hatch lid, 3 armour plate, 4 barrel, 5 jerrycan,
+ * 6 track links, 7 road wheel.
+ */
 sprites.define({
   name: 'grinder_parts',
   w: 40,
   h: 16,
   ox: 20,
   oy: 8,
-  frames: 6,
+  frames: 8,
   draw: (p, f) => {
     const d = new Pen(p, 20, 8);
     switch (f) {
@@ -742,7 +926,7 @@ sprites.define({
         rivet(d, 15, -4);
         rivet(d, -17, 3);
         rivet(d, 15, 3);
-        d.circle(4, 0, 2.5, BC.rust);
+        streak(d, 4, -3, 4);
         break;
       case 1:
         d.poly([-5, 4, 5, 4, 10, -3, -10, -3], BC.ironD);
@@ -765,9 +949,25 @@ sprites.define({
         d.cap(-18, -0.6, 12, -0.6, 1.4, BC.olive);
         d.rect(12, -4, 7, 8, BC.ironD);
         break;
-      default:
+      case 5:
         plate(d, -5, -7, 10, 13, BC.olive, BC.oliveL, BC.oliveDD);
         d.line(-4, -6, 3, 4, BC.oliveD);
+        break;
+      case 6:
+        for (let i = 0; i < 6; i++) {
+          const x = -15 + i * 5;
+          const y = Math.round(Math.sin(i * 0.9) * 2);
+          d.rect(x, y - 2, 5, 4, BC.tread);
+          d.rect(x, y - 2, 5, 1, BC.treadL);
+          d.px(x + 2, y, BC.treadLL);
+        }
+        break;
+      default:
+        d.circle(0, 0, 7, BC.steelDD);
+        d.circle(0, 0, 6, BC.steel);
+        d.circle(-1, -1, 4.4, BC.steelL);
+        d.circle(0, 0, 3.6, BC.steel);
+        d.circle(0, 0, 1.6, BC.brassD);
         break;
     }
   },
