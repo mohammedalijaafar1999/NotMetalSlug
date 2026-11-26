@@ -7,6 +7,7 @@ import { Z, type Damage, type DamageKind } from './constants';
 import { EnemyBullet, Grenade } from './projectile';
 import { dropPickup } from './pickup';
 import { fxRng } from '../engine/rng';
+import { rectsOverlap, type Rect } from '../engine/math';
 
 export abstract class Enemy extends Actor {
   state = 'idle';
@@ -20,6 +21,8 @@ export abstract class Enemy extends Actor {
   scaleHp = true;
   /** Death scream sfx name. */
   deathSfx: string | null = 'enemy_die';
+  /** Rallied (officer whistle): attacks come faster while > 0. See buff(). */
+  buffTime = 0;
 
   constructor() {
     super();
@@ -48,6 +51,7 @@ export abstract class Enemy extends Actor {
 
   override update(dt: number): void {
     this.stateTime += dt;
+    if (this.buffTime > 0) this.buffTime -= dt;
     if (this.dying) {
       this.deathTime += dt;
       this.updateDeath(dt);
@@ -81,9 +85,49 @@ export abstract class Enemy extends Actor {
     return this.onScreen(margin) && !this.dying;
   }
 
-  /** Scale a base cooldown by difficulty with +-15% jitter. */
+  /** Scale a base cooldown by difficulty with +-15% jitter (30% shorter while rallied). */
   fireDelay(base: number): number {
-    return base * this.world.difficulty.enemyFireDelay * this.world.rng.range(0.85, 1.15);
+    return base * this.world.difficulty.enemyFireDelay * this.world.rng.range(0.85, 1.15) * (this.buffTime > 0 ? 0.7 : 1);
+  }
+
+  /**
+   * Hook: an ally (officer whistle, alarm) calls this enemy to arms. Default: no-op.
+   * Calm subclasses should wake up / start engaging.
+   */
+  alert(_by?: Entity | null): void {}
+
+  /** Rally this enemy: faster attacks (see fireDelay) for `seconds`. */
+  buff(seconds: number): void {
+    this.buffTime = Math.max(this.buffTime, seconds);
+  }
+
+  /** Other living (not dying) enemies within `radius` px (box distance) of this one. */
+  alliesNear(radius: number): Enemy[] {
+    return this.world.query((e): e is Enemy => e instanceof Enemy && e !== this && !e.dying && Math.abs(e.x - this.x) <= radius && Math.abs(e.y - this.y) <= radius);
+  }
+
+  /**
+   * Damage every player-side target whose hurtboxes overlap `r` (melee swings, flame jets,
+   * stomps). Returns how many connected. Pass `once` (a set kept for the duration of one swing)
+   * to hit each target only once per attack.
+   */
+  hitPlayers(r: Rect, amount = 1, kind: DamageKind = 'melee', once?: Set<number>): number {
+    let n = 0;
+    for (const t of this.world.targets('enemy').slice()) {
+      if (t.dead || !t.hittable || once?.has(t.id)) continue;
+      let hit = false;
+      for (const hb of t.hurtboxes()) {
+        if (rectsOverlap(r, hb)) {
+          hit = true;
+          break;
+        }
+      }
+      if (hit && t.damage({ amount, kind, owner: this, x: r.x + r.w / 2, y: r.y + r.h / 2, dir: Math.sign(t.cx - this.x) || this.facing })) {
+        n++;
+        once?.add(t.id);
+      }
+    }
+    return n;
   }
 
   /** Projectile speed scaled by difficulty. */
