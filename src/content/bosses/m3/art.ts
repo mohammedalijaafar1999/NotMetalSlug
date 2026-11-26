@@ -52,7 +52,17 @@ export const WALL = {
     { x: 131, y: 76 },
     { x: 146, y: 76 },
   ],
+  /** Breach / crack points that smoke and burn as the wall takes damage (most visible first). */
+  BREACHES: [
+    { x: 118, y: 92 },
+    { x: 58, y: 104 },
+    { x: 172, y: 58 },
+    { x: 24, y: 58 },
+  ],
 };
+
+/** Icicle length per growth frame (bm3_icicle frames 0..3). */
+export const ICICLE_LEN = [6, 11, 16, 21] as const;
 
 // ------------------------------------------------------------------ helpers
 
@@ -548,33 +558,35 @@ export const BEACON_GLOW = ['#ffd040', '#ff8020'];
 
 // ------------------------------------------------------------------ turrets
 
-/** MG ball turret hanging from a mount. 6 aim angles (0..70 deg down) x [idle, firing]. */
+/** MG ball turret hanging from a mount. 11 aim angles (-15..135 deg below "forward") x [idle, firing]. */
+export const MG_FRAMES = { a0: -15, step: 15, n: 11 };
 sprites.define({
   name: 'bm3_mg',
-  w: 26,
-  h: 26,
-  ox: 9,
-  oy: 9,
-  frames: 12,
+  w: 38,
+  h: 34,
+  ox: 19,
+  oy: 0,
+  frames: MG_FRAMES.n * 2,
   draw: (p, f) => {
-    const ai = f % 6;
-    const firing = f >= 6;
-    const a = (ai * 14 * Math.PI) / 180;
-    const cx = 9;
+    const ai = f % MG_FRAMES.n;
+    const firing = f >= MG_FRAMES.n;
+    const a = ((MG_FRAMES.a0 + ai * MG_FRAMES.step) * Math.PI) / 180;
+    const cx = 19;
     const cy = 9;
     // Mount pipe up to the gallery.
-    p.rect(cx - 3, 0, 6, 5, IRON.darker);
-    p.rect(cx - 2, 0, 2, 5, IRON.base);
-    // Barrels (twin) along angle a.
+    p.rect(cx - 3, 0, 6, 4, IRON.darker);
+    p.rect(cx - 2, 0, 2, 4, IRON.base);
     const ca = Math.cos(a);
     const sa = Math.sin(a);
+    // Barrel shroud + twin barrels along angle a.
+    p.line(cx + ca * 4, cy + sa * 4, cx + ca * 9, cy + sa * 9, IRON.darker, 5);
     for (const off of [-1.6, 1.6]) {
       const ox = -sa * off;
       const oy = ca * off;
-      p.line(cx + ox + ca * 4, cy + oy + sa * 4, cx + ox + ca * 15, cy + oy + sa * 15, IRON.darker, 2);
+      p.line(cx + ox + ca * 6, cy + oy + sa * 6, cx + ox + ca * 15, cy + oy + sa * 15, IRON.darker, 2);
       p.px(Math.round(cx + ox + ca * 15), Math.round(cy + oy + sa * 15), '#101010');
     }
-    p.line(cx + ca * 5, cy + sa * 5, cx + ca * 9, cy + sa * 9, IRON.dark, 4);
+    p.line(cx + ca * 5, cy + sa * 5, cx + ca * 8, cy + sa * 8, IRON.base, 2);
     // Ball housing.
     p.circle(cx, cy, 7, IRON.dark);
     p.circle(cx - 0.8, cy - 0.8, 6, IRON.base);
@@ -913,5 +925,35 @@ sprites.define({
       const top = 46 - 40 * Math.sin((x / 170) * Math.PI);
       if (r.chance(0.5)) p.px(x, Math.round(top) + r.int(0, 3), SNOW.white);
     }
+  },
+});
+
+/** Ice spike erupting from the floor (spike wave): 0..2 growing, 3 shattering. Origin bottom-centre. */
+sprites.define({
+  name: 'bm3_spike',
+  w: 12,
+  h: 16,
+  frames: 4,
+  draw: (p, f) => {
+    if (f === 3) {
+      p.poly([1, 16, 3, 11, 5, 14, 7, 10, 10, 16], ICE.light);
+      p.px(3, 8, ICE.white);
+      p.px(8, 6, ICE.white);
+      p.px(6, 4, ICE.light);
+      return;
+    }
+    const k = [0.4, 0.75, 1][f];
+    const spikes: [number, number, number][] = [
+      [6, 15, 0],
+      [3, 10, -0.35],
+      [9, 9, 0.35],
+    ];
+    for (const [x, l, lean] of spikes) {
+      const h = l * k;
+      p.poly([x - 2.2, 16, x + 2.2, 16, x + lean * h, 16 - h], ICE.mid);
+      p.poly([x - 1.4, 16, x + 0.4, 16, x + lean * h, 16 - h + 1], ICE.light);
+      p.line(x - 0.8, 15, x + lean * h * 0.8, 16 - h * 0.85, ICE.white);
+    }
+    p.rect(0, 15, 12, 1, ICE.light);
   },
 });

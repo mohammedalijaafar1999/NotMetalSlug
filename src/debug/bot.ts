@@ -15,6 +15,7 @@ export class Bot {
   private bombTimer = 0;
   private turnTimer = 0;
   private frame = 0;
+  private bandDir = 0;
 
   constructor(public index: number) {}
 
@@ -50,8 +51,13 @@ export class Bot {
     }
     if (lvl.locked || lvl.bossActive) {
       const center = cam.x + VIEW_W * (lvl.bossActive ? 0.25 : 0.4);
-      dir = ctrl.x < center - 16 ? 1 : ctrl.x > center + 16 ? -1 : 0;
-    }
+      // Hysteresis: once heading back to the centre, go most of the way, so facing taps don't
+      // nudge the bot across the band edge (it would walk back facing away and shoot the wrong way).
+      const off = ctrl.x - center;
+      if (this.bandDir === 0) this.bandDir = off < -16 ? 1 : off > 16 ? -1 : 0;
+      else if ((this.bandDir > 0 && off >= -6) || (this.bandDir < 0 && off <= 6)) this.bandDir = 0;
+      dir = this.bandDir;
+    } else this.bandDir = 0;
     const flying = !!(p.vehicle as any)?.flying;
     // Bosses overhead: get under them and shoot up (on foot / ground vehicles).
     const boss = world.boss;
@@ -75,8 +81,12 @@ export class Bot {
     if (dir > 0) mask.right = true;
     if (dir < 0) mask.left = true;
     if (dir === 0 && nearest) {
-      if (nearest.cx > ctrl.cx) mask.right = this.frame % 30 < 2;
-      else mask.left = this.frame % 30 < 2;
+      // On foot, only tap toward the enemy while facing away from it (each tap also nudges us).
+      const want = nearest.cx > ctrl.cx ? 1 : -1;
+      if (p.vehicle || ctrl.facing !== want) {
+        if (want > 0) mask.right = this.frame % 30 < 2;
+        else mask.left = this.frame % 30 < 2;
+      }
     }
     // Aim up at enemies overhead.
     if (!flying && (aimUp || (nearest && nearest.cy < ctrl.cy - 40 && Math.abs(nearest.cx - ctrl.cx) < 70))) mask.up = true;
