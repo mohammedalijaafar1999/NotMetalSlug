@@ -882,6 +882,13 @@ export class FrostBastion extends BigBoss {
   private ambient(dt: number): void {
     const w = this.world;
     const G = this.G;
+    // Wrecked gate (phase 2): sparks rain from the torn door rails, small fires on the header.
+    if (this.broken && fxRng.chance(dt * 5)) {
+      const hx = this.fx(fxRng.range(2, WALL.FRAME - 2));
+      const hy = G - HY(WALL.GATE.y) + 1;
+      sparkBurst(w, hx, hy, 3, fxRng.chance(0.5) ? '#ffd060' : '#ffffff', 70);
+      if (fxRng.chance(0.4)) flames(w, hx, hy - 9, { n: 1, size: 1.5, life: 0.3 });
+    }
     // Smokestack exhaust.
     this.stackT -= dt;
     if (this.stackT <= 0) {
@@ -983,6 +990,8 @@ export class FrostBastion extends BigBoss {
     g.clip();
     const frame = this.dying ? 2 : Math.min(2, this.phase);
     sprites.get('bm3_wall').draw(g, ox, by, frame, { flip: true, flash: this.wallFlash > 0 });
+    const torn = this.dying || this.phase >= 2;
+    sprites.get('bm3_banner').draw(g, X(WALL.BANNER.x), Y(WALL.BANNER.y), (torn ? 4 : 0) + (Math.floor(this.age * 5) % 4), { flip: true });
     this.renderBeacons(g, X, Y);
     // Turrets pop up out of the deck / drop out of the gallery underside at the end of the intro.
     g.save();
@@ -1073,7 +1082,9 @@ export class FrostBastion extends BigBoss {
     if (!this.broken) {
       const s = sprites.get('bm3_door');
       const half = Math.round((gBot - gTop) / 2);
-      const open = Math.round(this.doorK * (half + 1));
+      // The doors rattle while the core builds up pressure behind them.
+      const warn = this.mode === 'closed' && this.introDone && this.modeDur - this.modeT < WARN;
+      const open = Math.round(this.doorK * (half + 1)) + (warn && Math.floor(this.age * 24) % 3 === 0 ? 1 : 0);
       g.save();
       g.beginPath();
       g.rect(faceX - WALL.FRAME - 2, gTop, WALL.FRAME + 5, gBot - gTop);

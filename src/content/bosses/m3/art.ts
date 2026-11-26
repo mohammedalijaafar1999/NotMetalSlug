@@ -48,6 +48,8 @@ export const WALL = {
   VENT: { x: 137, y: 122 },
   /** Icicle slots along the gallery underside (sprite x). */
   ICICLES: [182, 198, 224],
+  /** Top-left of the hanging banner (bm3_banner). */
+  BANNER: { x: 94, y: 67 },
   /** Machicolation corbels under the gallery (sprite x of their left edge). */
   CORBELS: [163, 188, 206],
   BEACONS: [
@@ -295,24 +297,12 @@ function drawWall(p: PixelArt, dmg: number): void {
     p.px(Math.round(x), Math.round(y) - 1, IRON.rivet);
   }
 
-  // Legion banner hanging from the gallery.
-  const bx = 94;
+  // Banner rod (the Legion banner itself is the animated bm3_banner sprite drawn by the boss).
+  const bx = WALL.BANNER.x;
   p.rect(bx - 2, GB + 1, 24, 3, IRON.dark);
   p.rect(bx - 2, GB + 1, 24, 1, IRON.light);
-  const torn = dmg >= 2;
-  const bh = torn ? 26 : 44;
-  p.rect(bx, GB + 3, 20, bh, '#8a2418');
-  p.rect(bx, GB + 3, 2, bh, '#b0342a');
-  p.rect(bx + 18, GB + 3, 2, bh, '#5a140c');
-  p.rect(bx + 3, GB + 5, 14, 1, BRASS.base);
-  p.rect(bx + 3, GB + bh - 1, 14, 1, BRASS.base);
-  for (let x = 0; x < 20; x += 4) p.tri(bx + x, GB + 3 + bh, bx + x + 4, GB + 3 + bh, bx + x + 2, GB + 7 + bh, '#8a2418');
-  if (!torn) legionCog(p, bx + 10, GB + 22, 6.5);
-  else {
-    p.rect(bx + 2, GB + 3 + bh - 3, 16, 3, SOOT);
-    p.px(bx + 6, GB + bh + 1, WARM.mid);
-    p.px(bx + 12, GB + bh, WARM.glow);
-  }
+  p.px(bx - 2, GB + 2, IRON.rivet);
+  p.px(bx + 21, GB + 2, IRON.rivet);
 
   // Ledges / iron cladding on the curtain.
   ironPlate(p, 81, 118, F - 81 - 38, 6, shade(IRON.base, -0.05));
@@ -575,6 +565,46 @@ sprites.define({
       p.px(2, 2, '#fff6c0');
       const sweep = (f - 1) % 4;
       if (f < 5) p.rect([0, 2, 4, 2][sweep], 1, 2, 3, '#ffffff');
+    }
+  },
+});
+
+/**
+ * The Legion banner hanging under the gallery, rippling in the mountain wind.
+ * Frames 0..3 flutter (intact), 4..7 flutter (torn and burnt, phase 2). Origin = top-left of the cloth.
+ */
+sprites.define({
+  name: 'bm3_banner',
+  w: 22,
+  h: 50,
+  ox: 0,
+  oy: 0,
+  frames: 8,
+  draw: (p, f) => {
+    const torn = f >= 4;
+    const ph = ((f % 4) / 4) * Math.PI * 2;
+    const bh = torn ? 26 : 44;
+    const sway = (y: number): number => Math.round(Math.sin(y * 0.22 - ph) * 1.2 * (y / bh));
+    for (let y = 0; y < bh; y++) {
+      const o = sway(y);
+      p.rect(o, y, 20, 1, '#8a2418');
+      p.rect(o, y, 2, 1, '#b0342a');
+      p.rect(o + 18, y, 2, 1, '#5a140c');
+      // Fold shading that travels down the cloth.
+      const fold = Math.sin(y * 0.22 - ph);
+      if (fold > 0.55) p.rect(o + 6, y, 3, 1, '#a02c1e');
+      if (fold < -0.55) p.rect(o + 12, y, 3, 1, '#6e1a10');
+    }
+    p.rect(sway(2) + 3, 2, 14, 1, BRASS.base);
+    p.rect(sway(bh - 2) + 3, bh - 2, 14, 1, BRASS.base);
+    const ob = sway(bh);
+    for (let x = 0; x < 20; x += 4) p.tri(ob + x, bh, ob + x + 4, bh, ob + x + 2 + (f % 2), bh + 4, '#8a2418');
+    if (!torn) legionCog(p, 10 + sway(19), 19, 6.5);
+    else {
+      p.rect(ob + 2, bh - 3, 16, 3, SOOT);
+      p.px(ob + 5, bh - 1, WARM.mid);
+      p.px(ob + 12, bh - 2, (f & 1) === 0 ? WARM.glow : WARM.mid);
+      p.px(ob + 9, bh + 1, '#3a3430');
     }
   },
 });
