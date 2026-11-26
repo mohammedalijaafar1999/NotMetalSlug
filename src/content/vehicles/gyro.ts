@@ -318,7 +318,7 @@ export class Gyro extends Vehicle {
     this.animate(dt, true);
     this.rotorSfx -= dt;
     if (this.rotorSfx <= 0) {
-      this.rotorSfx = 0.45;
+      this.rotorSfx = 0.3;
       vsfx(this.world, 'gyro_rotor', this.x, { vol: 0.25 });
     }
   }

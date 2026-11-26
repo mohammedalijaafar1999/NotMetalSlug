@@ -379,7 +379,7 @@ export class Tank extends Vehicle {
     if (moving && engineOn) {
       this.treadSfx -= dt;
       if (this.treadSfx <= 0) {
-        this.treadSfx = 0.22;
+        this.treadSfx = 0.32;
         vsfx(w, 'tank_tread', this.x, { vol: 0.3 });
       }
       if (fxRng.chance(0.25)) w.particles.dust(this.x - this.facing * 16, this.y, 1);
