@@ -2,9 +2,13 @@
 // ice. Everything is authored FACING RIGHT (the fortress front is the right edge of the sprite,
 // light from the top-left) and flipped at draw time, like every other sprite in the game.
 //
-// Sprite space of the main wall (bm3_wall): 226 x 152, ground at y = 152, front face at x = 160,
-// machicolation gallery overhanging x 160..225 at y 52..64. WALL.* constants describe the anchor
-// points the boss logic uses (turret mounts, gate, emitter, icicle slots).
+// Sprite space of the main wall (bm3_wall, 3 damage frames): 226 x 152, ground at y = 152, front
+// face at x = 160, machicolation gallery overhanging x 160..225 at y 52..64, gate frame sticking out
+// x 160..176 at the foot. WALL.* constants describe the anchor points the boss logic uses (gate,
+// turret mounts, icicle slots, banner, vents, breaches). Separate animated parts: bm3_core (frost
+// core on pistons), bm3_door (blast door halves), bm3_banner, bm3_beacon, bm3_mg / bm3_flak /
+// bm3_mortar (+ bm3_wreck), hazards (icicle, shard, flak shell, mortar shell, spike, boulder) and
+// debris (bm3_plate, bm3_rubble).
 
 import { sprites } from '../../../engine/sprites';
 import { PixelArt, shade } from '../../../engine/pixelart';
@@ -609,8 +613,6 @@ sprites.define({
   },
 });
 
-/** Beacon light cone overlay (cosmetic glow pixels drawn by the boss). */
-export const BEACON_GLOW = ['#ffd040', '#ff8020'];
 
 // ------------------------------------------------------------------ turrets
 

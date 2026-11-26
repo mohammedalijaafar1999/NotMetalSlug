@@ -1000,7 +1000,7 @@ export class FrostBastion extends BigBoss {
     g.clip();
     this.renderDeck(g, X, Y);
     g.restore();
-    this.renderCore(g, X, Y, shakeX);
+    this.renderCore(g, X, Y);
     g.save();
     g.beginPath();
     g.rect(this.face - 140, Y(WALL.GALLERY_BOTTOM) - 1, 700, 400);
@@ -1058,8 +1058,7 @@ export class FrostBastion extends BigBoss {
     } else sprites.get('bm3_wreck').draw(g, mx, my, 2, { flip: true });
   }
 
-  private renderCore(g: CanvasRenderingContext2D, X: (sx: number) => number, Y: (sy: number) => number, shakeX: number): void {
-    void shakeX;
+  private renderCore(g: CanvasRenderingContext2D, X: (sx: number) => number, Y: (sy: number) => number): void {
     const faceX = X(WALL.FACE);
     const gTop = Y(WALL.GATE.y);
     const gBot = Y(WALL.GATE.y + WALL.GATE.h);
