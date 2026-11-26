@@ -22,7 +22,7 @@ import type { Entity } from '../../../game/entity';
 import { BigBoss, GroundMarker as LandingMarker, FlyingPart, smoke, flames, sparkBurst } from '../common/kit';
 import { GroundMarker as ShadowMarker, puffSteam, puffFoam, pixelEllipse } from '../common/fx';
 import * as A from './art';
-import { ClawArm } from './arm';
+import { ClawArm, fillConvex } from './arm';
 import { Torpedo, PodMissile, LaserBeam, m4sfx } from './weapons';
 
 export const LEVIATHAN_HP = 360;
@@ -62,6 +62,8 @@ export class Leviathan extends BigBoss {
   sink = INTRO_DEPTH;
   sinkTarget = 0;
   advance = 0;
+  /** Recoil push-back (px, decays) when it launches torpedoes / missiles. */
+  kick = 0;
   t = 0;
   dmgLevel = 0;
   // ---- parts
@@ -333,7 +335,8 @@ export class Leviathan extends BigBoss {
     const adv = this.phase >= 2 ? 10 : this.phase >= 1 ? 18 : 0;
     this.advance = approach(this.advance, adv, 10 * dt);
     const drift = Math.sin(this.t * 0.55) * 3;
-    this.x = this.homeX + this.facing * (this.advance + drift);
+    this.kick = approach(this.kick, 0, (4 + this.kick * 6) * dt);
+    this.x = this.homeX + this.facing * (this.advance + drift - this.kick);
     if (this.state !== 'intro') {
       const want = this.phase >= 2 && this.state !== 'dive' ? DIVE_SINK : this.sinkTarget;
       this.sink = approach(this.sink, want, 26 * dt);
@@ -461,6 +464,8 @@ export class Leviathan extends BigBoss {
     const x = this.lx2w(A.TUBE_X + 8);
     const y = this.y + A.TUBE_Y;
     this.world.add(new Torpedo(this, x, y, this.facing, speed, this.waterY));
+    this.kick = 3;
+    this.world.shake(1.5, 0.15);
     this.world.effect('muzzle_flash', this.lx2w(A.TUBE_X + 4), y, { flip: this.facing < 0, fps: 30 });
     puffSteam(this.world, x, y, this.facing * 40, -10, 4, 3);
     m4sfx(this.world, 'enemy_rocket', x, { vol: 0.8, pitch: 0.6 });
@@ -511,7 +516,8 @@ export class Leviathan extends BigBoss {
     const hi = Math.max(this.pierFar + this.facing * -10, this.pierTip - this.facing * 8);
     const tx = clamp(this.targetX() + rng.range(-10, 10), lo, hi);
     const ty = this.surfaceAt(tx);
-    const fall = 210 * this.world.difficulty.enemyShotSpeed;
+    const fall = Math.min(220, 200 * this.world.difficulty.enemyShotSpeed);
+    this.kick = Math.max(this.kick, 1.2);
     const wait = 0.2;
     const m = this.world.add(new PodMissile(this, x, y, tx, ty, wait, fall));
     const mk = this.world.add(new LandingMarker(tx, ty, PodMissile.flightTime(y, this.world.camera.y, ty, wait, fall), 12));
@@ -886,7 +892,6 @@ export class Leviathan extends BigBoss {
       }
     }
     if (st >= 0.3) this.sinkTarget = DIVE_SINK;
-    this.sink = approach(this.sink, this.sinkTarget, 26 * dt);
     if (this.sink + FLOAT > 22 && !(this.introFlags & 8)) {
       this.introFlags |= 8;
       for (let lx = -150; lx <= 100; lx += 10) this.world.particles.splash(this.lx2w(lx), this.waterY, 6, '#e8f8ff');
@@ -1087,6 +1092,18 @@ export class Leviathan extends BigBoss {
     const dmg = this.dmgLevel;
     // Underwater shadow while deep.
     if (deep) pixelEllipse(g, this.lx2w(-20), this.waterY + 12, 120, 6, '#0a1420', 0.3 * (1 - alpha));
+    // Searchlight sweeping the dock from the tower lamp (atmosphere; off while the periscope fires).
+    if (this.introDone && !this.dying && this.state !== 'laser') {
+      const lx = this.lx2w(A.LAMP_X);
+      const ly = Y + A.DECK_Y + A.LAMP_Y;
+      const sx = lerp(this.pierFar, this.pierTip, 0.5 + 0.45 * Math.sin(this.t * 0.6));
+      const sy = this.surfaceAt(sx);
+      const prev = g.globalAlpha;
+      g.globalAlpha = 0.07;
+      fillConvex(g, [lx, ly, sx - 20, sy, sx + 20, sy], '#fff4c0');
+      g.globalAlpha = prev;
+      pixelEllipse(g, sx, sy - 1, 20, 3, '#fff4c0', 0.16);
+    }
     const hull = sprites.get('bm4_hull');
     hull.draw(g, X, Y, dmg, { flip, alpha });
     if (fl('hull')) hull.draw(g, X, Y, dmg, { flip, flash: true, alpha: 0.35 });
