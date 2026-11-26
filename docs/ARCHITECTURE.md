@@ -1,5 +1,7 @@
 # IRON RUCKUS — Architecture & Content Contracts
 
+See also docs/CONTENT.md (every placeable entity with props and placement rules) and docs/LEVEL_DESIGN.md.
+
 TypeScript + Vite, no runtime dependencies. Canvas 2D at a fixed low resolution
 (**384×216**, `VIEW_W`/`VIEW_H`) scaled up with nearest-neighbour. Fixed 60 Hz simulation
 (`STEP = 1/60`). All art is procedural pixel art baked at startup; all audio is synthesized.
