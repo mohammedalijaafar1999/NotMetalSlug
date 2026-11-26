@@ -101,7 +101,7 @@ describe('boss_m6 JUGGERNAUT', () => {
         }
         if (e instanceof Lobbed) {
           shells++;
-          expect(Math.abs(e.vx)).toBeLessThan(260);
+          expect(Math.abs(e.vx)).toBeLessThan(225);
           if (e.marker) markers++;
         }
       }

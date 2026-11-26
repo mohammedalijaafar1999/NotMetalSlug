@@ -580,7 +580,7 @@ export class Juggernaut extends BigBoss {
     if (this.sub === 0) {
       if (this.subT === 0 || this.targets.length === 0) this.planVolley(n, t);
       const tx = this.targets[0] ?? this.x - this.facing * 150;
-      this.cannonTarget = this.elevFor(Math.abs(tx - this.x));
+      this.cannonTarget = this.launchAngle(tx);
       if (this.subT > 0.5) {
         this.next(1);
         this.count = 0;
@@ -593,7 +593,7 @@ export class Juggernaut extends BigBoss {
           this.count++;
           this.subT = 0;
           const nx = this.targets[this.count];
-          if (nx !== undefined) this.cannonTarget = this.elevFor(Math.abs(nx - this.x));
+          if (nx !== undefined) this.cannonTarget = this.launchAngle(nx);
         } else this.next(2);
       }
     } else if (this.subT > 0.55) this.toWalk();
@@ -615,9 +615,18 @@ export class Juggernaut extends BigBoss {
     this.targets = out;
   }
 
-  /** Barrel elevation for a horizontal distance (steeper when close). */
-  private elevFor(dist: number): number {
-    return clamp(1.2 - dist / 380, CANNON_A0, CANNON_A0 + (CANNON_N - 1) * CANNON_STEP);
+  /** Shell flight time for a horizontal distance: long shots fly longer (<= ~210 px/s across). */
+  private flightTime(D: number): number {
+    return clamp(0.9 + D / 400, 1.05, 1.6) / Math.sqrt(this.world.difficulty.enemyShotSpeed);
+  }
+
+  /** Barrel elevation that matches the lob onto tx. */
+  private launchAngle(tx: number): number {
+    const [mx, my] = this.muzzle();
+    const D = Math.max(1, Math.abs(tx - mx));
+    const T = this.flightTime(D);
+    const vy = (this.groundY - 2 - my - 0.5 * 420 * T * T) / T;
+    return clamp(Math.atan2(-vy, D / T), CANNON_A0, CANNON_A0 + (CANNON_N - 1) * CANNON_STEP);
   }
 
   /** Muzzle (world) for the current elevation. */
@@ -629,11 +638,8 @@ export class Juggernaut extends BigBoss {
 
   private fireShell(tx: number): void {
     const [mx, my] = this.muzzle();
-    const D = Math.abs(tx - mx);
-    const H = this.groundY - my;
+    const T = this.flightTime(Math.abs(tx - mx));
     const e = this.cannonElev;
-    let T = Math.sqrt((2 * (D * Math.tan(e) + H)) / 420);
-    T = clamp(T, 1.0, 1.7) / Math.sqrt(this.world.difficulty.enemyShotSpeed);
     this.world.add(new Lobbed({ owner: this, x: mx, y: my, tx, ty: this.groundY - 2, time: T, radius: 16, size: 'medium', sprite: 'bm6_shell', marker: true, rotate: true, shake: 2, trail: '#8a8078' }));
     this.recoil = 1;
     this.world.shake(2, 0.15);
@@ -795,7 +801,14 @@ export class Juggernaut extends BigBoss {
       case 0: // brace: tuck the feet, steam hisses under the belly
         this.vxWalk = 0;
         this.stance = 'squat';
-        if (this.subT === 0) bsfx(this, 'engine', { vol: 0.7, pitch: 0.6 });
+        if (this.subT === 0) {
+          bsfx(this, 'engine', { vol: 0.7, pitch: 0.6 });
+          // Fairness: no new drone dives / zaps while players must stay crouched under the beam.
+          for (const d of this.drones) {
+            const dr = d as unknown as { attackT?: number };
+            if (typeof dr.attackT === 'number') dr.attackT = Math.max(dr.attackT, 5);
+          }
+        }
         if (fxRng.chance(0.25)) {
           const [x, y] = this.att(fxRng.range(-30, 24), 8);
           this.steam(x, y, 0, 40);
@@ -1307,13 +1320,14 @@ export class Juggernaut extends BigBoss {
       const [x0, y0, x1] = this.beamLine();
       const k = Math.min(1, this.subT / 1.05);
       const rate = 6 + k * 14;
-      if (Math.floor(this.age * rate) % 2 === 0) {
-        dottedLine(g, x0, y0, x1, y0, '#ff2a1a', 6, 4, -this.age * 60);
-        g.globalAlpha = 0.18 + k * 0.2;
-        g.fillStyle = '#ff2a1a';
-        g.fillRect(Math.min(x0, x1), Math.round(y0) - BEAM_HALF, Math.abs(x1 - x0), BEAM_HALF * 2);
-        g.globalAlpha = 1;
-      }
+      const on = Math.floor(this.age * rate) % 2 === 0;
+      // danger band exactly where the beam will be (always shown, pulsing) + a flickering aim line
+      g.globalAlpha = (0.16 + k * 0.22) * (on ? 1 : 0.6);
+      g.fillStyle = '#ff2a1a';
+      g.fillRect(Math.min(x0, x1), Math.round(y0) - BEAM_HALF, Math.abs(x1 - x0), BEAM_HALF * 2);
+      g.globalAlpha = 1;
+      if (on) pixelLine(g, x0, y0, x1, y0, '#ff4a30', 1);
+      else dottedLine(g, x0, y0, x1, y0, '#ffc8b0', 6, 3, -this.age * 60);
       pixelEllipse(g, x0, y0, 3 + k * 4, 3 + k * 4, '#fff0a0', 0.4 + k * 0.4);
     }
     if (this.beamOn) {
