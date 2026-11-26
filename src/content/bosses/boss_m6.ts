@@ -76,6 +76,9 @@ export const JUG_HP = 300;
 /** Damage multipliers per zone. */
 export const JUG_MUL = { legs: 0.8, hull: 1, armor: 0.75, chest: 1, core: 2.2, dome: 1.4 } as const;
 
+/** Artillery shell gravity (a little floaty so the arcs stay on screen). */
+const SHELL_G = 340;
+
 /** Laser beam: half thickness and height of its centre above the floor when horizontal. */
 export const BEAM_HALF = 3;
 export const BEAM_HEIGHT = HIP_SQUAT - CORE.y;
@@ -176,12 +179,10 @@ export class Juggernaut extends BigBoss {
   hitFx: Record<string, number> = {};
   private fxT = 0;
   private stackT = 0;
-  private sfxT = 0;
   private laserSfxT = 0;
   private crashed = false;
   private debrisT = 0;
   private marker: GroundMarker | null = null;
-  private overlay: JugOverlay | null = null;
 
   constructor() {
     super(JUG_NAME, JUG_HP);
@@ -208,7 +209,7 @@ export class Juggernaut extends BigBoss {
     this.legs[0].x = this.x + 8 * this.facing;
     this.legs[1].x = this.x - 8 * this.facing;
     this.destX = this.home;
-    this.overlay = this.world.add(new JugOverlay(this));
+    this.world.add(new JugOverlay(this));
     this.world.announce('WARNING!', { color: '#ff4040', time: 2.6, sub: 'MARSHAL GRISTLE APPROACHES' });
     this.setState('intro');
     this.layoutZones();
@@ -218,7 +219,13 @@ export class Juggernaut extends BigBoss {
 
   /** Hip pivot (hull origin) in world space. */
   get hipY(): number {
-    return this.y - this.hipH + this.impact * 3;
+    return this.y - this.hipH + this.impact * 3 + this.breath;
+  }
+
+  /** Idle "breathing" of the hydraulics (whole pixels; off while squatting / dying). */
+  get breath(): number {
+    if (this.dying || this.state === 'laser' || this.hipH < HIP_STAND - 12) return 0;
+    return Math.round(Math.sin(this.age * 2.4) * 0.9);
   }
 
   /** World position of a hull-local point (rotated by the tilt, mirrored by facing). */
@@ -628,7 +635,7 @@ export class Juggernaut extends BigBoss {
     const [mx, my] = this.muzzle();
     const D = Math.max(1, Math.abs(tx - mx));
     const T = this.flightTime(D);
-    const vy = (this.groundY - 2 - my - 0.5 * 420 * T * T) / T;
+    const vy = (this.groundY - 2 - my - 0.5 * SHELL_G * T * T) / T;
     return clamp(Math.atan2(-vy, D / T), CANNON_A0, CANNON_A0 + (CANNON_N - 1) * CANNON_STEP);
   }
 
@@ -643,7 +650,7 @@ export class Juggernaut extends BigBoss {
     const [mx, my] = this.muzzle();
     const T = this.flightTime(Math.abs(tx - mx));
     const e = this.cannonElev;
-    this.world.add(new Lobbed({ owner: this, x: mx, y: my, tx, ty: this.groundY - 2, time: T, radius: 16, size: 'medium', sprite: 'bm6_shell', marker: true, rotate: true, shake: 2, trail: '#8a8078' }));
+    this.world.add(new Lobbed({ owner: this, x: mx, y: my, tx, ty: this.groundY - 2, time: T, gravity: SHELL_G, radius: 16, size: 'medium', sprite: 'bm6_shell', marker: true, rotate: true, shake: 2, trail: '#8a8078' }));
     this.recoil = 1;
     this.world.shake(2, 0.15);
     bsfx(this, 'tank_cannon', { vol: 0.85, pitch: 0.85 });
@@ -1019,7 +1026,7 @@ export class Juggernaut extends BigBoss {
     }
     if (!this.gait || this.legs.some((l) => l.step)) return;
     const v = this.vxWalk;
-    const free = this.legs.map((l, i) => i).filter((i) => !this.legs[i].manual);
+    const free = [0, 1].filter((i) => !this.legs[i].manual);
     if (!free.length) return;
     if (Math.abs(v) > 3) {
       const sgn = Math.sign(v);
@@ -1061,7 +1068,6 @@ export class Juggernaut extends BigBoss {
     this.impact = Math.max(this.impact, 0.7);
     const heavy = this.state === 'intro';
     this.world.shake(heavy ? 3 : 1.6, 0.18);
-    this.sfxT = 0;
     bsfx(this, 'land', { vol: heavy ? 0.9 : 0.6, pitch: 0.42 + fxRng.range(-0.04, 0.04) });
     bsfx(this, 'metal_hit', { vol: 0.2, pitch: 0.35 });
     this.world.particles.dust(L.x - 12, this.y, 3, '#a88a64');

@@ -2,7 +2,6 @@
 // jet flame, debris chunks and the burnt-out wreck. Authored facing right, lit from the top-left.
 
 import { sprites } from '../../../engine/sprites';
-import type { PixelArt } from '../../../engine/pixelart';
 import { BC, Pen, cog, hazardStripes } from '../common/kit';
 import { DOME_OX, DOME_OY, DOME_W, JC, JPen, drawDome, drawHull, type DomeExpr } from './art';
 

@@ -13,9 +13,9 @@
 // Local coordinates: origin = the hip pivot under the hull centre, +x forward, +y down.
 
 import { sprites } from '../../../engine/sprites';
-import { mixColor, parseColor, shade, type PixelArt } from '../../../engine/pixelart';
+import { parseColor, shade, type PixelArt } from '../../../engine/pixelart';
 import { drawHuman, type HumanPose, type HumanoidStyle } from '../../../art/humanoid';
-import { BC, Pen, cog, charr, hash2, hazardStripes, rivet } from '../common/kit';
+import { BC, Pen, cog, hash2, hazardStripes, rivet } from '../common/kit';
 
 // ------------------------------------------------------------------ palette & geometry
 
