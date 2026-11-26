@@ -201,10 +201,10 @@ describe('boss_m1 GRINDER', () => {
     stepUntil(w, () => b.state === 'idle', 6);
     p.x = b.x;
     step(w, 1);
-    expect(p.x + p.w / 2).toBeLessThanOrEqual(b.frontX + 6.01);
+    expect(p.x + p.w / 2).toBeLessThanOrEqual(b.frontX + 0.01);
     p.x = b.rearX - 4;
     step(w, 1);
-    expect(p.x + p.w / 2).toBeLessThanOrEqual(b.frontX + 6.01);
+    expect(p.x + p.w / 2).toBeLessThanOrEqual(b.frontX + 0.01);
   });
 
   it('flame vents (phase 2+) cannot reach a player near the left edge', () => {

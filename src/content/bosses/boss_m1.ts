@@ -429,7 +429,7 @@ export class Grinder extends BigBoss {
 
   /** The hull is solid: players and their vehicles are pushed out to the front. */
   private pushPlayers(): void {
-    const front = this.wx(GR.BLADE_TIP - 6);
+    const front = this.wx(GR.BLADE_TIP);
     const rear = this.wx(GR.REAR);
     const lo = Math.min(front, rear);
     const hi = Math.max(front, rear);
@@ -1113,7 +1113,10 @@ export class Grinder extends BigBoss {
 
   override applyHit(d: Damage, mul: number, id: string): boolean {
     if (d.x !== undefined && d.y !== undefined) this.hitAt[id] = { x: d.x, y: d.y, big: d.kind === 'explosion' || d.amount >= 5 };
-    return super.applyHit(d, mul, id);
+    const ok = super.applyHit(d, mul, id);
+    // Heavy hits (grenades, rockets, cannon shells) jolt the suspension.
+    if (ok && !this.dying && d.amount * mul >= 8) this.bobV += Math.min(40, d.amount * mul * 2);
+    return ok;
   }
 
   /** Draw every part (group null), or only one zone's parts as a white flash silhouette. */
@@ -1229,8 +1232,9 @@ registerEntity(
   'boss_m1',
   'boss',
   () => new Grinder(),
-  'GRINDER (mission 1 boss, 380 HP): steam war-dozer that parks against the right edge of a one-screen arena. ' +
-    'Arena: FLAT ground across [L, L+384] (no pits/solids/water/platforms/props), camera locked at L (boss lock, NO announce - ' +
-    'the boss shows its own WARNING banner), bossMusic "boss". Spawn { type: "boss_m1", x: L + 282 } (resting hull centre, y from ' +
-    'the ground; it drives in from off-screen right). Needs ~120 px of sky above the ground; keep the left 80 px clear (charge safe pocket).',
+  'GRINDER (mission 1 boss, 380 HP, 30000 pts): steam war-dozer that parks against the right edge of a one-screen arena; its hull is ' +
+    'solid. Arena: FLAT ground across [L, L+384] (no pits/solids/water/platforms/props), boss lock at L with NO announce (the boss ' +
+    'shows its own WARNING banner), bossMusic "boss". Spawn { type: "boss_m1", x: L + 282 } (resting hull centre; y read from the ' +
+    'ground; it drives in from off-screen right). Camera at the bottom of the level (ground ~y 170-190 on screen, >= 120 px of sky ' +
+    'above it for the 113 px tall stack). Keep the left 80 px clear: the blade charge stops 74/60/50 px from the left edge (safe pocket).',
 );
