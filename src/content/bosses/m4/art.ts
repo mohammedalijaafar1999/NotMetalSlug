@@ -112,7 +112,9 @@ function scorch(d: Pen, cx: number, cy: number, rx: number, ry: number, seed: nu
       if (q > 1) continue;
       if (clip && !clip(x, y)) continue;
       const n = hash2(x, y, seed);
-      if (n < 0.75 - q * 0.55) d.px(x, y, q < 0.35 && n < 0.3 ? LV.soot : LV.sootL);
+      // Solid charred core, dithered sooty rim.
+      if (q < 0.4) d.px(x, y, n < 0.18 ? LV.sootL : LV.soot);
+      else if (n < 0.85 - q * 0.75) d.px(x, y, LV.sootL);
     }
   }
 }
