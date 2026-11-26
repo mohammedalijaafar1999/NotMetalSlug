@@ -913,11 +913,12 @@ sprites.define({
       d.line(Math.cos(a) * 3, Math.sin(a) * 3, Math.cos(a) * 5.4, Math.sin(a) * 5.4, BC.steelD);
       d.px(Math.round(Math.cos(a) * 5.4), Math.round(Math.sin(a) * 5.4), BC.brass);
     }
-    d.circle(0, 0, 4, BC.ironD);
-    d.circle(-0.4, -0.4, 3.3, BC.iron);
-    d.circle(-1.3, -1.3, 1.6, BC.ironLL);
-    d.px(-2, -2, '#a89c8a');
-    d.rect(-3, 1, 7, 1, BC.rust);
+    d.circle(0, 0, 4, BC.rustD);
+    d.circle(-0.4, -0.4, 3.3, BC.rust);
+    d.circle(-1.3, -1.3, 1.6, BC.rustL);
+    d.px(-2, -2, '#ffc890');
+    d.rect(-3, 1, 7, 1, BC.hazard);
+    d.px(-3, 1, BC.hazardD);
     d.px(0, -3, f ? T5.lampL : T5.lampOff);
     d.px(1, -3, f ? T5.lamp : T5.lampOff);
   },
