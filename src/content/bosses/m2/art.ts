@@ -418,7 +418,7 @@ function drawHull(p: PixelArt, tilt: number, dmg: number, wreck = false): void {
   if (dmg >= 3) {
     hole(d, -44, -14, 12, 9, 17);
     hole(d, 52, -20, 8, 5, 19);
-    speckle(d, -92, -20, 50, 34, BC.charD, 0.25, 51);
+    speckle(d, -92, -20, 50, 34, BC.charD, 0.17, 51);
     speckle(d, -20, -20, 70, 30, BC.char, 0.14, 53);
     speckle(d, 50, -18, 30, 26, BC.char, 0.12, 57);
     // Door hanging loose: dark gap at its edge.

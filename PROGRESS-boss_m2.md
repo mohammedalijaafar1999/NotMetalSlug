@@ -9,9 +9,11 @@
 - levels/test/bosstest_m2.ts, tests/boss_m2.test.ts (8 tests green), full suite green (422).
 - Visual checks done for intro, sweep, salvo, carpet, tear, rain, turn, death.
 
+- fairness: sweep safe zone, rain free slot, bomb spacing + edge pockets, TopMissile (dives at the
+  marker), dodging-player survival test (0 deaths on easy/normal/hard x 6 seeds in diag runs).
+
 ## Next
-- fairness tests (sweep safe zone under hull, rain free neighbour slot)
-- polish pass; delete tests/boss_m2_diag.test.ts before final commit; delete this file.
+- final: delete tests/boss_m2_diag.test.ts (untracked scratch) and this file, final commit.
 
 ## Decisions
 - anchor 'center', (x,y) = fuselage pivot. Lock announce (WARNING!) used, not world.announce.
