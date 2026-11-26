@@ -298,6 +298,8 @@ export class HornetKing extends BigBoss {
   }
 
   private cancelAttack(): void {
+    // A phase change can interrupt a yaw turn: snap back to a clean side view.
+    this.sx = this.facing;
     this.aimLine = false;
     this.gunSpinV = 0;
     if (this.podState === 1 || this.podState === 2) this.podState = 3;
@@ -1092,6 +1094,13 @@ export class HornetKing extends BigBoss {
     if (this.pylonOn) {
       sprites.get('bm2_rotor').draw(g, hubR.x, hubR.y, ti * ROT_N + rf(this.rotorB), { flip });
       sprites.get('bm2_hub').draw(g, hubR.x, hubR.y, Math.floor(this.rotorB * 2) % 2, { flip });
+    }
+    // The compound eye flares while an attack winds up.
+    if ((this.state === 'sweepAim' || this.state === 'salvoOpen' || this.state === 'rainOpen' || this.state === 'carpetOpen') && Math.floor(this.age * 12) % 2 === 0) {
+      const e = R(P.eye[0] - 5, P.eye[1] - 4);
+      pixelEllipse(g, e.x, e.y, 7, 5, '#ffe070', 0.45);
+      g.fillStyle = '#fff6d0';
+      g.fillRect(Math.round(e.x) - 1, Math.round(e.y) - 1, 3, 2);
     }
     // Beacon + tail light.
     if (!this.dying || this.deathTime < 1) {

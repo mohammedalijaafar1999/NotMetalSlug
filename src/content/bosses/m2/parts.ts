@@ -109,8 +109,9 @@ export class TornRotor extends Entity {
 
   private crash(): void {
     this.landed = true;
-    this.y = this.groundY - 9;
-    this.rot = Math.round(this.rot / (Math.PI / 4)) * (Math.PI / 4);
+    // Comes to rest flat (upright or on its back), half dug into the ground.
+    this.rot = Math.round(this.rot / Math.PI) * Math.PI;
+    this.y = this.groundY - 12;
     const w = this.world;
     w.explode(this.x, this.y - 4, { radius: 30, damage: 0, team: 'enemy', size: 'large', shake: 6, sfx: 'explosion_big' });
     w.particles.dust(this.x, this.groundY, 14, '#d8c8a0');
