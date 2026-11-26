@@ -624,6 +624,8 @@ export class Thunderhead extends BigBoss {
 
   onPhase(phase: number, prev: number): void {
     for (let p = prev + 1; p <= phase; p++) this.enterPhase(p);
+    // Each phase opens with its signature attack.
+    this.cycle = 0;
     this.resetRig();
     this.strike?.remove();
     this.strike = null;
@@ -799,7 +801,7 @@ export class Thunderhead extends BigBoss {
       const key = id === 'bridge' ? 'gondola' : id;
       const f = (this.hitFx[key] ??= { t: 0, cd: 0 });
       if (f.cd <= 0) {
-        f.t = key === 'hull' ? 0.034 : 0.05;
+        f.t = key === 'core' ? 0.05 : 0.034;
         f.cd = key === 'hull' ? 0.22 : 0.15;
       }
     }
@@ -863,7 +865,7 @@ export class Thunderhead extends BigBoss {
     }
     // Gondola.
     S('bm5_gondola').draw(g, sx, sy, this.dmgFrame, { flip });
-    if (this.lit('gondola')) S('bm5_gondola').draw(g, sx, sy, this.dmgFrame, { flip, flash: true, alpha: 0.55 });
+    if (this.lit('gondola')) S('bm5_gondola').draw(g, sx, sy, this.dmgFrame, { flip, flash: true, alpha: 0.42 });
     S('bm5_bay').draw(g, sx, sy, this.bay, { flip });
     if (this.portsOpen) {
       PORTS.forEach(([px, py], i) => {

@@ -338,12 +338,14 @@ export class LightningStrike extends Entity {
     const y0 = this.y;
     if (this.stage === 'track') {
       const ph = this.world.time * 40;
-      if (Math.floor(this.world.time * 30) % 3 !== 0) dottedLine(g, x0, y0, e.x, e.y, Math.floor(this.st * 12) % 2 ? '#e8fbff' : '#8ce0ff', 6, 3, -ph);
+      dottedLine(g, x0, y0, e.x, e.y, '#1c2a7a', 6, 3, -ph, 3);
+      dottedLine(g, x0, y0, e.x, e.y, Math.floor(this.st * 12) % 2 ? '#e8fbff' : '#8ce0ff', 6, 3, -ph);
       return;
     }
     if (this.stage === 'lock') {
       const on = Math.floor(this.st * 20) % 2 === 0;
-      dottedLine(g, x0, y0, e.x, e.y, on ? '#ffffff' : '#ff5a4a', 4, 3, 0);
+      dottedLine(g, x0, y0, e.x, e.y, '#3a0a10', 4, 3, 0, 3);
+      dottedLine(g, x0, y0, e.x, e.y, on ? '#ffffff' : '#ff5a4a', 4, 3, 0, on ? 1 : 2);
       return;
     }
     // Bolt: jagged polyline, rebuilt every few frames, with a cyan glow and a white core.
