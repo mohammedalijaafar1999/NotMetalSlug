@@ -221,6 +221,52 @@ describe('boss_m2 HORNET KING', () => {
     for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeGreaterThanOrEqual(58);
   });
 
+  it('a simple dodging player (not invincible) survives whole fights', () => {
+    // Stays under the hull (sweep-safe) and keeps out of marked missile / bomb impact spots without
+    // ever walking through one. Script damage stands in for some of the player's gun.
+    for (const seed of [1, 2, 3]) {
+      const w = arenaWorld(seed);
+      const p = w.players[0];
+      let deaths = 0;
+      w.on('playerDied', () => deaths++);
+      for (let i = 0; i < 60 * 120 && w.state !== 'complete'; i++) {
+        const b = bossOf(w);
+        const mask: Record<string, boolean> = {};
+        if (b && b.introDone && !b.dying) {
+          p.godMode = false;
+          const threats: { x: number; r: number }[] = [];
+          for (const e of w.query((x) => x.constructor.name === 'LockMark')) threats.push({ x: e.x, r: 30 });
+          for (const e of w.query((x) => x.constructor.name === 'CarpetBomb')) threats.push({ x: (e as any).tx, r: 25 });
+          const safe = (x: number) => threats.every((th) => Math.abs(th.x - x) > th.r);
+          const crosses = (a: number, c: number) => threats.some((th) => th.x + th.r > Math.min(a, c) && th.x - th.r < Math.max(a, c));
+          const want = Math.max(b.arenaL + 10, Math.min(b.arenaR - 10, b.x - b.facing * 12));
+          let target = want;
+          if (!safe(p.x)) {
+            let best = Infinity;
+            for (let dx = 0; dx < 400; dx += 2)
+              for (const sg of [-1, 1]) {
+                const x = p.x + sg * dx;
+                if (x > b.arenaL + 8 && x < b.arenaR - 8 && safe(x) && dx < best) {
+                  best = dx;
+                  target = x;
+                }
+              }
+          } else if (crosses(p.x, want)) target = p.x;
+          if (target > p.x + 3) mask.right = true;
+          else if (target < p.x - 3) mask.left = true;
+          mask.up = true;
+          mask.fire = i % 6 < 3;
+          if (i % 10 === 0 && b.hittable) b.damage({ amount: 1, kind: 'bullet', owner: p, x: b.x, y: b.y + 16 });
+        }
+        input.setVirtual(0, mask);
+        step(w, 1);
+      }
+      releaseInput();
+      expect(w.state, `seed ${seed}`).toBe('complete');
+      expect(deaths, `seed ${seed}`).toBe(0);
+    }
+  }, 60_000);
+
   it('is defeated by the invincible autopilot within the time budget', () => {
     const r = simulateMission('bosstest_m2', 300);
     if (!r.completed) console.log('bosstest_m2', JSON.stringify(r));

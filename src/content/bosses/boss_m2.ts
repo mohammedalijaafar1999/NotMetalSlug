@@ -29,10 +29,10 @@ import type { Damage } from '../../game/constants';
 import type { Entity } from '../../game/entity';
 import { EnemyBullet } from '../../game/projectile';
 import { registerEntity } from '../../game/registry';
-import { BigBoss, FlyingPart, LockMissile, Wreck, bsfx, bsfxAt, flames, smoke, sparkBurst, type Zone } from './common/kit';
+import { BigBoss, FlyingPart, Wreck, bsfx, bsfxAt, flames, smoke, sparkBurst, type Zone } from './common/kit';
 import { dottedLine, pixelEllipse } from './common/fx';
 import { BAY_N, FRONT_HUB_F, FRONT_HUB_R, GUN_MAX, GUN_N, NT, P, POD_N, ROT_N, TILT0, TILTS } from './m2/art';
-import { CarpetBomb, LockMark, TornRotor } from './m2/parts';
+import { CarpetBomb, LockMark, TopMissile, TornRotor } from './m2/parts';
 
 export const HORNET_HP = 380;
 
@@ -740,25 +740,23 @@ export class HornetKing extends BigBoss {
     const pm = this.toWorld(P.podMouth[0], P.podMouth[1]);
     const lockX = clamp(t ? t.x : this.x, this.arenaL + 12, this.arenaR - 12);
     const gy = this.floorAt(lockX);
-    const m = new LockMissile({
+    const dir = Math.abs(lockX - pm.x) < 8 ? this.facing : Math.sign(lockX - pm.x);
+    const m = new TopMissile({
       owner: this,
       x: pm.x,
       y: pm.y,
-      vx: this.facing * 55 + this.vx * 0.4,
+      vx: dir * 50 + this.vx * 0.3,
       vy: 30,
       tx: lockX,
       ty: gy,
-      sprite: 'bm2_missile',
-      drop: 0.3,
-      speed: 50,
-      topSpeed: Math.min(220, this.shotSpeed(205)),
-      accel: 250,
-      turn: 4.6,
-      steer: 0.95,
-      radius: 15,
+      drop: 0.28,
+      ceilY: this.groundY - 120,
+      floorY: this.groundY - 54,
+      cruise: Math.min(200, this.shotSpeed(150)),
+      dive: Math.min(220, this.shotSpeed(205)),
     });
     this.world.add(m);
-    const mk = this.world.add(new LockMark(lockX, gy, 1.4, 9));
+    const mk = this.world.add(new LockMark(lockX, gy, 1.3, 13));
     mk.watch = m;
     smoke(this.world, pm.x, pm.y, { n: 3, color: '#e8e0d0', color2: '#8a8480', vy: -6, life: 0.5 });
     bsfx(this, 'metal_hit', { vol: 0.35, pitch: 1.5 });
@@ -786,25 +784,23 @@ export class HornetKing extends BigBoss {
   private launchRain(x: number): void {
     const pm = this.toWorld(P.podMouth[0], P.podMouth[1]);
     const gy = this.floorAt(x);
-    const m = new LockMissile({
+    const dir = Math.abs(x - pm.x) < 8 ? this.facing : Math.sign(x - pm.x);
+    const m = new TopMissile({
       owner: this,
       x: pm.x,
       y: pm.y,
-      vx: this.facing * this.world.rng.range(-10, 50),
+      vx: dir * this.world.rng.range(15, 45),
       vy: -205,
       tx: x,
       ty: gy,
-      sprite: 'bm2_missile',
-      drop: 0.56,
-      speed: 40,
-      topSpeed: Math.min(220, this.shotSpeed(215)),
-      accel: 320,
-      turn: 7,
-      steer: 1.1,
-      radius: 15,
+      drop: 0.5,
+      ceilY: this.groundY - 140,
+      floorY: this.groundY - 54,
+      cruise: Math.min(210, this.shotSpeed(165)),
+      dive: Math.min(220, this.shotSpeed(215)),
     });
     this.world.add(m);
-    const mk = this.world.add(new LockMark(x, gy, 1.7, 10));
+    const mk = this.world.add(new LockMark(x, gy, 1.7, 13));
     mk.watch = m;
     smoke(this.world, pm.x, pm.y, { n: 3, color: '#e8e0d0', color2: '#8a8480', vy: -16, life: 0.5 });
     bsfx(this, 'enemy_rocket', { vol: 0.4, pitch: 1.2 });

@@ -1,12 +1,14 @@
 // HORNET KING helpers: the aft rotor that tears off in phase 2 (tumbles, crashes, burns), a lock-on
-// marker that lives exactly as long as the missile it marks, and the carpet bomb.
+// marker that lives exactly as long as the missile it marks, the top-attack missile and the carpet bomb.
 
 import { sprites } from '../../../engine/sprites';
 import { fxRng } from '../../../engine/rng';
+import { angleTo, rotateTowards } from '../../../engine/math';
 import { Entity } from '../../../game/entity';
+import { Projectile } from '../../../game/projectile';
 import { Z } from '../../../game/constants';
 import { GroundMarker as FloorMarker } from '../common/fx';
-import { Lobbed, FlyingPart, bsfxAt, flames, smoke, sparkBurst } from '../common/kit';
+import { Lobbed, FlyingPart, bsfx, bsfxAt, flames, smoke, sparkBurst } from '../common/kit';
 import { ROT_N, TILT0 } from './art';
 
 /** Blinking lock-on brackets on the floor that stay until the watched projectile is gone. */
@@ -25,6 +27,132 @@ export class LockMark extends FloorMarker {
     // Keep blinking at the "imminent" rate while the missile is still on its way.
     this.life = Math.max(0.06, this.life - dt);
     if (!this.watch && this.age > this.max + 0.2) this.remove();
+  }
+}
+
+export interface TopMissileOpts {
+  owner: Entity;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  /** Locked ground point (marked on the floor). */
+  tx: number;
+  ty: number;
+  /** Unpowered drop / toss before the motor lights. */
+  drop: number;
+  /** Highest point (lowest y) and lowest point it cruises at. */
+  ceilY: number;
+  floorY: number;
+  cruise: number;
+  dive: number;
+  accel?: number;
+  turn?: number;
+  radius?: number;
+}
+
+/**
+ * Top-attack missile: drops (or is tossed up) out of the pod, ignites slowly, cruises ABOVE head
+ * height to the spot over its locked point, then dives almost vertically onto it - so the only
+ * danger zone is the marked spot. Shootable (1 HP); a shot-down or expired missile pops harmlessly.
+ */
+export class TopMissile extends Projectile {
+  readonly tx: number;
+  readonly ty: number;
+  private t = 0;
+  private lit = false;
+  private diving = false;
+  private cruiseY = 0;
+  private smokeT = 0;
+  private readonly o: TopMissileOpts;
+
+  constructor(o: TopMissileOpts) {
+    super({
+      team: 'enemy',
+      owner: o.owner,
+      x: o.x,
+      y: o.y,
+      vx: o.vx,
+      vy: o.vy,
+      w: 7,
+      h: 6,
+      sprite: 'bm2_missile',
+      rotate: true,
+      fps: 16,
+      life: 7,
+      explode: { radius: o.radius ?? 15, damage: 1, size: 'small', shake: 1 },
+    });
+    this.o = o;
+    this.tx = o.tx;
+    this.ty = o.ty;
+    this.hittable = true;
+    this.hp = this.maxHp = 1;
+    this.scoreValue = 100;
+    this.offscreenMargin = 160;
+  }
+
+  get ignited(): boolean {
+    return this.lit;
+  }
+
+  get isDiving(): boolean {
+    return this.diving;
+  }
+
+  protected override move(dt: number): void {
+    const o = this.o;
+    this.t += dt;
+    if (this.t < o.drop) {
+      this.vy += 320 * dt;
+      this.vx *= Math.max(0, 1 - 2.5 * dt);
+      this.x += this.vx * dt;
+      this.y += this.vy * dt;
+      return;
+    }
+    let ang = Math.atan2(this.vy, this.vx);
+    let sp = Math.hypot(this.vx, this.vy);
+    const turn = o.turn ?? 7;
+    if (!this.lit) {
+      this.lit = true;
+      sp = 45;
+      this.cruiseY = Math.max(o.ceilY, Math.min(o.floorY, this.y));
+      ang = rotateTowards(ang, Math.atan2(this.cruiseY - this.y, this.tx - this.x), 1.2);
+      bsfx(this, 'enemy_rocket', { vol: 0.4 });
+      this.world.particles.add({ kind: 'smoke', x: this.x, y: this.y, vx: 0, vy: -6, life: 0.4, color: '#e8e0d0', color2: '#8a8480', size: 2, size2: 6, drag: 2 });
+    }
+    const dx = this.tx - this.x;
+    if (!this.diving && Math.abs(dx) < sp / turn + 5) this.diving = true;
+    const want = this.diving ? angleTo(this.x, this.y, this.tx, this.ty) : Math.atan2((this.cruiseY - this.y) * 1.5, dx);
+    ang = rotateTowards(ang, want, turn * dt);
+    sp = Math.min(this.diving ? o.dive : o.cruise, sp + (o.accel ?? 260) * dt);
+    this.vx = Math.cos(ang) * sp;
+    this.vy = Math.sin(ang) * sp;
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    this.smokeT -= dt;
+    if (this.smokeT <= 0) {
+      this.smokeT = 0.025;
+      const bx = this.x - Math.cos(ang) * 7;
+      const by = this.y - Math.sin(ang) * 7;
+      this.world.particles.add({ kind: 'smoke', x: bx, y: by, vx: fxRng.range(-6, 6), vy: fxRng.range(-10, 2), life: 0.45, color: '#d8d0c8', color2: '#7a7470', size: 1, size2: 3, drag: 2 });
+      this.world.particles.add({ kind: 'px', x: bx, y: by, vx: -Math.cos(ang) * 30, vy: -Math.sin(ang) * 30, life: 0.08, color: fxRng.chance(0.5) ? '#ffe070' : '#ff8a30', size: 2 });
+    }
+  }
+
+  protected override onHitTerrain(): void {
+    const gy = this.world.terrain.groundTopAt(this.x);
+    if (isFinite(gy) && this.y > gy) this.y = gy - 2;
+    this.detonate();
+  }
+
+  protected override expire(): void {
+    this.die();
+  }
+
+  override die(): void {
+    // Shot down / out of fuel: harmless pop.
+    this.world.explode(this.x, this.y, { radius: 10, damage: 0, team: 'enemy', size: 'small', shake: 0, sfx: 'explosion_small' });
+    this.remove();
   }
 }
 
