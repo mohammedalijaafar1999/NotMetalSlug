@@ -7,10 +7,10 @@
 //    fire telegraphed 3-round bursts), two dorsal drone launch tubes, a bomb bay (parachute mines),
 //    three broadside gun ports on the gondola, engine pods with pusher propellers (contact hurts).
 //  - Damage: bridge windows x1.25, gondola x1, envelope x0.35, engines x0.5; the storm core in the
-//    nose x2 once exposed.
-//  - Phase 0 (100-60%): turrets + drones + mine curtains.
-//    Phase 1 (60-30%): the envelope is holed and burns; broadside fan volleys join in.
-//    Phase 2 (<30%): the nose cap is blown off, exposing the STORM CORE: aimed lightning bolts
+//    nose x1.35 once exposed.
+//  - Phase 0 (100-62%): turrets + drones + mine curtains.
+//    Phase 1 (62-33%): the envelope is holed and burns; broadside fan volleys join in.
+//    Phase 2 (<33%): the nose cap is blown off, exposing the STORM CORE: aimed lightning bolts
 //    (tracking dotted line, lock blink, strike) on top of everything else; the ship lists lower.
 //  - Death: fires everywhere, the ship plunges nose-first, breaks in two and falls out of the sky.
 // The boss entity's own box (x, y, w, h) is the current main target (gondola, then the core), which
@@ -219,7 +219,7 @@ export class Thunderhead extends BigBoss {
     this.w = 79;
     this.h = 25;
     this.scoreValue = 30000;
-    this.phaseAt = [0.6, 0.3];
+    this.phaseAt = [0.62, 0.33];
     this.deathDuration = 4.6;
   }
 
@@ -290,7 +290,7 @@ export class Thunderhead extends BigBoss {
     const z: Zone[] = [];
     const add = (id: string, ax0: number, ay0: number, ax1: number, ay1: number, mul: number) => z.push({ id, mul, ...this.rectAt(ax0, ay0, ax1, ay1) });
     add('hull', -62, -26, 96, 26, 0.35);
-    if (this.coreOpen) add('core', 66, -16, 97, 16, 1.5);
+    if (this.coreOpen) add('core', 66, -16, 97, 16, 1.35);
     add('gondola', 8, 33, 88, 58, 1);
     add('bridge', 55, 33, 89, 46, 1.25);
     add('engine', -86, -14, -55, -2, 0.5);
@@ -413,7 +413,7 @@ export class Thunderhead extends BigBoss {
       const i = this.launched++;
       const tb = this.tubes[i % 2];
       const m = this.at(TUBES[i % 2], TUBE_Y - 13);
-      const kinds: ('kamikaze' | 'zap')[][] = [['kamikaze'], ['zap', 'kamikaze'], ['kamikaze', 'zap', 'kamikaze']];
+      const kinds: ('kamikaze' | 'zap')[][] = [['kamikaze', 'zap'], ['zap', 'kamikaze'], ['kamikaze', 'zap', 'zap']];
       const kl = kinds[Math.min(this.phase, 2)];
       const kind = kl[i % kl.length];
       const alt = 66 + 38 * ((i + this.cycle) % 3);
