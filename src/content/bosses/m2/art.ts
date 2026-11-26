@@ -841,25 +841,31 @@ sprites.define({
 /** High-drag carpet bomb: nose down, retarder fins, yellow band (2 wobble frames). */
 sprites.define({
   name: 'bm2_bomb',
-  w: 10,
-  h: 15,
-  ox: 5,
-  oy: 9,
+  w: 14,
+  h: 20,
+  ox: 7,
+  oy: 12,
   frames: 2,
   draw: (p, f) => {
     const d = new Pen(p);
     const w = f ? 1 : 0;
-    // Retarder fins (top).
-    d.poly([1 - w, 0, 4, 4, 2, 5], BC.steel);
-    d.poly([9 + w, 0, 6, 4, 8, 5], BC.steelD);
-    d.rect(4, 1, 2, 4, BC.steelD);
-    // Body.
-    d.ellipse(5, 9, 3.6, 5.2, BC.oliveD);
-    d.ellipse(4.6, 8.6, 2.8, 4.6, BC.olive);
-    d.rect(3, 6, 1, 4, BC.oliveLL);
-    d.rect(1.5, 7, 7, 2, BC.hazard);
-    d.rect(1.5, 7, 3, 1, BC.hazardL);
-    d.circle(5, 13, 1.4, BC.steelD);
+    // Retarder fins (top) spread open, flutter between frames.
+    d.poly([1 - w, 0, 6, 5, 3, 7], BC.steel);
+    d.line(1 - w, 0, 5, 5, BC.steelL);
+    d.poly([13 + w, 0, 8, 5, 11, 7], BC.steelD);
+    d.rect(6, 1, 2, 6, BC.steelD);
+    d.px(6, 1, BC.steelL);
+    // Body (nose down).
+    d.ellipse(7, 12.5, 4.8, 6.8, BC.oliveDD);
+    d.ellipse(6.6, 12, 4, 6.2, BC.olive);
+    d.ellipse(5.4, 10.5, 1.4, 3.4, BC.oliveL);
+    d.px(5, 9, BC.oliveLL);
+    // Hornet band + nose fuse.
+    d.rect(2.2, 10, 9.6, 2.5, BC.hazard);
+    d.rect(2.2, 10, 4, 1, BC.hazardL);
+    d.rect(2.6, 12.5, 9, 1, BC.ironDD);
+    d.circle(7, 18, 1.8, BC.steelD);
+    d.px(6, 17, BC.steelL);
   },
 });
 
