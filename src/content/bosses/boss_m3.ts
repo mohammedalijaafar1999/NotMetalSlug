@@ -41,7 +41,7 @@ import { Boulder, FallingIcicle, FlakShell, FrostLance, SPIKE_ACTIVE, SPIKE_LEAD
 /** Arena-relative x of the wall face (camera-lock x + FACE_X). */
 export const FACE_X = 248;
 /** Height of the frost lance above the floor (crouch under it: crouched players are 17 px tall). */
-export const LANCE_H = 24;
+export const LANCE_H = 25;
 
 const HP = 260;
 const TURRET_HP = { mg: 20, flak: 26, mortar: 26 } as const;
@@ -264,15 +264,20 @@ export class FrostBastion extends BigBoss {
     this.mortar.place(o.x, o.y - 8);
   }
 
-  /** Core zone + armoured doors (world space), rebuilt every frame. */
+  /** Core zone + armoured doors and gate header (world space), rebuilt every frame. */
   layoutZones(): void {
     const z: Zone[] = [];
     if (this.face) {
       const G = this.groundY;
-      if (!this.broken && this.doorK < 0.6) z.push({ id: 'doors', mul: 0, x: this.face - 10, y: G - CORE_Y - 23, w: 12, h: 45 });
-      if (this.coreK > 0.3) {
+      const F = this.face;
+      const FR = WALL.FRAME;
+      // Armour (no damage, shots clang): the gate header always, the doors while shut.
+      z.push({ id: 'frame', mul: 0, x: F - FR, y: G - HY(WALL.HEADER), w: FR + 2, h: HY(WALL.HEADER) - HY(WALL.GATE.y) });
+      // Until the core is pushed out far enough to be hit, the gate counts as armour.
+      if (this.coreK <= 0.3) z.push({ id: 'doors', mul: 0, x: F - FR, y: G - HY(WALL.GATE.y), w: FR + 2, h: WALL.GATE.h });
+      else {
         const tip = this.tipX();
-        z.push({ id: 'core', mul: 1, x: tip - 3, y: G - CORE_Y - 17, w: 26, h: 34 });
+        z.push({ id: 'core', mul: 1, x: tip - 3, y: G - CORE_Y - 17, w: 29, h: 34 });
       }
     }
     this.zones = z;
@@ -312,6 +317,7 @@ export class FrostBastion extends BigBoss {
     this.coreRecoil = approach(this.coreRecoil, 0, dt * 18);
     this.jolt = Math.max(0, this.jolt - dt);
     this.wallFlash = Math.max(0, this.wallFlash - dt);
+    this.blockGate();
     if (!this.introDone) {
       this.intro(dt);
       this.placeTurrets();
@@ -465,10 +471,16 @@ export class FrostBastion extends BigBoss {
       }
     }
     this.attackUpdate(dt);
-    // The pushed-out core is a physical obstacle at floor level (anyone standing there is shoved);
-    // above it the face of the wall (terrain solid) stays where it is, so shots fly on to the face.
-    const edge = this.tipX() + 7;
-    if (edge < this.face + 2) this.pushOut(edge, this.G - CORE_Y - 21);
+  }
+
+  /**
+   * The gate frame (and the core once it is pushed out) is a physical obstacle at floor level:
+   * anyone standing there is shoved out. Above it the terrain solid of the face stays put, so
+   * shots fly on to the face instead of stopping in mid-air.
+   */
+  private blockGate(): void {
+    const edge = Math.min(this.face - WALL.FRAME, this.tipX() + 7);
+    this.pushOut(edge, this.G - HY(WALL.HEADER) - 2);
   }
 
   private startAttack(k: CoreAttack): void {
@@ -659,7 +671,6 @@ export class FrostBastion extends BigBoss {
     this.jolt = 0.25;
     // Shaking the wall loosens the icicles.
     if (this.allow(1.1)) this.dropIcicles(2);
-    if (this.destroyed === 3) w.announce('TURRETS DOWN!', { color: '#8ae8ff', time: 1.4 });
   }
 
   // ---------------------------------------------------------------- icicles
@@ -749,7 +760,6 @@ export class FrostBastion extends BigBoss {
       this.reserve(at, at + this.attackLength(this.pending));
     }
     if (this.allow(1.1)) this.dropIcicles(3);
-    w.announce(phase >= 2 ? 'THE CORE IS EXPOSED!' : 'THE BASTION RAGES!', { color: '#8ae8ff', time: 1.6 });
   }
 
   /** Phase 2: the blast doors are blown off; the core stays out for good. */
@@ -759,8 +769,8 @@ export class FrostBastion extends BigBoss {
     const gx = this.face - 4;
     const gy = this.G - CORE_Y;
     w.explode(gx, gy, { radius: 22, damage: 0, team: 'enemy', size: 'large', shake: 6, sfx: 'explosion_big' });
-    w.add(new FlyingPart('bm3_shutter', 0, gx, gy - 12, -150, -260, { burn: true, life: 2.6 }));
-    w.add(new FlyingPart('bm3_shutter', 1, gx, gy + 8, -90, -170, { burn: false, life: 2.6 }));
+    w.add(new FlyingPart('bm3_door', 0, gx - 8, gy - 12, -150, -260, { burn: true, life: 2.6 }));
+    w.add(new FlyingPart('bm3_door', 1, gx - 8, gy + 8, -90, -170, { burn: false, life: 2.6 }));
     snd(w, 'alarm', this.face, 0.7, 0.9);
     const busy = this.lance && !this.lance.dead ? this.lance.total - this.lance.t : 0;
     this.setMode('broken');
@@ -771,15 +781,33 @@ export class FrostBastion extends BigBoss {
 
   // ---------------------------------------------------------------- ambient fx
 
+  /** Steam jets from the gate seams (above / below the core, drawn behind it) and the vent grille. */
   private steamBurst(n: number): void {
     const w = this.world;
     const G = this.G;
+    const top = G - HY(WALL.GATE.y);
+    const bot = G - 4;
     for (let i = 0; i < n; i++) {
-      const top = fxRng.chance(0.5);
-      puffSteam(w, this.face - 2, G - CORE_Y + (top ? -22 : 20), -fxRng.range(20, 60), top ? -fxRng.range(10, 40) : -fxRng.range(0, 15), 1, 3);
+      const up = fxRng.chance(0.5);
+      const x = this.face - WALL.FRAME - 1;
+      const y = up ? top + 2 : bot - 2;
+      w.particles.add({
+        kind: 'smoke',
+        x: x + fxRng.range(-2, 2),
+        y,
+        vx: -fxRng.range(25, 70),
+        vy: up ? -fxRng.range(15, 45) : -fxRng.range(4, 18),
+        life: fxRng.range(0.35, 0.7),
+        color: '#f2f6ff',
+        color2: '#aebccc',
+        size: 1.5,
+        size2: 5,
+        drag: 2.6,
+        alpha: 0.75,
+      });
     }
     const v = WALL.VENT;
-    puffSteam(w, this.fx(D(v.x)), G - HY(v.y) - 4, -fxRng.range(5, 25), -fxRng.range(25, 50), 1, 3);
+    puffSteam(w, this.fx(D(v.x)), G - HY(v.y) - 4, -fxRng.range(5, 25), -fxRng.range(25, 50), 1, 2.5);
   }
 
   private ambient(dt: number): void {
@@ -823,7 +851,6 @@ export class FrostBastion extends BigBoss {
       { t: 1.2, done: false, d: D(WALL.MORTAR.x), h: HY(WALL.MORTAR.y) + 8 },
       { t: 1.6, done: false, d: 8, h: CORE_Y },
     ];
-    w.announce('', { time: 0.01 });
   }
 
   override deathArea(): Rect {
@@ -895,6 +922,11 @@ export class FrostBastion extends BigBoss {
     g.restore();
   }
 
+  /** Hit flash for a part, blinking so constant fire never hides the art. */
+  private blink(e: Entity): boolean {
+    return e.flash > 0 && Math.floor(this.age * 30) % 2 === 0;
+  }
+
   private renderBeacons(g: CanvasRenderingContext2D, X: (sx: number) => number, Y: (sy: number) => number): void {
     const spr = sprites.get('bm3_beacon');
     const warn = this.mode === 'closed' && this.introDone && this.modeDur - this.modeT < WARN;
@@ -925,7 +957,7 @@ export class FrostBastion extends BigBoss {
     if (!fl.dead) {
       const ef = fl.stage === 'aim' ? 4 : fl.stage === 'fire' || fl.recoil > 1 ? 2 : 1;
       const firing = fl.recoil > 2 ? 5 : 0;
-      sprites.get('bm3_flak').draw(g, fx + Math.round(fl.recoil * 0.6), fy, ef + firing, { flip: true, flash: fl.flash > 0 });
+      sprites.get('bm3_flak').draw(g, fx + Math.round(fl.recoil * 0.6), fy, ef + firing, { flip: true, flash: this.blink(fl) });
     } else sprites.get('bm3_wreck').draw(g, fx, fy, 1, { flip: true });
     // Mortar nest.
     const mo = this.mortar;
@@ -933,36 +965,41 @@ export class FrostBastion extends BigBoss {
     const my = Y(WALL.MORTAR.y) + pop;
     if (!mo.dead) {
       const mf = mo.recoil > 2 ? 1 : mo.recoil > 0.5 ? 2 : 0;
-      sprites.get('bm3_mortar').draw(g, mx, my, mf, { flip: true, flash: mo.flash > 0 });
+      sprites.get('bm3_mortar').draw(g, mx, my, mf, { flip: true, flash: this.blink(mo) });
     } else sprites.get('bm3_wreck').draw(g, mx, my, 2, { flip: true });
   }
 
   private renderCore(g: CanvasRenderingContext2D, X: (sx: number) => number, Y: (sy: number) => number, shakeX: number): void {
+    void shakeX;
     const faceX = X(WALL.FACE);
-    const cy = Y(WALL.GATE.y + WALL.GATE.h / 2);
-    // Core assembly (clipped to the outside of the face).
-    if (this.coreK > 0.01) {
+    const gTop = Y(WALL.GATE.y);
+    const gBot = Y(WALL.GATE.y + WALL.GATE.h);
+    const cy = Math.round((gTop + gBot) / 2);
+    // Core assembly: glows in the dark gate recess once the doors part, then rams out on its pistons.
+    if (this.doorK > 0.02 || this.coreK > 0.01) {
       g.save();
       g.beginPath();
-      g.rect(faceX - 120, cy - 60, 120, 120);
+      g.rect(faceX - 90, gTop - 1, 90 + (WALL.FACE - WALL.GATE.x), gBot - gTop + 2);
       g.clip();
       const hot = this.charge > 0.6 || (this.lance?.firing ?? false);
-      const fr = hot ? 4 + (Math.floor(this.age * 20) % 2) : Math.floor(this.age * 6) % 4;
-      const x = faceX + Math.round(WALL.CORE_LEN * (1 - this.coreK) + this.coreRecoil) + shakeX * 0;
-      sprites.get('bm3_core').draw(g, x, cy, this.dying ? 4 + (Math.floor(this.age * 30) % 2) : fr, { flip: true, flash: this.flashing('core') });
+      const fr = this.dying ? 4 + (Math.floor(this.age * 30) % 2) : hot ? 4 + (Math.floor(this.age * 20) % 2) : Math.floor(this.age * 6) % 4;
+      const x = faceX + Math.round(WALL.CORE_LEN * (1 - this.coreK) + this.coreRecoil);
+      // Hit flash blinks so a core under constant fire still shows its art.
+      const flash = this.flashing('core') && Math.floor(this.age * 30) % 2 === 0;
+      sprites.get('bm3_core').draw(g, x, cy, fr, { flip: true, flash });
       g.restore();
     }
-    // Blast doors: upper half slides up, lower half slides down (into the floor).
+    // Blast doors: the upper half retracts into the header, the lower one into the sill.
     if (!this.broken) {
-      const s = sprites.get('bm3_shutter');
-      const open = Math.round(this.doorK * 24);
-      const gx = faceX + 1;
+      const s = sprites.get('bm3_door');
+      const half = Math.round((gBot - gTop) / 2);
+      const open = Math.round(this.doorK * (half + 1));
       g.save();
       g.beginPath();
-      g.rect(faceX - 20, cy - 70, 40, 70 + (this.G - cy));
+      g.rect(faceX - WALL.FRAME - 2, gTop, WALL.FRAME + 5, gBot - gTop);
       g.clip();
-      s.draw(g, gx, cy - 22 - open, 0, { flip: true, flash: this.flashing('doors') && false });
-      s.draw(g, gx, cy + open, 1, { flip: true });
+      s.draw(g, faceX + 1, gTop - open, 0, { flip: true });
+      s.draw(g, faceX + 1, gTop + half + open, 1, { flip: true });
       g.restore();
     }
   }
@@ -982,7 +1019,7 @@ export class FrostBastion extends BigBoss {
     const firing = t.stage === 'fire' && t.recoil > 1;
     const rx = Math.round(Math.cos(t.ang) * -t.recoil);
     const ry = Math.round(Math.sin(t.ang) * -t.recoil);
-    sprites.get('bm3_mg').draw(g, x + rx, y + ry, ai + (firing ? MG_N : 0), { flip: true, flash: t.flash > 0 });
+    sprites.get('bm3_mg').draw(g, x + rx, y + ry, ai + (firing ? MG_N : 0), { flip: true, flash: this.blink(t) });
     // Lock-on blink.
     if (t.stage === 'aim' && t.locked && Math.floor(this.age * 20) % 2 === 0) {
       const cx = x;

@@ -457,24 +457,33 @@ export class SpikeWave extends Entity {
 
   override render(g: CanvasRenderingContext2D): void {
     const G = Math.round(this.groundY);
-    // Frost crack racing ahead of the spikes.
+    // Frost crack racing ahead of the spikes: a bright blinking seam with frost sparkles above it.
     const crack = Math.max(this.xEnd, this.x0 - this.speed * this.t);
-    const blink = Math.floor(this.t * 20) % 2 === 0;
-    for (let x = Math.round(this.x0); x >= crack; x -= 2) {
-      const sinceCrack = (this.x0 - x) / this.speed;
-      const age = this.t - sinceCrack;
-      if (age > this.lead + this.active + 0.4) continue;
-      const j = ((x * 7) % 5) - 2;
-      g.fillStyle = age < 0.12 ? '#ffffff' : blink ? ICE.light : ICE.mid;
-      g.fillRect(x, G - 1 + (j > 1 ? -1 : 0), 2, 1);
-      if (((x >> 1) % 3) === 0) g.fillRect(x + 1, G - 2, 1, 1);
+    const blink = Math.floor(this.t * 24) % 2 === 0;
+    for (let x = Math.round(this.x0); x >= crack; x--) {
+      const age = this.t - (this.x0 - x) / this.speed;
+      if (age > this.lead + this.active + 0.3) continue;
+      const fresh = age < this.lead;
+      const j = (x * 7) % 5;
+      g.fillStyle = fresh ? (blink ? '#ffffff' : ICE.light) : ICE.mid;
+      g.fillRect(x, G - 1 - (j === 4 ? 1 : 0), 1, 1);
+      if (fresh) {
+        g.fillStyle = ICE.light;
+        if (j === 1) g.fillRect(x, G - 2, 1, 1);
+        if ((x * 13 + Math.floor(this.t * 30)) % 11 === 0) {
+          g.fillStyle = '#ffffff';
+          g.fillRect(x, G - 3 - ((x * 3) % 4), 1, 1);
+        }
+      }
     }
-    // Leading glint.
+    // Leading glint (a little star running along the floor).
     if (crack > this.xEnd) {
+      const cx = Math.round(crack);
       g.fillStyle = '#ffffff';
-      g.fillRect(Math.round(crack) - 2, G - 3, 4, 2);
+      g.fillRect(cx - 3, G - 2, 7, 1);
+      g.fillRect(cx, G - 5, 1, 5);
       g.fillStyle = ICE.light;
-      g.fillRect(Math.round(crack) - 1, G - 5, 2, 1);
+      g.fillRect(cx - 1, G - 3, 3, 2);
     }
     // Spikes.
     const spr = sprites.get('bm3_spike');

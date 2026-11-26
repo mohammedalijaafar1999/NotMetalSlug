@@ -28,36 +28,38 @@ export const WALL = {
   OX: 92,
   /** Front face column. World face x F = boss.x - (FACE - OX). */
   FACE: 160,
-  /** Gallery underside / walkway top (sprite y). */
+  /** Gallery walkway top / underside (sprite y) and its tip (sprite x). */
   GALLERY_TOP: 52,
   GALLERY_BOTTOM: 64,
   GALLERY_END: 225,
-  /** Core hatch slot on the face (the core assembly slides out of it). */
-  GATE: { x: 150, y: 108, w: 10, h: 42 },
-  /** Emitter (cannon muzzle) mount on the face; the muzzle tip is EMITTER.x + EMITTER_LEN. */
-  EMITTER: { x: 160, y: 90 },
-  EMITTER_LEN: 13,
-  /** Core assembly: fully extended it spans FACE .. FACE + CORE_LEN (centered on the slot). */
-  CORE_LEN: 28,
-  /** Turret mounts (sprite space). */
-  MG: { x: 212, y: 64 },
-  FLAK: { x: 192, y: 52 },
-  MORTAR: { x: 160, y: 52 },
-  SMOKESTACK: { x: 18, y: 2 },
-  /** Steam vent grille (sprite space). */
-  VENT: { x: 140, y: 124 },
+  /** Gate opening in the face (a dark recess; the core slides out of it). */
+  GATE: { x: 148, y: 106, w: 12, h: 42 },
+  /** The gate frame sticks out FRAME px from the face: header block from HEADER down to GATE.y. */
+  HEADER: 97,
+  FRAME: 16,
+  /** Core assembly: fully extended its back sits on the face and the crystal tip is CORE_LEN out. */
+  CORE_LEN: 40,
+  /** Turret mounts: the MG hangs from the gallery underside, flak and mortar sit on the deck. */
+  MG: { x: 214, y: 64 },
+  FLAK: { x: 194, y: 52 },
+  MORTAR: { x: 172, y: 52 },
+  SMOKESTACK: { x: 36, y: 1 },
+  /** Steam vent grille on the gatehouse. */
+  VENT: { x: 137, y: 122 },
   /** Icicle slots along the gallery underside (sprite x). */
-  ICICLES: [168, 178, 188, 198, 224],
+  ICICLES: [182, 198, 224],
+  /** Machicolation corbels under the gallery (sprite x of their left edge). */
+  CORBELS: [163, 188, 206],
   BEACONS: [
     { x: 131, y: 76 },
-    { x: 146, y: 76 },
+    { x: 147, y: 76 },
   ],
   /** Breach / crack points that smoke and burn as the wall takes damage (most visible first). */
   BREACHES: [
     { x: 118, y: 92 },
-    { x: 58, y: 104 },
-    { x: 172, y: 58 },
-    { x: 24, y: 58 },
+    { x: 62, y: 106 },
+    { x: 176, y: 58 },
+    { x: 30, y: 58 },
   ],
 };
 
@@ -224,59 +226,63 @@ function drawWall(p: PixelArt, dmg: number): void {
   const F = WALL.FACE;
   const GT = WALL.GALLERY_TOP;
   const GB = WALL.GALLERY_BOTTOM;
+  const GE = WALL.GALLERY_END;
   // --- Keep (back tower).
-  masonry(p, 4, 22, 74, H - 22, 11, shade(STONE.base, -0.06), 11);
+  masonry(p, 4, 22, 76, H - 22, 11, shade(STONE.base, -0.06), 11);
+  // Smokestack behind the battlement.
+  const sx = WALL.SMOKESTACK.x;
+  p.rect(sx - 5, 0, 11, 16, IRON.darker);
+  p.rect(sx - 4, 2, 9, 14, IRON.dark);
+  p.rect(sx - 3, 2, 2, 14, IRON.base);
+  p.rect(sx - 6, 0, 13, 3, IRON.darker);
+  p.rect(sx - 5, 0, 11, 1, IRON.light);
+  p.rect(sx - 4, 8, 9, 1, RUST.dark);
+  p.px(sx + 3, 5, RUST.base);
   // Keep battlement: merlons.
-  for (let x = 4; x < 78; x += 12) {
+  for (let x = 4; x < 80; x += 12) {
     masonry(p, x, 12, 8, 10, 30 + x, STONE.base, 10);
     snowCap(p, x, 12, 8, 70 + x, 2, false);
   }
-  p.rect(4, 21, 74, 2, STONE.darker);
-  snowCap(p, 4, 22, 74, 5, 2);
-  // Smokestack.
-  p.rect(14, 0, 9, 14, IRON.dark);
-  p.rect(15, 0, 2, 14, IRON.base);
-  p.rect(13, 0, 11, 2, IRON.darker);
-  p.rect(14, 6, 9, 1, RUST.dark);
+  p.rect(4, 21, 76, 2, STONE.darker);
+  snowCap(p, 4, 22, 76, 5, 2);
   // Iron bands with rivets.
-  ironPlate(p, 4, 30, 74, 6);
-  ironPlate(p, 4, 120, 74, 7, shade(IRON.base, -0.08));
-  // Emblem + slits.
-  p.circle(40, 70, 17, STONE.darker);
-  legionCog(p, 40, 70, 14);
-  arrowSlit(p, 16, 44);
-  arrowSlit(p, 62, 44);
-  arrowSlit(p, 16, 92);
-  arrowSlit(p, 62, 92, 9, dmg < 2);
-  // Keep shadow onto the curtain (light from top-left: the keep's right edge is dark).
-  p.rect(77, 22, 2, H - 22, STONE.darker);
+  ironPlate(p, 4, 30, 76, 6);
+  ironPlate(p, 4, 120, 76, 7, shade(IRON.base, -0.08));
+  // Emblem + lit slits.
+  p.circle(48, 74, 17, STONE.darker);
+  legionCog(p, 48, 74, 14);
+  arrowSlit(p, 18, 44);
+  arrowSlit(p, 72, 46);
+  arrowSlit(p, 18, 94);
+  arrowSlit(p, 72, 96, 9, dmg < 2);
+  // Keep shadow onto the curtain (light from the top-left: the keep's right edge is dark).
+  p.rect(79, 22, 2, H - 22, STONE.darker);
 
   // --- Curtain block under the gallery.
-  masonry(p, 79, GB, F - 79, H - GB, 23, STONE.base, 10);
+  masonry(p, 81, GB, F - 81, H - GB, 23, STONE.base, 10);
   // Gallery walkway (overhang).
-  masonry(p, 70, GT, WALL.GALLERY_END - 70, GB - GT, 41, shade(STONE.base, 0.05), 6);
-  p.rect(70, GB - 1, WALL.GALLERY_END - 70, 1, STONE.darker);
-  p.rect(70, GB, WALL.GALLERY_END - 70, 1, SOOT);
+  masonry(p, 72, GT, GE - 72, GB - GT, 41, shade(STONE.base, 0.05), 6);
+  p.rect(72, GB - 1, GE - 72, 1, STONE.darker);
+  p.rect(72, GB, GE - 72, 1, SOOT);
   // Parapet merlons along the gallery front.
-  for (let x = 206; x < WALL.GALLERY_END - 2; x += 10) {
+  for (let x = 208; x < GE - 2; x += 9) {
     masonry(p, x, GT - 7, 6, 7, 90 + x, STONE.base, 7);
     snowCap(p, x, GT - 7, 6, 91 + x, 2, false);
   }
-  snowCap(p, 70, GT, WALL.GALLERY_END - 70, 9, 3);
-  // Machicolation corbels under the gallery at the face (stepped brackets with murder holes).
-  for (let i = 0; i < 5; i++) {
-    const x = F + 4 + i * 12;
-    if (x > WALL.GALLERY_END - 10) break;
-    p.rect(x, GB + 1, 7, 5, STONE.dark);
-    p.rect(x + 1, GB + 6, 5, 3, STONE.dark);
-    p.rect(x + 2, GB + 9, 3, 2, STONE.darker);
-    p.rect(x, GB + 1, 7, 1, STONE.light);
-    p.rect(x + 7, GB + 1, 4, 3, SOOT); // murder hole
+  snowCap(p, 72, GT, GE - 72, 9, 3);
+  // Machicolation corbels under the gallery (stepped brackets with murder holes).
+  for (const x of WALL.CORBELS) {
+    p.rect(x, GB + 1, 8, 5, STONE.dark);
+    p.rect(x + 1, GB + 6, 6, 3, STONE.dark);
+    p.rect(x + 2, GB + 9, 4, 2, STONE.darker);
+    p.rect(x, GB + 1, 8, 1, STONE.light);
+    p.px(x, GB + 2, STONE.lighter);
+    p.rect(x + 8, GB + 1, 3, 3, SOOT); // murder hole
   }
-  // Iron truss from the face up to the gallery end.
-  const tx0 = F;
-  const ty0 = 98;
-  const tx1 = 218;
+  // Iron truss from the gate header up to the gallery tip.
+  const tx0 = F + 10;
+  const ty0 = WALL.HEADER;
+  const tx1 = 220;
   const ty1 = GB + 1;
   p.line(tx0, ty0, tx1, ty1, IRON.darker, 4);
   p.line(tx0, ty0 - 1, tx1, ty1 - 1, IRON.base, 2);
@@ -290,14 +296,16 @@ function drawWall(p: PixelArt, dmg: number): void {
   }
 
   // Legion banner hanging from the gallery.
-  const bx = 96;
+  const bx = 94;
   p.rect(bx - 2, GB + 1, 24, 3, IRON.dark);
+  p.rect(bx - 2, GB + 1, 24, 1, IRON.light);
   const torn = dmg >= 2;
   const bh = torn ? 26 : 44;
   p.rect(bx, GB + 3, 20, bh, '#8a2418');
   p.rect(bx, GB + 3, 2, bh, '#b0342a');
   p.rect(bx + 18, GB + 3, 2, bh, '#5a140c');
   p.rect(bx + 3, GB + 5, 14, 1, BRASS.base);
+  p.rect(bx + 3, GB + bh - 1, 14, 1, BRASS.base);
   for (let x = 0; x < 20; x += 4) p.tri(bx + x, GB + 3 + bh, bx + x + 4, GB + 3 + bh, bx + x + 2, GB + 7 + bh, '#8a2418');
   if (!torn) legionCog(p, bx + 10, GB + 22, 6.5);
   else {
@@ -307,43 +315,58 @@ function drawWall(p: PixelArt, dmg: number): void {
   }
 
   // Ledges / iron cladding on the curtain.
-  ironPlate(p, 79, 118, F - 79 - 20, 6, shade(IRON.base, -0.05));
+  ironPlate(p, 81, 118, F - 81 - 38, 6, shade(IRON.base, -0.05));
 
-  // --- Gatehouse: iron-clad front block that houses the cannon core.
+  // --- Gatehouse: iron-clad front block that houses the frost core.
   const g = WALL.GATE;
-  const gx0 = 124;
+  const gx0 = 122;
   const gy0 = 76;
   p.rect(gx0, gy0, F - gx0, H - gy0, IRON.darker);
   for (let x = gx0 + 1; x < F - 2; x += 12) ironPlate(p, x, gy0 + 6, Math.min(11, F - 1 - x), H - gy0 - 10, shade(IRON.base, -0.06));
   // Lintel with hazard band.
   ironPlate(p, gx0 - 2, gy0, F - gx0 + 2, 7, IRON.base);
   hazardStripes(p, gx0 - 1, gy0 + 4, F - gx0, 3);
-  // Feed pipe with a red valve wheel.
+  // Coolant pipe with a red valve wheel.
   p.rect(gx0 + 4, GB + 2, 5, H - GB - 8, IRON.darker);
   p.rect(gx0 + 5, GB + 2, 2, H - GB - 8, '#7a8698');
   p.rect(gx0 + 5, GB + 2, 1, H - GB - 8, '#a8b4c4');
   for (const yy of [GB + 6, 112, 138]) p.rect(gx0 + 3, yy, 7, 2, IRON.dark);
-  p.ring(gx0 + 6.5, 104, 4.5, '#a02418', 1.5);
-  p.line(gx0 + 3, 104, gx0 + 10, 104, '#a02418');
-  p.line(gx0 + 6.5, 100.5, gx0 + 6.5, 107.5, '#a02418');
-  p.px(gx0 + 4, 101, '#e05a40');
+  p.ring(gx0 + 6.5, 102, 4.5, '#a02418', 1.5);
+  p.line(gx0 + 3, 102, gx0 + 10, 102, '#a02418');
+  p.line(gx0 + 6.5, 98.5, gx0 + 6.5, 105.5, '#a02418');
+  p.px(gx0 + 4, 99, '#e05a40');
+  // Frost gauge (blue dial).
+  p.circle(gx0 + 17, 92, 4.5, IRON.darker);
+  p.circle(gx0 + 17, 92, 3.5, '#d8e4ee');
+  p.line(gx0 + 17, 92, gx0 + 19, 90, '#a02418');
+  p.px(gx0 + 15, 90, '#ffffff');
   // Vent grille (steam puffs out of here when the core opens).
-  p.rect(WALL.VENT.x - 7, WALL.VENT.y - 5, 15, 11, IRON.darker);
-  for (let yy = -4; yy <= 4; yy += 2) {
-    p.rect(WALL.VENT.x - 6, WALL.VENT.y + yy, 13, 1, '#0c0e14');
-    p.rect(WALL.VENT.x - 6, WALL.VENT.y + yy + 1, 13, 1, IRON.light);
+  const v = WALL.VENT;
+  p.rect(v.x - 7, v.y - 6, 15, 13, IRON.darker);
+  for (let yy = -5; yy <= 5; yy += 2) {
+    p.rect(v.x - 6, v.y + yy, 13, 1, '#0c0e14');
+    p.rect(v.x - 6, v.y + yy + 1, 13, 1, IRON.light);
   }
-  p.rect(WALL.VENT.x - 7, WALL.VENT.y - 6, 15, 1, ICE.light);
-  // Hatch slot on the face (the core slides out here; the shutter sprites cover it).
+  p.rect(v.x - 7, v.y - 7, 15, 1, ICE.light);
+  // Gate opening: a dark recess in the face with the core's blue glow deep inside.
   p.rect(g.x - 3, g.y - 3, g.w + 3, g.h + 3, IRON.darker);
-  p.rect(g.x, g.y, g.w, g.h, '#080b14');
+  p.rect(g.x, g.y, g.w, g.h, '#070a12');
+  p.rect(g.x + 2, g.y + 8, g.w - 2, g.h - 16, CORE.deep);
+  p.rect(g.x + 4, g.y + 14, g.w - 4, g.h - 28, '#173a78');
   p.rect(g.x, g.y, g.w, 2, '#1a2236');
-  for (let yy = g.y + 4; yy < g.y + g.h; yy += 8) p.rect(g.x - 2, yy, 2, 3, HAZ.y);
-  // Emitter collar above the slot.
-  p.rect(F - 14, WALL.EMITTER.y - 9, 14, 18, IRON.dark);
-  ironPlate(p, F - 14, WALL.EMITTER.y - 9, 13, 17);
-  p.rect(F - 3, WALL.EMITTER.y - 8, 3, 16, IRON.darker);
-  p.ring(F - 8, WALL.EMITTER.y, 4, CORE.dark, 1);
+  for (let yy = g.y + 3; yy < g.y + g.h - 2; yy += 7) p.rect(g.x - 2, yy, 2, 3, HAZ.y);
+  // Protruding gate frame: a riveted header block (the upper blast door retracts into it) and a sill.
+  const FR = WALL.FRAME;
+  const hy = WALL.HEADER;
+  p.rect(F - 1, hy, FR + 1, g.y - hy, IRON.darker);
+  ironPlate(p, F - 1, hy, FR, g.y - hy - 1, IRON.base);
+  p.rect(F - 1, g.y - 3, FR, 2, HAZ.k);
+  hazardStripes(p, F - 1, g.y - 3, FR, 2, 1);
+  p.rect(F + FR - 2, hy + 1, 1, g.y - hy - 2, IRON.dark);
+  snowCap(p, F - 1, hy, FR + 1, 23, 2, false);
+  hangIcicle(p, F + 4, g.y - 1, 3, 2);
+  p.rect(F - 1, H - 3, FR, 3, IRON.darker);
+  p.rect(F - 1, H - 3, FR, 1, IRON.light);
   // Sill.
   p.rect(gx0 - 4, H - 4, F - gx0 + 4, 4, STONE.dark);
   p.rect(gx0 - 4, H - 4, F - gx0 + 4, 1, STONE.light);
@@ -351,7 +374,7 @@ function drawWall(p: PixelArt, dmg: number): void {
   snowCap(p, gx0 - 2, gy0, F - gx0 + 2, 17, 2);
   for (const [x, l] of [
     [gx0 + 14, 5],
-    [gx0 + 26, 7],
+    [gx0 + 27, 7],
   ] as const)
     hangIcicle(p, x, gy0 + 7, l, 2);
   // Snow drifts along the foot of the wall (not over the gate).
@@ -366,9 +389,9 @@ function drawWall(p: PixelArt, dmg: number): void {
       if (d > 2) p.px(x, H - d + 1, SNOW.white);
     }
   };
-  drift(0, 40, 7, 1);
-  drift(34, 92, 10, 2);
-  drift(88, 132, 6, 3);
+  drift(0, 42, 7, 1);
+  drift(36, 94, 10, 2);
+  drift(90, 128, 6, 3);
   // Icicles under the keep walkway and banner ledge (cosmetic).
   for (const [x, l] of [
     [8, 5],
@@ -379,8 +402,8 @@ function drawWall(p: PixelArt, dmg: number): void {
   ] as const)
     hangIcicle(p, x, 24, l, 2);
   for (const [x, l] of [
-    [84, 6],
-    [118, 9],
+    [86, 6],
+    [120, 9],
   ] as const)
     hangIcicle(p, x, GB + 1, l, 3);
 
@@ -389,9 +412,9 @@ function drawWall(p: PixelArt, dmg: number): void {
   if (dmg >= 1) {
     crack(p, r, 30, 24, 26, 1);
     crack(p, r, 110, GB + 2, 30, -1);
-    crack(p, r, 60, 98, 20, 1);
-    crack(p, r, 186, GT + 1, 8, 1);
-    breach(p, r, 58, 104, 7, 5, false);
+    crack(p, r, 64, 100, 20, 1);
+    crack(p, r, 190, GT + 1, 8, 1);
+    breach(p, r, 62, 106, 7, 5, false);
     // Scorch dither.
     for (let i = 0; i < 160; i++) {
       const x = r.int(90, 158);
@@ -403,13 +426,13 @@ function drawWall(p: PixelArt, dmg: number): void {
     p.rect(52, 20, 9, 3, STONE.darker);
   }
   if (dmg >= 2) {
-    breach(p, r, 24, 58, 11, 9, true);
+    breach(p, r, 30, 58, 11, 9, true);
     breach(p, r, 118, 92, 12, 10, true);
-    breach(p, r, 172, GT + 6, 6, 4, false);
+    breach(p, r, 176, GT + 6, 6, 4, false);
     crack(p, r, 140, 70, 34, 1);
     crack(p, r, 8, 64, 40, 1);
-    // Broken gallery tip.
-    p.poly([214, GT - 8, 226, GT - 8, 226, GB + 2, 219, GB + 2, 216, GT + 3], '#0000');
+    // Smashed parapet at the gallery tip.
+    p.poly([215, GT - 8, 226, GT - 8, 226, GT + 2, 219, GT + 3], '#0000');
     for (let i = 0; i < 220; i++) {
       const x = r.int(6, 150);
       const y = r.int(24, 150);
@@ -429,106 +452,109 @@ sprites.define({
   draw: (p, f) => drawWall(p, f),
 });
 
-// ------------------------------------------------------------------ core, shutters, emitter, beacons
+// ------------------------------------------------------------------ core, blast doors, beacons
 
 /**
- * Core assembly that slides out of the face when the gate opens: piston rods, a cradle and the
- * glowing frost crystal at the tip. Origin = attachment point on the face (left-middle).
- * Frames 0..3 idle pulse, 4..5 overcharged (white hot, before/while the lance fires).
+ * Frost core assembly that rams out of the gate on two pistons: chrome rods, an armoured collar and
+ * the glowing ice crystal (the weak point). Origin = the back of the pistons (left-middle).
+ * Frames 0..3 idle pulse, 4..5 overcharged (white hot, charging / firing).
  */
 sprites.define({
   name: 'bm3_core',
-  w: 28,
-  h: 38,
+  w: 41,
+  h: 42,
   ox: 0,
-  oy: 19,
+  oy: 21,
   frames: 6,
   draw: (p, f) => {
     const hot = f >= 4;
-    const pulse = hot ? 1 : [0, 0.33, 0.66, 0.33][f];
+    const pulse = hot ? 1 : [0, 0.4, 0.8, 0.4][f];
     // Piston rods.
-    for (const y of [5, 32]) {
-      p.rect(0, y - 2, 13, 5, IRON.darker);
-      p.rect(0, y - 1, 13, 2, '#8a96a8');
-      p.rect(0, y - 1, 13, 1, '#c8d2de');
+    for (const y of [9, 32]) {
+      p.rect(0, y - 3, 18, 6, IRON.darker);
+      p.rect(0, y - 2, 18, 3, '#8a96a8');
+      p.rect(0, y - 2, 18, 1, '#d6e0ea');
+      p.rect(0, y + 1, 18, 1, '#5a6470');
+      p.rect(6, y - 3, 2, 6, IRON.dark);
     }
-    // Cradle ring.
-    p.rect(10, 0, 6, 38, IRON.dark);
-    p.rect(10, 0, 6, 1, IRON.light);
-    p.rect(10, 0, 1, 38, IRON.light);
-    p.px(13, 3, IRON.rivet);
-    p.px(13, 34, IRON.rivet);
-    hazardStripes(p, 11, 15, 4, 8);
-    // Glow halo.
-    p.ellipse(21, 19, 7, 17, hot ? CORE.mid : CORE.deep);
-    p.ellipse(21, 19, 5.5 + pulse, 15 + pulse, hot ? CORE.light : CORE.dark);
+    // Armoured collar.
+    p.rect(13, 0, 11, 42, IRON.darker);
+    p.rect(14, 1, 9, 40, IRON.dark);
+    p.rect(14, 1, 9, 1, IRON.light);
+    p.rect(14, 1, 1, 40, IRON.light);
+    p.rect(22, 2, 1, 38, IRON.darker);
+    hazardStripes(p, 15, 16, 6, 10);
+    for (const y of [4, 11, 30, 37]) {
+      p.px(17, y, IRON.rivet);
+      p.px(18, y + 1, IRON.darker);
+    }
+    // Glow halo behind the crystal.
+    p.ellipse(31, 21, 10, 19, hot ? CORE.mid : CORE.deep);
+    p.ellipse(31, 21, 7.5 + pulse, 16.5 + pulse, hot ? CORE.light : CORE.dark);
     // Crystal (hexagonal prism seen from the side).
-    p.poly([16, 6, 24, 3, 27, 12, 27, 26, 24, 35, 16, 32], hot ? CORE.white : CORE.mid);
-    p.poly([17, 8, 23, 6, 25, 13, 24, 27, 19, 30, 17, 22], hot ? '#ffffff' : CORE.light);
-    p.line(19, 9, 19, 24, CORE.white);
-    p.line(21, 7, 25, 12, CORE.white);
-    p.px(24, 20, hot ? '#ffffff' : CORE.white);
+    p.poly([22, 8, 31, 3, 40, 12, 40, 30, 31, 39, 22, 34], hot ? CORE.white : CORE.mid);
+    p.poly([24, 10, 30, 6, 37, 13, 36, 29, 30, 35, 24, 31], hot ? '#ffffff' : CORE.light);
+    p.poly([26, 12, 30, 8, 33, 13, 31, 26, 27, 28], hot ? '#ffffff' : CORE.white);
+    p.line(31, 4, 31, 38, hot ? CORE.light : CORE.mid);
+    p.line(36, 13, 36, 28, hot ? '#ffffff' : CORE.white);
+    p.px(38, 14, '#ffffff');
     // Clamp claws.
-    p.poly([15, 0, 22, 0, 18, 6], IRON.dark);
-    p.poly([15, 38, 22, 38, 18, 32], IRON.dark);
-    // Energy arcs.
+    p.poly([19, 0, 29, 0, 25, 8], IRON.dark);
+    p.poly([20, 0, 27, 0, 24, 5], IRON.base);
+    p.poly([19, 42, 29, 42, 25, 34], IRON.dark);
+    p.px(21, 1, IRON.light);
+    // Energy crackle.
     const r = new Rng(f + 3);
-    for (let i = 0; i < (hot ? 5 : 2); i++) {
-      const y = r.int(6, 31);
-      p.px(r.chance(0.5) ? 26 : 16, y, CORE.white);
-      p.px(r.chance(0.5) ? 27 : 15, y + 1, CORE.light);
+    for (let i = 0; i < (hot ? 6 : 2 + (f % 2)); i++) {
+      const y = r.int(7, 34);
+      p.px(r.chance(0.5) ? 40 : 21, y, CORE.white);
+      p.px(r.chance(0.5) ? 39 : 22, y + 1, CORE.light);
     }
-    if (pulse > 0.5 || hot) p.px(22, 10, '#ffffff');
+    if (pulse > 0.5 || hot) p.px(28, 10, '#ffffff');
   },
 });
 
-/** Core hatch halves. Frame 0: upper half (hazard edge at bottom), 1: lower half (edge at top). */
+/**
+ * Blast door halves that close the gate (they stick out of the face like a clamshell).
+ * Frame 0: upper half (hazard seam at the bottom), 1: lower half (seam at the top). Origin top-left.
+ */
 sprites.define({
-  name: 'bm3_shutter',
-  w: 13,
-  h: 22,
+  name: 'bm3_door',
+  w: 17,
+  h: 21,
   ox: 0,
   oy: 0,
   frames: 2,
   draw: (p, f) => {
-    ironPlate(p, 0, 0, 13, 22, shade(IRON.base, -0.04));
-    p.rect(11, 1, 2, 20, IRON.darker);
-    for (const y of [5, 10, 15]) p.rect(3, f === 0 ? y : y + 2, 7, 1, IRON.darker);
-    if (f === 0) hazardStripes(p, 0, 18, 11, 4);
-    else hazardStripes(p, 0, 0, 11, 4, 1);
-    p.rect(4, f === 0 ? 2 : 7, 2, 9, IRON.light);
-    p.rect(0, f === 0 ? 0 : 21, 13, 1, ICE.light);
-  },
-});
-
-/** The frost cannon muzzle above the core. f: 0 idle, 1..3 charging, 4 firing. Origin: face mount. */
-sprites.define({
-  name: 'bm3_emitter',
-  w: 15,
-  h: 16,
-  ox: 0,
-  oy: 8,
-  frames: 5,
-  draw: (p, f) => {
-    p.rect(0, 2, 8, 12, IRON.darker);
-    p.rect(0, 3, 7, 10, IRON.dark);
-    p.rect(0, 3, 7, 1, IRON.light);
-    p.rect(6, 0, 7, 16, IRON.dark);
-    p.rect(6, 0, 7, 1, IRON.light);
-    p.rect(6, 1, 1, 14, IRON.light);
-    p.rect(8, 4, 5, 8, '#080a12');
-    const glow = [0, 0.35, 0.65, 0.9, 1][f];
-    if (glow > 0) {
-      p.rect(9, 5, 4, 6, glow > 0.6 ? CORE.light : CORE.dark);
-      p.rect(10, 6, 3, 4, glow > 0.8 ? '#ffffff' : CORE.mid);
-      if (f >= 3) {
-        p.rect(13, 6, 2, 4, CORE.white);
-        p.px(14, 5, CORE.light);
-        p.px(14, 10, CORE.light);
-      }
+    const up = f === 0;
+    const base = shade(IRON.base, -0.02);
+    p.rect(0, 0, 16, 21, IRON.darker);
+    p.rect(0, 0, 15, 21, base);
+    p.rect(0, 0, 15, 1, shade(base, 0.3));
+    p.rect(0, 0, 1, 21, shade(base, 0.16));
+    // Bulging rounded nose (front = right).
+    p.rect(13, 1, 3, 19, IRON.base);
+    p.rect(14, 2, 1, 17, IRON.light);
+    p.rect(16, 3, 1, 15, IRON.dark);
+    p.px(15, 1, IRON.dark);
+    p.px(15, 19, IRON.dark);
+    // Reinforcement ribs and rivets.
+    const ry = up ? 7 : 11;
+    p.rect(2, ry, 11, 2, IRON.darker);
+    p.rect(2, ry, 11, 1, IRON.light);
+    rivets(p, 3, up ? 3 : 15, 11, 4);
+    // Hazard seam where the halves meet.
+    if (up) hazardStripes(p, 0, 17, 16, 4);
+    else hazardStripes(p, 0, 0, 16, 4, 1);
+    p.rect(0, up ? 16 : 4, 16, 1, IRON.darker);
+    // Red warning lamp on the nose.
+    p.rect(12, up ? 11 : 7, 3, 3, '#5a140c');
+    p.px(13, up ? 12 : 8, '#ff4a2a');
+    // Frost.
+    if (up) {
+      p.rect(0, 0, 16, 1, ICE.light);
+      p.px(3, 1, ICE.white);
     }
-    for (let x = 1; x < 6; x += 2) p.px(x, 2, IRON.rivet);
-    p.rect(2, 14, 4, 2, IRON.darker);
   },
 });
 
@@ -606,51 +632,60 @@ sprites.define({
   },
 });
 
-/** Twin flak cannon on a shielded mount. 5 elevations (15..75 deg up) x [idle, firing]. */
+/** Twin ice-flak cannon on an armoured turntable. 5 elevations (15..75 deg up) x [idle, firing]. */
 sprites.define({
   name: 'bm3_flak',
-  w: 34,
-  h: 30,
+  w: 38,
+  h: 32,
   ox: 14,
-  oy: 30,
+  oy: 32,
   frames: 10,
   draw: (p, f) => {
     const ei = f % 5;
     const firing = f >= 5;
     const a = -((15 + ei * 15) * Math.PI) / 180;
-    const px = 13;
-    const py = 18;
+    const px = 15;
+    const py = 19;
     const ca = Math.cos(a);
     const sa = Math.sin(a);
-    const recoil = firing ? -2 : 0;
-    // Barrels.
-    for (const off of [-2.2, 2.2]) {
-      const ox = -sa * off;
-      const oy = ca * off;
-      p.line(px + ox, py + oy, px + ox + ca * (17 + recoil), py + oy + sa * (17 + recoil), IRON.darker, 3);
-      p.line(px + ox, py + oy, px + ox + ca * (16 + recoil), py + oy + sa * (16 + recoil), IRON.base, 1);
-      p.line(px + ox + ca * (12 + recoil), py + oy + sa * (12 + recoil), px + ox + ca * (14 + recoil), py + oy + sa * (14 + recoil), RUST.base, 3);
+    const L = firing ? 17 : 20;
+    // Twin barrels: dark steel tubes with a lit top edge, a cooling jacket and a muzzle brake.
+    for (const off of [2.6, -2.6]) {
+      const x0 = px - sa * off;
+      const y0 = py + ca * off;
+      const x1 = x0 + ca * L;
+      const y1 = y0 + sa * L;
+      p.line(x0, y0, x1, y1, IRON.darker, 3);
+      p.line(x0 - sa * -0.8, y0 + ca * -0.8, x1 - sa * -0.8, y1 + ca * -0.8, '#6e7684');
+      p.line(x0 + ca * 4, y0 + sa * 4, x0 + ca * 9, y0 + sa * 9, IRON.dark, 4);
+      p.rotRect(x1 - ca * 1.5, y1 - sa * 1.5, 2.2, 2.2, a, IRON.darker);
+      p.px(Math.round(x1 - ca * 1.5 - sa * -1), Math.round(y1 - sa * 1.5 + ca * -1), '#8a92a0');
     }
-    // Base turntable.
-    p.rect(2, 24, 24, 6, IRON.darker);
-    ironPlate(p, 3, 24, 22, 5);
-    hazardStripes(p, 4, 28, 20, 2);
-    // Gun cradle + shield.
-    p.circle(px, py, 6, IRON.dark);
-    p.circle(px - 0.6, py - 0.6, 5, IRON.base);
-    p.poly([3, 26, 3, 10, 9, 6, 13, 8, 12, 26], IRON.dark);
-    p.poly([4, 25, 4, 11, 9, 7, 11, 9, 10, 25], IRON.base);
-    p.line(4, 11, 9, 7, IRON.light);
-    p.px(6, 14, IRON.rivet);
-    p.px(6, 20, IRON.rivet);
-    // Crew hatch light.
-    p.rect(6, 16, 2, 2, WARM.glow);
+    // Turntable with hazard skirt.
+    p.rect(2, 25, 26, 7, IRON.darker);
+    ironPlate(p, 3, 25, 24, 6);
+    hazardStripes(p, 4, 29, 22, 2);
+    // Gun cradle.
+    p.circle(px, py, 6.5, IRON.darker);
+    p.circle(px - 0.5, py - 0.5, 5.5, IRON.base);
+    p.circle(px - 2, py - 2, 2.2, IRON.light);
+    // Crew shield (sloped plate behind the guns).
+    p.poly([3, 26, 3, 11, 9, 6, 12, 8, 11, 26], IRON.darker);
+    p.poly([4, 25, 4, 12, 9, 7, 10, 9, 10, 25], IRON.base);
+    p.line(4, 12, 9, 7, IRON.light);
+    p.rect(4, 13, 1, 12, shade(IRON.base, 0.12));
+    p.px(7, 15, IRON.rivet);
+    p.px(7, 21, IRON.rivet);
+    // Lit vision slit + frost.
+    p.rect(5, 17, 4, 1, WARM.glow);
+    p.px(5, 16, WARM.mid);
+    p.rect(4, 11, 3, 1, ICE.light);
     if (firing) {
-      for (const off of [-2.2, 2.2]) {
-        const mx = px - sa * off + ca * 19;
-        const my = py + ca * off + sa * 19;
-        p.circle(mx, my, 2.6, '#ffd23c');
-        p.px(Math.round(mx), Math.round(my), '#ffffff');
+      for (const off of [2.6, -2.6]) {
+        const mx = px - sa * off + ca * (L + 3);
+        const my = py + ca * off + sa * (L + 3);
+        p.circle(mx, my, 2.8, '#ffd23c');
+        p.circle(mx, my, 1.4, '#ffffff');
       }
     }
   },
@@ -830,38 +865,6 @@ sprites.define({
   },
 });
 
-/** Frost crystals left by the beam: 0..1 growing, 2 full, 3 shattering. */
-sprites.define({
-  name: 'bm3_crystal',
-  w: 11,
-  h: 12,
-  ox: 5,
-  oy: 12,
-  frames: 4,
-  draw: (p, f) => {
-    const k = [0.45, 0.75, 1, 1][f];
-    const spikes: [number, number, number][] = [
-      [5, 12, 0],
-      [2, 9, -0.45],
-      [8, 9, 0.4],
-    ];
-    if (f === 3) {
-      p.poly([1, 12, 3, 8, 5, 11, 7, 7, 10, 12], ICE.light);
-      p.px(3, 6, ICE.white);
-      p.px(8, 4, ICE.white);
-      p.px(5, 3, ICE.light);
-      return;
-    }
-    for (const [h, l, lean] of spikes) {
-      const x = 5 + lean * 6;
-      p.poly([x - 1.6, 12, x + 1.6, 12, x + lean * l * k, 12 - l * k * 0.95], ICE.mid);
-      p.line(x - 0.5, 11, x + lean * l * k * 0.8, 12 - l * k * 0.8, ICE.white);
-      void h;
-    }
-    p.rect(1, 11, 9, 1, ICE.light);
-  },
-});
-
 /** Armor plate / stone chunk debris (rotated freely). 0..2 plates, 3..5 stone chunks. */
 sprites.define({
   name: 'bm3_plate',
@@ -928,32 +931,44 @@ sprites.define({
   },
 });
 
-/** Ice spike erupting from the floor (spike wave): 0..2 growing, 3 shattering. Origin bottom-centre. */
+/** Ice spike cluster erupting from the floor (spike wave): 0..2 growing, 3 shattering. Origin bottom-centre. */
 sprites.define({
   name: 'bm3_spike',
-  w: 12,
-  h: 16,
+  w: 15,
+  h: 21,
   frames: 4,
   draw: (p, f) => {
+    const B = 21;
     if (f === 3) {
-      p.poly([1, 16, 3, 11, 5, 14, 7, 10, 10, 16], ICE.light);
-      p.px(3, 8, ICE.white);
-      p.px(8, 6, ICE.white);
-      p.px(6, 4, ICE.light);
+      // Shattering: a low heap of shards and flying chips.
+      p.poly([1, B, 3, B - 5, 5, B - 2, 7, B - 7, 9, B - 3, 11, B - 6, 14, B], ICE.mid);
+      p.poly([3, B, 4, B - 3, 6, B - 1, 7, B - 5, 9, B - 1, 12, B], ICE.light);
+      p.px(2, B - 9, ICE.white);
+      p.px(12, B - 11, ICE.light);
+      p.px(7, B - 13, ICE.white);
+      p.px(5, B - 10, ICE.light);
       return;
     }
-    const k = [0.4, 0.75, 1][f];
-    const spikes: [number, number, number][] = [
-      [6, 15, 0],
-      [3, 10, -0.35],
-      [9, 9, 0.35],
+    const k = [0.45, 0.8, 1][f];
+    // [base x0, base x1, tip x, height]
+    const shards: [number, number, number, number][] = [
+      [0, 6, 1 - 2 * k, 13],
+      [9, 15, 14 + k, 11],
+      [3.5, 11, 7, 20],
     ];
-    for (const [x, l, lean] of spikes) {
-      const h = l * k;
-      p.poly([x - 2.2, 16, x + 2.2, 16, x + lean * h, 16 - h], ICE.mid);
-      p.poly([x - 1.4, 16, x + 0.4, 16, x + lean * h, 16 - h + 1], ICE.light);
-      p.line(x - 0.8, 15, x + lean * h * 0.8, 16 - h * 0.85, ICE.white);
+    for (const [x0, x1, tx, h] of shards) {
+      const ty = B - h * k;
+      const mx = (x0 + x1) / 2;
+      p.poly([x0, B, x1, B, tx, ty], ICE.dark);
+      p.poly([x0 + 0.6, B, x1 - 0.8, B, tx, ty + 1], ICE.mid);
+      // Lit left face.
+      p.poly([x0 + 0.8, B, mx, B, tx, ty + 1.5], ICE.light);
+      p.line(x0 + 1.2, B - 1, tx, ty + 2, ICE.white);
     }
-    p.rect(0, 15, 12, 1, ICE.light);
+    // Frosty base.
+    p.rect(0, B - 1, 15, 1, ICE.light);
+    p.px(2, B - 2, ICE.white);
+    p.px(11, B - 2, ICE.white);
+    if (f === 2) p.px(7, Math.round(B - 20 * k) + 3, '#ffffff');
   },
 });
