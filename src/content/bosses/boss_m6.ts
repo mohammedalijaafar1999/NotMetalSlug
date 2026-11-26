@@ -71,10 +71,10 @@ import './m6/fxart';
 import { EscapePod, JugOverlay, JugShockwave, LaunchTrail, RainMissile } from './m6/parts';
 
 export const JUG_NAME = 'JUGGERNAUT';
-export const JUG_HP = 340;
+export const JUG_HP = 300;
 
 /** Damage multipliers per zone. */
-export const JUG_MUL = { legs: 0.7, hull: 1, armor: 0.75, chest: 1, core: 2.2, dome: 1.4 } as const;
+export const JUG_MUL = { legs: 0.8, hull: 1, armor: 0.75, chest: 1, core: 2.2, dome: 1.4 } as const;
 
 /** Laser beam: half thickness and height of its centre above the floor when horizontal. */
 export const BEAM_HALF = 3;
@@ -162,7 +162,9 @@ export class Juggernaut extends BigBoss {
   stumbleT = 8;
   flinchT = 0;
   exprT = 0;
-  attacks: Record<string, number> = {};
+  staggerDur = 1.2;
+  /** True on the first think() of a state / sub-step (subT was just reset). */
+  first = false;
   /** Laser: angle above horizontal (rad) and whether it is lethal right now. */
   beamA = 0.42;
   beamOn = false;
@@ -360,7 +362,7 @@ export class Juggernaut extends BigBoss {
   private stagger(dur: number, tilt: number): void {
     this.setState('stagger');
     this.count = 0;
-    this.attacks.stagger = dur;
+    this.staggerDur = dur;
     this.tiltTarget = tilt;
     this.vxWalk = 0;
   }
@@ -434,6 +436,7 @@ export class Juggernaut extends BigBoss {
 
   override think(dt: number): void {
     this.flinchT -= dt;
+    this.first = this.subT === 0;
     this.subT += dt;
     const t = this.target();
     switch (this.state) {
@@ -561,7 +564,7 @@ export class Juggernaut extends BigBoss {
 
   // ---- stagger (phase change / stumble)
   private thinkStagger(_dt: number): void {
-    const dur = this.attacks.stagger ?? 1.2;
+    const dur = this.staggerDur;
     this.vxWalk = 0;
     const k = this.stateTime / dur;
     this.hipTarget = HIP_STAND - 10 * Math.sin(Math.min(1, k) * Math.PI);
@@ -578,7 +581,7 @@ export class Juggernaut extends BigBoss {
     const t = this.target();
     const n = [3, 4, 5][this.phase] ?? 3;
     if (this.sub === 0) {
-      if (this.subT === 0 || this.targets.length === 0) this.planVolley(n, t);
+      if (this.first) this.planVolley(n, t);
       const tx = this.targets[0] ?? this.x - this.facing * 150;
       this.cannonTarget = this.launchAngle(tx);
       if (this.subT > 0.5) {
@@ -656,7 +659,7 @@ export class Juggernaut extends BigBoss {
     const lift = this.count === 0 ? ([0.75, 0.62, 0.52][this.phase] ?? 0.7) : 0.48;
     const liftT = lift * Math.sqrt(this.world.difficulty.enemyFireDelay);
     if (this.sub === 0) {
-      if (this.subT === 0 || !L.manual) {
+      if (this.first || !L.manual) {
         this.gait = false;
         L.manual = true;
         L.step = null;
@@ -729,7 +732,7 @@ export class Juggernaut extends BigBoss {
     const n = [6, 8, 9][this.phase] ?? 6;
     if (this.sub === 0) {
       this.podFrame = this.subT > 0.2 ? 2 : 1;
-      if (this.subT === 0) bsfx(this, 'metal_hit', { vol: 0.6, pitch: 0.5 });
+      if (this.first) bsfx(this, 'metal_hit', { vol: 0.6, pitch: 0.5 });
       if (this.subT > 0.42) {
         this.next(1);
         this.count = 0;
@@ -801,7 +804,7 @@ export class Juggernaut extends BigBoss {
       case 0: // brace: tuck the feet, steam hisses under the belly
         this.vxWalk = 0;
         this.stance = 'squat';
-        if (this.subT === 0) {
+        if (this.first) {
           bsfx(this, 'engine', { vol: 0.7, pitch: 0.6 });
           // Fairness: no new drone dives / zaps while players must stay crouched under the beam.
           for (const d of this.drones) {
@@ -918,7 +921,7 @@ export class Juggernaut extends BigBoss {
     const n = this.phase >= 2 ? 3 : 2;
     if (this.sub === 0) {
       this.hatchOpen = true;
-      if (this.subT === 0) bsfx(this, 'metal_hit', { vol: 0.6, pitch: 0.6 });
+      if (this.first) bsfx(this, 'metal_hit', { vol: 0.6, pitch: 0.6 });
       if (this.subT > 0.35) {
         this.next(1);
         this.count = 0;
