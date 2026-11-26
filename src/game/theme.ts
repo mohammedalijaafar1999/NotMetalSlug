@@ -270,6 +270,16 @@ export class ThemeRenderer {
     // Decor marked as 'far' sits behind the terrain fill.
     for (const d of this.decorBack) if (d.props?.behindTerrain) this.drawDecor(g, d, camX, time);
     for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) g.drawImage(this.tile(tx, ty), tx * TILE, ty * TILE);
+    // Pre-bake at most one upcoming tile per frame so scrolling never hitches.
+    const ahead = tx1 + 1;
+    if (ahead * TILE < this.level.width) {
+      for (let ty = ty0; ty <= ty1; ty++) {
+        if (!this.tiles.has(ahead + ',' + ty)) {
+          this.tile(ahead, ty);
+          break;
+        }
+      }
+    }
     // Platforms.
     for (const p of this.terrain.platforms()) {
       if (p.x2 < camX - 8 || p.x1 > camX + VIEW_W + 8 || p.owner) continue;
