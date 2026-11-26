@@ -224,8 +224,6 @@ export function fragLanding(x: number, y: number, vx: number, vy: number, g: num
 /** Flak shell: arcs to a burst point above the target, pops (harmless flash) into ice fragments. */
 export class FlakShell extends Projectile {
   readonly m3hazard = true;
-  private bx: number;
-  private by: number;
   private groundY: number;
   /** Fragment launch velocities (x, y) and their gravity. */
   static readonly FRAGS: ReadonlyArray<[number, number]> = [
@@ -242,8 +240,6 @@ export class FlakShell extends Projectile {
     const vx = (bx - x) / time;
     const vy = (by - y - 0.5 * g * time * time) / time;
     super({ team: 'enemy', owner, x, y, vx, vy, gravity: g, w: 5, h: 5, sprite: 'bm3_flakshell', fps: 12, life: time });
-    this.bx = bx;
-    this.by = by;
     this.groundY = groundY;
     this.offscreenMargin = 240;
   }
@@ -256,9 +252,8 @@ export class FlakShell extends Projectile {
     this.burst();
   }
 
-  /** Fragment landing spots for a burst at (bx, by). */
-  static landings(bx: number, by: number, groundY: number): { x: number; t: number }[] {
-    return FlakShell.FRAGS.map(([vx, vy]) => fragLanding(bx, by, vx, vy, FlakShell.FRAG_G, groundY));
+  protected override onHitTarget(): void {
+    this.burst();
   }
 
   burst(): void {
@@ -274,8 +269,6 @@ export class FlakShell extends Projectile {
       const l = fragLanding(x, y, vx, vy, FlakShell.FRAG_G, this.groundY);
       if (isFinite(l.t)) w.add(new FloorMark(l.x, this.groundY, l.t, 'shadow', 5));
     }
-    void this.bx;
-    void this.by;
     this.remove();
   }
 

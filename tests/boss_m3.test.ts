@@ -9,6 +9,7 @@ import type { Player } from '../src/game/player';
 import { FrostBastion, FACE_X, LANCE_H } from '../src/content/bosses/boss_m3';
 import { FrostLance, SPIKE_SPEED, SpikeWave } from '../src/content/bosses/m3/parts';
 import { Bullet } from '../src/game/projectile';
+import { getLevel, registerLevel } from '../src/game/level';
 
 const LOCK_X = 600;
 
@@ -198,7 +199,23 @@ describe('boss_m3 fairness director', () => {
 describe('boss_m3 autopilot', () => {
   it('the invincible autopilot beats the boss test arena', () => {
     const r = simulateMission('bosstest_m3', 300);
-    console.log('bosstest_m3', JSON.stringify(r));
     expect(r.completed).toBe(true);
+    expect(r.seconds).toBeLessThan(150);
+  }, 120_000);
+
+  it('also works when the arena is the very end of the level (and on hard)', () => {
+    const base = getLevel('bosstest_m3')!;
+    registerLevel({ ...base, id: 'bosstest_m3_end', width: LOCK_X + 384, ground: [[[0, 184], [LOCK_X + 384, 184]]] });
+    const r = simulateMission('bosstest_m3_end', 300, 3);
+    expect(r.completed).toBe(true);
+    const w = makeWorld('bosstest_m3', { seed: 2, god: true, difficulty: 2 });
+    const bots = w.players.map((p) => new Bot(p.index));
+    let t = 0;
+    while (w.state !== 'complete' && t < 300) {
+      step(w, 1, bots);
+      t += DT;
+    }
+    release();
+    expect(w.state).toBe('complete');
   }, 120_000);
 });

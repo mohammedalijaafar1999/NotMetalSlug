@@ -22,6 +22,18 @@
 //    core stays exposed for good and attacks back to back). The wall shows cracks, breaches, fire.
 //  - Death: core overload, turret pops, explosions, then the whole bastion sinks into the snow
 //    leaving smoking rubble.
+//
+// ARENA CONTRACT (copy src/content/levels/test/bosstest_m3.ts):
+//  - Boss lock { x: lockX, boss: true, announce: 'WARNING! FROST BASTION', music: 'boss',
+//    waves: [{ spawns: [{ type: 'boss_m3', x: lockX + 316 }] }] }. The boss itself never announces.
+//    Any spawn x inside the arena works: the boss puts its wall face at lockX + FACE_X (248) itself.
+//  - One perfectly flat floor from lockX - 40 to lockX + 384 or beyond (the wall, the spike wave and the
+//    rolling boulders assume a single floor height); the level must be >= lockX + 384 wide.
+//  - Camera at the floor: ground ~184 px below the camera top (level height 216, ground y 184),
+//    so the 152 px wall tops out just under the HUD.
+//  - Nothing else in the arena: no pits, water, platforms, solids, other enemies or front-layer decor
+//    (the wall covers lockX + 183 .. lockX + 408; the gallery overhangs lockX + 183 .. lockX + 248).
+//    A bomb crate or hostage with a weapon just before the lock is welcome.
 
 import { sprites } from '../../engine/sprites';
 import { fxRng } from '../../engine/rng';
@@ -1129,11 +1141,11 @@ registerEntity(
   'boss_m3',
   'boss',
   () => new FrostBastion(),
-  'FROST BASTION (mission 3 boss, 260 hp): a mountain gatehouse wall that rises out of the snow and fills the right side of the arena. ' +
-    'Weak point: the frost core behind blast doors at the foot of the wall (only hittable while open - shoot it with plain forward fire); ' +
-    '3 destructible turrets (MG under the gallery, ice flak + mortar on the gallery - shoot them from below); attacks: head-height frost lance ' +
-    '(crouch), floor spike wave (jump), avalanche boulders (jump/shoot), icicles (shadows). ' +
-    'ARENA: flat ground from lockX-40 to lockX+470 (no pits/water/platforms/solids), camera at the level bottom with the ground at y ~184 ' +
-    '(level height 216). Spawn x = lockX + 316 (the boss aligns its wall face to lockX + 248 itself; the wall extends past the right edge). ' +
-    'Lock: boss: true, announce "WARNING! FROST BASTION" (the boss itself does not announce), music "boss". Nothing else in the lock waves.',
+  'FROST BASTION (mission 3 boss, 260 hp): a fortified gatehouse wall that rises out of the snow and fills the right side of the arena. ' +
+    'Weak point: the frost core behind blast doors at the foot of the wall (hittable only while pushed out - plain forward fire hits it); ' +
+    '3 destructible turrets (MG under the gallery tip, ice flak + mortar nest on the gallery - shoot them from below). Attacks: head-height ' +
+    'frost lance (crouch), floor spike wave (jump), avalanche boulders (jump or shoot), mortar/flak marks, icicles (shadows). ' +
+    'ARENA: lock { x: lockX, boss: true, announce: "WARNING! FROST BASTION", music: "boss" } with the single spawn { type: "boss_m3", x: lockX + 316 } ' +
+    '(the wall face always lands at lockX + 248). One flat floor from lockX - 40 to lockX + 384 or beyond, ground 184 px below the camera top ' +
+    '(level height 216, ground y 184). No pits, water, platforms, solids, other enemies or front decor in the arena.',
 );
