@@ -264,6 +264,10 @@ export class Grinder extends BigBoss {
   private sinkY = 0;
   private lastPuff = 0;
   private sway = 0;
+  /** Tuning of the attack in progress (a phase change mid-attack never moves the goalposts). */
+  private atk = PH[0];
+  /** Blade stop line of the charge in progress. */
+  private chargeStop = 0;
   /** Attack forced after a phase change (shows off the new move). */
   private nextAttack: Attack | null = null;
   private usedFlame = false;
@@ -314,6 +318,7 @@ export class Grinder extends BigBoss {
 
   /** Where the blade tip stops at the end of a charge. */
   get stopX(): number {
+    if (this.state === 'rev' || this.state === 'charge' || this.state === 'slam') return this.chargeStop;
     return this.facing < 0 ? this.arenaL + this.stats.pocket : this.arenaR - this.stats.pocket;
   }
 
@@ -498,7 +503,8 @@ export class Grinder extends BigBoss {
     this.headGlow = Math.max(0, this.headGlow - dt * 2);
     // Idle sway: creeps a few px forward and back (rear stays against the arena edge).
     this.sway += dt;
-    this.x = this.homeX + this.facing * 3 * (0.5 - 0.5 * Math.cos(this.sway * 1.7));
+    const swayX = this.homeX + this.facing * 3 * (0.5 - 0.5 * Math.cos(this.sway * 1.7));
+    this.x += (swayX - this.x) * Math.min(1, dt * 6);
     this.barrelTarget = 0.45 + Math.sin(this.age * 0.8) * 0.08;
     if (this.pendingStagger) {
       this.pendingStagger = 0;
@@ -534,12 +540,11 @@ export class Grinder extends BigBoss {
     // Never start a charge while shells are still in the air (they could land in the safe pocket).
     if (pick === 'charge' && this.shellsInFlight()) return;
     this.nextAttack = null;
+    this.atk = st;
     if (pick === 'flame') this.usedFlame = true;
     this.attacks++;
     this.lastAttack = pick;
     this.sinceCharge = pick === 'charge' ? 0 : this.sinceCharge + 1;
-    this.x = this.homeX;
-    this.sway = 0;
     switch (pick) {
       case 'volley':
         this.shotsLeft = st.shells;
@@ -554,7 +559,8 @@ export class Grinder extends BigBoss {
       case 'charge':
         this.charges++;
         this.setState('rev');
-        this.world.add(new ChargeLane(this, this.stopX, this.groundY));
+        this.chargeStop = this.facing < 0 ? this.arenaL + st.pocket : this.arenaR - st.pocket;
+        this.world.add(new ChargeLane(this, this.chargeStop, this.groundY));
         break;
       case 'flame':
         this.setState('flame_tel');
@@ -589,7 +595,7 @@ export class Grinder extends BigBoss {
     this.beacon = 'red';
     const dist = Math.abs(this.targetX() - this.wx(GR.BARREL_X));
     this.barrelTarget = Math.max(GR.BARREL_MIN, Math.min(GR.BARREL_MIN + GR.BARREL_STEP * (GR.BARREL_N - 1), 0.35 + dist / 420));
-    this.aimAndFire(dt, this.stats.shells);
+    this.aimAndFire(dt, this.atk.shells);
     if (this.shotsLeft <= 0 && this.shotT <= -0.3) this.setState('idle');
   }
 
@@ -599,7 +605,7 @@ export class Grinder extends BigBoss {
     if (this.shotT <= 0 && this.shotsLeft > 0) {
       this.fireShell(total - this.shotsLeft);
       this.shotsLeft--;
-      this.shotT = this.stats.shellGap;
+      this.shotT = this.atk.shellGap;
     }
   }
 
@@ -616,7 +622,7 @@ export class Grinder extends BigBoss {
     tx = Math.max(this.arenaL + 10, Math.min(this.arenaR - 10, tx));
     const m = this.muzzle();
     this.world.add(
-      new Lobbed({ owner: this, x: m.x, y: m.y, tx, ty: this.groundY, time: this.stats.shellTime, gravity: 380, radius: 18, size: 'medium', sprite: 'grinder_shell', shake: 3, trail: '#9a928a' }),
+      new Lobbed({ owner: this, x: m.x, y: m.y, tx, ty: this.groundY, time: this.atk.shellTime, gravity: 380, radius: 18, size: 'medium', sprite: 'grinder_shell', shake: 3, trail: '#9a928a' }),
     );
     this.recoil = 1;
     this.turretKick = 2;
@@ -664,7 +670,7 @@ export class Grinder extends BigBoss {
   // ---- blade charge
 
   private revTime(): number {
-    return this.stats.rev * (0.85 + 0.15 * this.world.difficulty.enemyFireDelay);
+    return this.atk.rev * (0.85 + 0.15 * this.world.difficulty.enemyFireDelay);
   }
 
   private updateRev(dt: number): void {
@@ -708,7 +714,7 @@ export class Grinder extends BigBoss {
   }
 
   private updateCharge(dt: number): void {
-    const st = this.stats;
+    const st = this.atk;
     const speed = Math.min(st.charge, Math.abs(this.vxMove) + CHARGE_ACCEL * dt);
     this.vxMove = this.facing * speed;
     this.x += this.vxMove * dt;
@@ -745,7 +751,7 @@ export class Grinder extends BigBoss {
 
   private updateSlam(dt: number): void {
     const t = this.stateTime;
-    const st = this.stats;
+    const st = this.atk;
     this.rpm = t < 0.3 ? 2 : 3.5;
     this.drumRate = Math.max(0, this.drumRate - dt * 120);
     if (this.crossed(0, dt)) {
@@ -784,7 +790,7 @@ export class Grinder extends BigBoss {
     this.bladeTarget = 0;
     this.rpm = 4;
     this.drumRate = 6;
-    this.vxMove = -this.facing * this.stats.back;
+    this.vxMove = -this.facing * this.atk.back;
     this.x += this.vxMove * dt;
     if (this.shotsLeft > 0) {
       const dist = Math.abs(this.targetX() - this.wx(GR.BARREL_X));
@@ -818,7 +824,7 @@ export class Grinder extends BigBoss {
   }
 
   private updateFlame(dt: number): void {
-    const st = this.stats;
+    const st = this.atk;
     const t = this.stateTime;
     this.beacon = 'red';
     this.bladeTarget = 1;
@@ -938,7 +944,7 @@ export class Grinder extends BigBoss {
       [12, -30, 0],
       [-52, -42, 3],
       [16, -44, 3],
-      [-74, -66, 5],
+      [-30, -48, 3],
     ];
     pts.forEach(([lx, ly, fr], i) => {
       this.world.add(new Scrap('grinder_parts', fr, this.wx(lx), this.wy(ly), this.facing * fxRng.range(-120, 120), fxRng.range(-300, -180), { vr: fxRng.range(-9, 9), life: 3, burn: i % 2 === 0, groundY: this.groundY }));
@@ -1091,7 +1097,7 @@ export class Grinder extends BigBoss {
     // Vent glow while the nozzles build pressure: blinking faster and hotter until the jet fires.
     if (this.state === 'flame_tel') {
       const n = this.nozzle();
-      const k = Math.min(1, this.stateTime / Math.max(0.1, this.stats.flameTel));
+      const k = Math.min(1, this.stateTime / Math.max(0.1, this.atk.flameTel));
       const on = Math.floor(this.age * (8 + 14 * k)) % 2 === 0;
       const nx = Math.round(n.x) - (this.facing < 0 ? 2 : 0);
       for (const dy of [-9, -1]) {

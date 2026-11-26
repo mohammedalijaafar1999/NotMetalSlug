@@ -179,6 +179,22 @@ describe('boss_m1 GRINDER', () => {
     }
   });
 
+  it('a phase change in the middle of a charge does not move the stop line', () => {
+    const { w, p } = arena();
+    const b = waitBoss(w);
+    readyInPhase(w, b, 0);
+    p.godMode = false;
+    p.x = L + GRINDER_PHASES[0].pocket - p.w / 2 - 1;
+    b.forceAttack('charge');
+    expect(stepUntil(w, () => b.state === 'rev', 3)).toBe(true);
+    const stop = b.stopX;
+    b.hp = b.maxHp * 0.2; // jumps to phase 3 mid-charge
+    expect(stepUntil(w, () => b.state === 'slam', 6)).toBe(true);
+    expect(b.phase).toBe(2);
+    expect(Math.round(b.frontX)).toBe(Math.round(stop));
+    expect(p.state).toBe('play');
+  });
+
   it('the hull is solid: players are pushed out in front of it', () => {
     const { w, p } = arena();
     const b = waitBoss(w);

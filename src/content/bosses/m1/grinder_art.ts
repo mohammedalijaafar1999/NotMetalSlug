@@ -907,8 +907,8 @@ sprites.define({
 });
 
 /**
- * Debris pieces: 0 skirt plate, 1 stack crown, 2 hatch lid, 3 armour plate, 4 barrel, 5 jerrycan,
- * 6 track links, 7 road wheel.
+ * Debris pieces: 0 skirt plate, 1 stack crown, 2 hatch lid, 3 armour plate, 4 barrel, 5 jerrycan
+ * (spare), 6 track links, 7 road wheel.
  */
 sprites.define({
   name: 'grinder_parts',
