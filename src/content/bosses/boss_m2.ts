@@ -94,8 +94,6 @@ export class HornetKing extends BigBoss {
   // ---- flight
   tx = 0;
   ty = 0;
-  maxV = 100;
-  maxVy = 70;
   private bob = 0;
   private behindT = 0;
   private lurchT = 2;
@@ -661,8 +659,6 @@ export class HornetKing extends BigBoss {
     this.vy = clamp(this.vy + ay * dt, -maxVy, maxVy + (this.phase >= 1 ? 40 : 0));
     this.x += this.vx * dt;
     this.y += this.vy * dt;
-    this.maxV = maxV;
-    this.maxVy = maxVy;
   }
 
   private startTurn(after: string): void {
@@ -799,7 +795,7 @@ export class HornetKing extends BigBoss {
       sprite: 'bm2_missile',
       drop: 0.56,
       speed: 40,
-      topSpeed: Math.min(235, this.shotSpeed(220)),
+      topSpeed: Math.min(220, this.shotSpeed(215)),
       accel: 320,
       turn: 7,
       steer: 1.1,
@@ -846,13 +842,13 @@ export class HornetKing extends BigBoss {
       this.world.flash('#ffffff', 0.45);
       // It lands inside the arena, well clear of the player (purely cosmetic crash).
       let away = s.x < px ? -1 : 1;
-      const flight = (210 + Math.sqrt(210 * 210 + 2 * 330 * Math.max(10, this.groundY - 12 - s.y))) / 330;
+      const flight = (150 + Math.sqrt(150 * 150 + 2 * 330 * Math.max(10, this.groundY - 12 - s.y))) / 330;
       let land = clamp(s.x + away * 70, this.arenaL + 34, this.arenaR - 34);
       if (Math.abs(land - px) < 70) {
         away = -away as 1 | -1;
         land = clamp(px + away * 90, this.arenaL + 34, this.arenaR - 34);
       }
-      this.world.add(new TornRotor(s.x, s.y, (land - s.x) / flight, -210, away * 5.5, this.groundY));
+      this.world.add(new TornRotor(s.x, s.y, (land - s.x) / flight, -150, away * 5.5, this.groundY));
       this.world.particles.debris(s.x, s.y, 18, ['#7d7343', '#5a522e', '#4c4e5a', '#e8c02a'], 240);
       this.throwPlate(-60, -24, 1, true);
       this.throwPlate(-70, -20, 2, true);

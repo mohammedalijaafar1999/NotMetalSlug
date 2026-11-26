@@ -158,6 +158,69 @@ describe('boss_m2 HORNET KING', () => {
     expect(worst).toBe(0);
   });
 
+  it('chin-gun sweeps never reach a player standing under the hull', () => {
+    const w = arenaWorld(11);
+    const b = waitBoss(w);
+    for (let i = 0; i < 300 && !b.introDone; i++) step(w, 1);
+    const p = w.players[0];
+    p.godMode = false;
+    let deaths = 0;
+    let sweeps = 0;
+    const bullets = new Set<number>();
+    w.on('playerDied', () => deaths++);
+    for (let i = 0; i < 60 * 30; i++) {
+      b.attackCd = 99;
+      if (b.state === 'hover') {
+        (b as any).setState('sweepMove');
+        sweeps++;
+      }
+      if (b.state === 'sweepAim' || b.state === 'sweepFire') {
+        p.x = b.x - b.facing * 8;
+        p.vx = 0;
+      }
+      step(w, 1);
+      for (const e of w.query((x) => (x as any).spriteName === 'bullet_enemy')) bullets.add(e.id);
+    }
+    expect(sweeps).toBeGreaterThanOrEqual(3);
+    expect(bullets.size).toBeGreaterThan(30);
+    expect(deaths).toBe(0);
+  });
+
+  it('missile rain always leaves a free slot right next to the player', () => {
+    const w = arenaWorld(13);
+    const b = waitBoss(w) as any;
+    for (let px = b.arenaL + 4; px < b.arenaR - 4; px += 9) {
+      for (const n of [5, 6]) {
+        const hits: number[] = b.pickRainSlots(px, n);
+        expect(hits.length).toBeLessThanOrEqual(n);
+        // The slot under the player is targeted (forces a move)...
+        expect(hits.some((x) => Math.abs(x - px) <= 24.5)).toBe(true);
+        // ...but a neighbouring slot (48 px away) is free.
+        const free = [-48, 48].some((dx) => {
+          const sx = hits.reduce((best, x) => (Math.abs(x - px) < Math.abs(best - px) ? x : best), hits[0]) + dx;
+          return sx > b.arenaL && sx < b.arenaR && !hits.some((x) => Math.abs(x - sx) < 1);
+        });
+        expect(free).toBe(true);
+      }
+    }
+  });
+
+  it('carpet bombs land at least 60 px apart (stand between the shadows)', () => {
+    const w = arenaWorld(17);
+    const b = waitBoss(w) as any;
+    for (let i = 0; i < 300 && !b.introDone; i++) step(w, 1);
+    b.runDir = b.facing;
+    b.setState('carpetGo');
+    const seen = new Map<number, number>();
+    for (let i = 0; i < 60 * 8 && b.state !== 'reload'; i++) {
+      step(w, 1);
+      for (const e of w.query((x) => x.constructor.name === 'CarpetBomb')) seen.set(e.id, (e as any).tx);
+    }
+    const xs = [...seen.values()].sort((a, c) => a - c);
+    expect(xs.length).toBeGreaterThanOrEqual(4);
+    for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeGreaterThanOrEqual(58);
+  });
+
   it('is defeated by the invincible autopilot within the time budget', () => {
     const r = simulateMission('bosstest_m2', 300);
     if (!r.completed) console.log('bosstest_m2', JSON.stringify(r));
