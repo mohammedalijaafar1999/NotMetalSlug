@@ -34,7 +34,7 @@ export const LT = 36;
 export const LS = 38;
 export const ANKLE = 14;
 /** Hip height above the ground: standing and squatting (laser pose). */
-export const HIP_STAND = 80;
+export const HIP_STAND = 72;
 export const HIP_SQUAT = 24;
 
 /** Reactor core (centre, local to the hip pivot) - at ground-25 when squatting. */

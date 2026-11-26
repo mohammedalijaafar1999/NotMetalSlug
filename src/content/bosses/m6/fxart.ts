@@ -3,42 +3,44 @@
 
 import { sprites } from '../../../engine/sprites';
 import type { PixelArt } from '../../../engine/pixelart';
-import { BC, Pen, charr, cog, hazardStripes } from '../common/kit';
+import { BC, Pen, cog, hazardStripes } from '../common/kit';
 import { DOME_OX, DOME_OY, DOME_W, JC, JPen, drawDome, drawHull, type DomeExpr } from './art';
 
 // ------------------------------------------------------------------ stomp shockwave
 
-/** Ground shockwave travelling right (flip for left): erupting dirt with an energy rim. */
+/** Ground shockwave travelling right (flip for left): a fiery crest of torn-up floor. */
 sprites.define({
   name: 'bm6_wave',
-  w: 20,
-  h: 16,
-  ox: 10,
-  oy: 16,
+  w: 24,
+  h: 19,
+  ox: 12,
+  oy: 19,
   frames: 4,
   draw: (p, f) => {
-    const d = new Pen(p, 10, 16, 0);
+    const d = new Pen(p, 12, 19, 0);
     const k = [0, 1, 2, 1][f];
-    // dirt plume (leans back, front edge steep)
-    d.poly([-10, 0, -7, -6 - k, -2, -11 - k, 3, -13 - k, 7, -9, 9, -3, 10, 0], '#6e5038');
-    d.poly([-7, 0, -4, -6 - k, 0, -10 - k, 4, -11 - k, 7, -6, 8, 0], '#9a7450');
-    d.poly([-3, 0, 0, -6 - k, 4, -8 - k, 6, -3, 6, 0], '#c89a62');
-    // energy rim on the leading edge
-    d.poly([5, 0, 7, -7, 9, -4, 10, 0], '#ffd060');
-    d.poly([7, 0, 8, -4, 10, 0], '#fff6c8');
-    // flying chunks
+    // dust tail
+    d.poly([-12, 0, -10, -4, -6, -6 - (f % 2), -2, -5, 0, 0], '#8a6a4a');
+    d.poly([-10, 0, -7, -3, -3, -3, -2, 0], '#b08a5e');
+    // crest
+    d.poly([-6, 0, -4, -7 - k, 0, -12 - k, 5, -14 - k, 9, -11, 11, -5, 12, 0], '#c8401a');
+    d.poly([-3, 0, -1, -7 - k, 3, -11 - k, 7, -10, 9, -5, 10, 0], '#ff8a20');
+    d.poly([1, 0, 3, -6 - k, 6, -8, 8, -4, 9, 0], '#ffd040');
+    d.poly([4, 0, 6, -5, 8, -2, 8.5, 0], '#fff8d0');
+    // torn-up chunks and sparks
     const chunks: [number, number][] = [
-      [-6, -12 - k],
-      [1, -15 - k],
-      [6, -12 + k],
-      [-9, -7],
+      [-8, -9 - k],
+      [-1, -16 - k],
+      [8, -15 + k],
+      [-11, -6],
     ];
     for (const [x, y] of chunks) {
-      d.rect(x, y + (f % 2), 2, 2, '#5a4030');
-      d.px(x, y + (f % 2), '#a88a60');
+      d.rect(x, y + (f % 2), 2, 2, '#4a3426');
+      d.px(x, y + (f % 2), '#9a7a56');
     }
-    d.px(8, -10 - (f % 2), '#ffe070');
-    d.px(-2, -14 + (f % 2), '#ffe070');
+    d.px(10, -13 - (f % 2), '#ffe070');
+    d.px(2, -17 + (f % 2), '#fff6b0');
+    d.px(-5, -12 + (f % 2), '#ffb040');
   },
 });
 
@@ -247,6 +249,13 @@ sprites.define({
     h.px(10, -61, BC.brass);
     h.px(28, -62, '#7cc4e4');
     h.px(16, -60, '#7cc4e4');
-    charr(p, 6);
+    // Burnt, not blackened: darken towards soot but keep the structure, sprinkle embers.
+    p.mapPixels((v, x, y) => {
+      const n = ((x * 73856093) ^ (y * 19349663)) >>> 0;
+      if (n % 233 === 0) return n % 2 ? 0xff3aa0ff : 0xff1a4ad8;
+      const k = 0.52;
+      const m = (s2: number, t: number) => Math.round(((v >>> s2) & 255) * (1 - k) + t * k);
+      return ((255 << 24) | (m(16, 0x10) << 16) | (m(8, 0x14) << 8) | m(0, 0x1a)) >>> 0;
+    });
   },
 });

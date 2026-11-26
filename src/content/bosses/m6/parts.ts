@@ -144,8 +144,8 @@ export class EscapePod extends Entity {
     this.x = x;
     this.y = y;
     this.dir = away;
-    this.vx = away * 55;
-    this.vy = -290;
+    this.vx = away * 70;
+    this.vy = -105;
     this.z = Z.FX - 4;
     this.persistent = true;
   }
@@ -157,25 +157,27 @@ export class EscapePod extends Entity {
 
   override update(dt: number): void {
     const t = this.age;
-    if (t < 0.85) {
-      this.vy += 230 * dt;
+    if (t < 0.45) {
+      // short rocket hop (stays below the HUD), wobbling
+      this.vy += 150 * dt;
       this.fxT -= dt;
       if (this.fxT <= 0) {
         this.fxT = 0.02;
         flames(this.world, this.x, this.y + 10, { n: 1, vy: 120, size: 2.5, life: 0.25, spread: 2 });
         smoke(this.world, this.x, this.y + 14, { n: 1, vy: 40, size: 2, size2: 7, life: 0.8, color: '#c8c0b8', color2: '#6a6668' });
       }
-    } else if (t < 1.15) {
-      this.vy += 420 * dt;
-      if (fxRng.chance(dt * 20)) smoke(this.world, this.x, this.y + 10, { n: 1, vy: 10, size: 2, size2: 5, life: 0.6, color: '#5a5458', color2: '#3a3438' });
+    } else if (t < 0.95) {
+      // the rocket sputters out and the pod drops a little before the chute catches it
+      this.vy += 330 * dt;
+      if (fxRng.chance(dt * 25)) smoke(this.world, this.x, this.y + 10, { n: 1, vy: 10, size: 2, size2: 5, life: 0.6, color: '#5a5458', color2: '#3a3438' });
     } else {
       if (!this.chute) {
         this.chute = true;
         this.world.sfx('parachute', this.x, { vol: 0.9 });
       }
       this.popped += dt;
-      this.vy += (20 - this.vy) * Math.min(1, dt * 3);
-      this.vx += (this.dir * 26 + Math.sin(t * 2.2) * 14 - this.vx) * Math.min(1, dt * 2);
+      this.vy += (14 - this.vy) * Math.min(1, dt * 3);
+      this.vx += (this.dir * 30 + Math.sin(t * 2.2) * 12 - this.vx) * Math.min(1, dt * 2);
     }
     this.x += this.vx * dt;
     this.y += this.vy * dt;
@@ -191,7 +193,7 @@ export class EscapePod extends Entity {
     }
     const c = this.world.camera;
     if (t > 2 && (this.x < c.x - 60 || this.x > c.x + VIEW_W + 60 || this.y > c.y + VIEW_H + 60)) this.remove();
-    if (t > 16) this.remove();
+    if (t > 20) this.remove();
   }
 
   override render(g: CanvasRenderingContext2D): void {
@@ -202,7 +204,7 @@ export class EscapePod extends Entity {
       const f = this.popped < 0.18 ? 0 : Math.floor(t * 1.6) % 2 === 0 ? 1 : 2;
       sprites.get('bm6_chute').draw(g, this.x, this.y - 22, f, { flip, rot: wob * 0.5 || undefined });
     }
-    if (t < 0.85) sprites.get('bm6_flame').draw(g, this.x, this.y + 10, Math.floor(t * 20));
+    if (t < 0.45) sprites.get('bm6_flame').draw(g, this.x, this.y + 10, Math.floor(t * 20));
     const face = this.chute ? (Math.floor(t * 5) % 2 === 0 ? 0 : 1) : 2;
     sprites.get('bm6_eject').draw(g, this.x, this.y, face, { flip, rot: wob || undefined });
   }

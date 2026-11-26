@@ -170,6 +170,8 @@ export class Juggernaut extends BigBoss {
   ventGlow = 0;
   venting = false;
   private beamCd = new Map<number, number>();
+  /** Heavy-hit flash timers per zone id. */
+  hitFx: Record<string, number> = {};
   private fxT = 0;
   private stackT = 0;
   private sfxT = 0;
@@ -236,7 +238,7 @@ export class Juggernaut extends BigBoss {
       const ty = this.y - ANKLE - L.lift - hy0;
       let [kx, ky, ex, ey] = ik2(hx, hy, tx, ty, LT, LS, -1);
       // Never fold a knee through the floor: bend it forward instead.
-      if (hy0 + ky > this.y - 9) [kx, ky, ex, ey] = ik2(hx, hy, tx, ty, LT, LS, 1);
+      if (hy0 + ky > this.y - 4) [kx, ky, ex, ey] = ik2(hx, hy, tx, ty, LT, LS, 1);
       L.thighA = Math.atan2(ky - hy, kx - hx);
       L.shinA = Math.atan2(ey - ky, ex - kx);
       L.hx = this.x + hx * f;
@@ -327,6 +329,8 @@ export class Juggernaut extends BigBoss {
   override applyHit(d: Damage, mul: number, id: string): boolean {
     const ok = super.applyHit(d, mul, id);
     if (ok && d.amount * mul >= 5) this.flinchT = 0.3;
+    // White hit flash only for heavy hits (bullets just spark) - and any hit on the small weak points.
+    if (ok && (d.amount * mul * this.armorMul >= 3 || id === 'core' || id === 'dome')) this.hitFx[id] = 0.12;
     if (ok && id === 'core' && d.x !== undefined && d.y !== undefined && fxRng.chance(0.5)) sparkBurst(this.world, d.x, d.y, 3, '#fff0a0', 140);
     return ok;
   }
@@ -421,6 +425,11 @@ export class Juggernaut extends BigBoss {
   private liveDrones(): number {
     this.drones = this.drones.filter((d) => !d.dead && !(d as { dying?: boolean }).dying);
     return this.drones.length;
+  }
+
+  override update(dt: number): void {
+    for (const k in this.hitFx) this.hitFx[k] -= dt;
+    super.update(dt);
   }
 
   override think(dt: number): void {
@@ -787,9 +796,9 @@ export class Juggernaut extends BigBoss {
         this.vxWalk = 0;
         this.stance = 'squat';
         if (this.subT === 0) bsfx(this, 'engine', { vol: 0.7, pitch: 0.6 });
-        if (fxRng.chance(0.5)) {
+        if (fxRng.chance(0.25)) {
           const [x, y] = this.att(fxRng.range(-30, 24), 8);
-          puffSteam(this.world, x, y, 0, 40, 1, 3);
+          this.steam(x, y, 0, 40);
         }
         if (this.subT > 0.5 && !this.legs.some((l) => l.step)) {
           this.gait = false;
@@ -854,9 +863,9 @@ export class Juggernaut extends BigBoss {
         break;
       }
       default:
-        if (fxRng.chance(0.4)) {
+        if (fxRng.chance(0.2)) {
           const [x, y] = this.att(fxRng.range(-30, 24), 8);
-          puffSteam(this.world, x, y, 0, 30, 1, 3);
+          this.steam(x, y, 0, 30);
         }
         if (this.hipH >= HIP_STAND - 1 && this.subT > 0.3) {
           this.gait = true;
@@ -929,9 +938,9 @@ export class Juggernaut extends BigBoss {
     const tele = 0.75;
     if (this.sub === 0) {
       this.ventGlow = Math.min(1, this.subT / tele);
-      if (fxRng.chance(0.6)) {
+      if (fxRng.chance(0.35)) {
         const [x, y] = this.att(fxRng.range(-30, 22), 8);
-        puffSteam(this.world, x, y, 0, 50, 1, 2.5);
+        this.steam(x, y, 0, 50);
       }
       if (this.subT > tele) {
         this.next(1);
@@ -970,7 +979,7 @@ export class Juggernaut extends BigBoss {
   stance: 'stand' | 'squat' = 'stand';
 
   private home0(i: number): number {
-    if (this.stance === 'squat') return this.x + (i === 0 ? 5 : 2) * this.facing;
+    if (this.stance === 'squat') return this.x + (i === 0 ? 2 : -1) * this.facing;
     return this.x + (i === 0 ? 8 : -8) * this.facing;
   }
 
@@ -1016,7 +1025,7 @@ export class Juggernaut extends BigBoss {
       }
     } else {
       let best = -1;
-      let err = 5;
+      let err = this.stance === 'squat' ? 1.5 : 5;
       for (const i of free) {
         const e = Math.abs(this.legs[i].x - this.home0(i));
         if (e > err) {
@@ -1167,6 +1176,16 @@ export class Juggernaut extends BigBoss {
 
   // ---------------------------------------------------------------- rendering
 
+  /** Hit flash as a flicker (continuous fire must not turn whole parts into white blobs). */
+  flick(id: string): boolean {
+    return !this.dying && (this.hitFx[id] ?? 0) > 0 && Math.floor(this.age * 30) % 2 === 0;
+  }
+
+  /** Light steam puff (behind the near leg, translucent). */
+  steam(x: number, y: number, vx: number, vy: number, size = 2): void {
+    this.world.particles.add({ kind: 'smoke', x: x + fxRng.range(-2, 2), y, vx: vx + fxRng.range(-8, 8), vy: vy * fxRng.range(0.7, 1.2), life: fxRng.range(0.35, 0.6), color: '#e8eef6', color2: '#a8b4c4', size, size2: size * 2.2, drag: 2.5, alpha: 0.55 });
+  }
+
   /** Current expression of Gristle in the dome. */
   domeExpr(): DomeExpr {
     const blink = (r: number) => Math.floor(this.age * r) % 2 === 0;
@@ -1210,7 +1229,7 @@ export class Juggernaut extends BigBoss {
     for (const L of this.legs) if (L.lift > 2) ops.push({ e: [L.x, this.y - 1, 16, 2.5], c: '#0a0810', a: Math.min(0.35, 0.12 + L.lift / 140) });
     // far leg
     const far = this.legs[1];
-    const ff = this.flashing('legF');
+    const ff = this.flick('legF');
     S('bm6_thigh_f', angleFrame(far.thighA, THIGH_A0, SEG_STEP, THIGH_N), far.hx, far.hy, ff);
     S('bm6_shin_f', angleFrame(far.shinA, SHIN_A0, SEG_STEP, SHIN_N), far.kx, far.ky, ff);
     S('bm6_foot_f', footFrame(far.tilt), far.ax, far.ay, ff);
@@ -1219,7 +1238,7 @@ export class Juggernaut extends BigBoss {
     const [pX, pY] = this.att(POD.x, POD.y);
     S('bm6_pod', this.podFrame, pX, pY);
     // hull
-    const hf = this.flashing('hull') || this.flashing('chest');
+    const hf = this.flick('hull') || this.flick('chest');
     S('bm6_hull', this.hullState() * TILTS.length + tiltIndex(this.tilt), this.x, this.hipY, hf);
     const [hX, hY] = this.att(HATCH.x, HATCH.y);
     S('bm6_hatch', this.hatchOpen ? 1 : 0, hX, hY);
@@ -1229,23 +1248,23 @@ export class Juggernaut extends BigBoss {
     // chest armour or the exposed core
     if (this.armorOn) {
       const [aX, aY] = this.att(ARMOR_ORIGIN.x, ARMOR_ORIGIN.y);
-      S('bm6_armor', 0, aX, aY, this.flashing('armor'));
+      S('bm6_armor', 0, aX, aY, this.flick('armor'));
     } else {
       const [oX, oY] = this.att(CORE.x, CORE.y);
       const fr = this.charging || this.beamOn ? 4 + (Math.floor(this.age * 20) % 2) : Math.floor(this.age * 8) % 4;
       if (this.charging || this.beamOn) ops.push({ e: [oX + jx, oY, 14, 14], c: '#ffb040', a: 0.25 + 0.15 * Math.sin(this.age * 40) });
-      S('bm6_core', fr, oX, oY, this.flashing('core'));
+      S('bm6_core', fr, oX, oY, this.flick('core'));
     }
     // cockpit
     if (!this.podOut) {
       const [dX, dY] = this.att(DOME.x, DOME.y + 1);
-      S('bm6_dome', DOMEF[this.domeExpr()], dX, dY, this.flashing('dome'));
+      S('bm6_dome', DOMEF[this.domeExpr()], dX, dY, this.flick('dome'));
       const crack = this.phase >= 2 || this.dying ? 1 : this.hpFrac < 0.5 ? 0 : -1;
       if (crack >= 0) S('bm6_crack', crack, dX, dY);
     }
     // near leg
     const near = this.legs[0];
-    const nf = this.flashing('legN');
+    const nf = this.flick('legN');
     S('bm6_thigh_n', angleFrame(near.thighA, THIGH_A0, SEG_STEP, THIGH_N), near.hx, near.hy, nf);
     S('bm6_shin_n', angleFrame(near.shinA, SHIN_A0, SEG_STEP, SHIN_N), near.kx, near.ky, nf);
     S('bm6_foot_n', footFrame(near.tilt), near.ax, near.ay, nf);
