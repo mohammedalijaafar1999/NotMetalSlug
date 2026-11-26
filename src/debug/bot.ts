@@ -15,6 +15,7 @@ export class Bot {
   private bombTimer = 0;
   private turnTimer = 0;
   private frame = 0;
+  private recentre = false;
 
   constructor(public index: number) {}
 
@@ -50,7 +51,13 @@ export class Bot {
     }
     if (lvl.locked || lvl.bossActive) {
       const center = cam.x + VIEW_W * (lvl.bossActive ? 0.25 : 0.4);
-      dir = ctrl.x < center - 16 ? 1 : ctrl.x > center + 16 ? -1 : 0;
+      // Hysteresis: once outside the band, walk back to its middle. (Stopping right at the band
+      // edge let the "tap toward the enemy" below push us out again, and walking back in left
+      // the player facing away from the enemy most of the time.)
+      const off = ctrl.x - center;
+      if (Math.abs(off) > 16) this.recentre = true;
+      else if (Math.abs(off) < 4) this.recentre = false;
+      dir = this.recentre ? (off < 0 ? 1 : -1) : 0;
     }
     const flying = !!(p.vehicle as any)?.flying;
     // Bosses overhead: get under them and shoot up (on foot / ground vehicles).

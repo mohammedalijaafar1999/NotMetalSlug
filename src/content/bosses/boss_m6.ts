@@ -234,7 +234,9 @@ export class Juggernaut extends BigBoss {
       const hy = i === 1 ? -2 : 0;
       const tx = (L.x - this.x) * f;
       const ty = this.y - ANKLE - L.lift - hy0;
-      const [kx, ky, ex, ey] = ik2(hx, hy, tx, ty, LT, LS, -1);
+      let [kx, ky, ex, ey] = ik2(hx, hy, tx, ty, LT, LS, -1);
+      // Never fold a knee through the floor: bend it forward instead.
+      if (hy0 + ky > this.y - 9) [kx, ky, ex, ey] = ik2(hx, hy, tx, ty, LT, LS, 1);
       L.thighA = Math.atan2(ky - hy, kx - hx);
       L.shinA = Math.atan2(ey - ky, ex - kx);
       L.hx = this.x + hx * f;
@@ -371,6 +373,7 @@ export class Juggernaut extends BigBoss {
     this.hipRate = 120;
     this.tiltTarget = 0;
     this.gait = true;
+    this.stance = 'stand';
     for (const L of this.legs) L.manual = false;
     this.marker?.remove();
     this.marker = null;
@@ -780,8 +783,9 @@ export class Juggernaut extends BigBoss {
   private thinkLaser(dt: number): void {
     const hold = ([1.1, 1.1, 1.25][this.phase] ?? 1.1) * 1;
     switch (this.sub) {
-      case 0: // brace: settle the feet, steam hisses under the belly
+      case 0: // brace: tuck the feet, steam hisses under the belly
         this.vxWalk = 0;
+        this.stance = 'squat';
         if (this.subT === 0) bsfx(this, 'engine', { vol: 0.7, pitch: 0.6 });
         if (fxRng.chance(0.5)) {
           const [x, y] = this.att(fxRng.range(-30, 24), 8);
@@ -962,7 +966,11 @@ export class Juggernaut extends BigBoss {
     this.updateGait(dt);
   }
 
+  /** Foot rest spots: a wide stance standing, both feet tucked just ahead of the hip squatting. */
+  stance: 'stand' | 'squat' = 'stand';
+
   private home0(i: number): number {
+    if (this.stance === 'squat') return this.x + (i === 0 ? 5 : 2) * this.facing;
     return this.x + (i === 0 ? 8 : -8) * this.facing;
   }
 
@@ -1104,10 +1112,17 @@ export class Juggernaut extends BigBoss {
       for (let i = 0; i < 4; i++) this.world.add(new FlyingPart('bm6_debris', 5, x + fxRng.range(-8, 8), y - 6, fxRng.range(-80, 80), fxRng.range(-200, -100), { life: 1.6, smoke: false }));
     }
     if (t > 1.1) {
-      // knees buckle: the hull sinks and pitches nose-first
+      // knees buckle: the hull sinks and pitches nose-first, feet skid inwards
       this.hipTarget = 18;
       this.hipRate = t < 2.2 ? 18 : 46;
       this.tiltTarget = 0.16;
+      this.stance = 'squat';
+      for (let i = 0; i < 2; i++) {
+        const L = this.legs[i];
+        L.step = null;
+        L.lift = Math.max(0, L.lift - dt * 60);
+        L.x = approach(L.x, this.home0(i), dt * 30);
+      }
     }
     this.hipH = approach(this.hipH, this.hipTarget, this.hipRate * dt);
     this.tilt += (this.tiltTarget - this.tilt) * Math.min(1, dt * 2.5);

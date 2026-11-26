@@ -69,31 +69,31 @@ function drawThigh(p: PixelArt, a: number, P: LegPal): void {
   const d = new JPen(p, SEG_C, SEG_C, a);
   const s = litSide(a);
   // hydraulic "hamstring" piston on the +y side
-  d.cap(5, 10, 19, 10, 3, P.stD);
-  d.cap(5, 9.5, 19, 9.5, 2, P.st);
-  d.cap(19, 10, LT - 3, 7, 1.3, P.chrome);
-  d.px(20, 9, P.stLL);
+  d.cap(4, 13, 19, 13, 3.4, P.stD);
+  d.cap(4, 12.4, 19, 12.4, 2.3, P.st);
+  d.cap(19, 12.5, LT - 2, 8, 1.5, P.chrome);
+  d.px(21, 11, P.stLL);
   // inner strut
-  d.cap(0, 0, LT, 0, 5.5, P.stD);
+  d.cap(0, 0, LT, 0, 7, P.stD);
   // armour shell
-  const shell = [-3, -9.5, 10, -11, LT - 9, -8, LT - 3, -5, LT - 3, 5, LT - 9, 8, 10, 11, -3, 9.5];
+  const shell = [-5, -12, 10, -14, LT - 9, -10, LT - 2, -6, LT - 2, 6, LT - 9, 10, 10, 14, -5, 12];
   d.poly(shell, P.mr);
-  d.shape(-4, -12, LT, 12, s < 0 ? P.mrL : P.mrL, (x, y) => inShell(shell, x, y) && y * s > 4.5);
-  d.shape(-4, -12, LT, 12, P.mrLL, (x, y) => inShell(shell, x, y) && y * s > 7.5 && x > 2 && x < LT - 10);
-  d.shape(-4, -12, LT, 12, P.mrD, (x, y) => inShell(shell, x, y) && y * s < -4.5);
-  d.shape(-4, -12, LT, 12, P.mrDD, (x, y) => inShell(shell, x, y) && y * s < -8);
+  d.shape(-6, -15, LT, 15, P.mrL, (x, y) => inShell(shell, x, y) && y * s > 5);
+  d.shape(-6, -15, LT, 15, P.mrLL, (x, y) => inShell(shell, x, y) && y * s > 9.5 && x > 0 && x < LT - 11);
+  d.shape(-6, -15, LT, 15, P.mrD, (x, y) => inShell(shell, x, y) && y * s < -5);
+  d.shape(-6, -15, LT, 15, P.mrDD, (x, y) => inShell(shell, x, y) && y * s < -10);
   // centre ridge + rivets
-  d.rect(2, -0.5, LT - 8, 1, P.mrDD);
-  for (let x = 4; x < LT - 8; x += 6) {
-    d.px(x, -3 * s, P.mrLL);
-    d.px(x, 3 * s, P.mrD);
+  d.rect(0, -0.5, LT - 8, 1, P.mrDD);
+  for (let x = 2; x < LT - 8; x += 6) {
+    d.px(x, -4 * s, P.mrLL);
+    d.px(x, 4 * s, P.mrD);
   }
   // brass band
-  d.rect(21, -8.5, 3, 17, P.brD);
-  d.rect(21, -8.5, 2, 17, P.br);
-  d.rect(21, -8.5 * (s < 0 ? 1 : -1) - (s < 0 ? 0 : 0), 1, 1, P.brL);
+  d.rect(20, -11, 4, 22, P.brD);
+  d.rect(20, -11, 2, 22, P.br);
+  d.rect(20, s < 0 ? -11 : 10, 2, 1, P.brL);
   // knee end cap
-  d.circle(LT, 0, 6, P.stD);
+  d.circle(LT, 0, 7.5, P.stD);
 }
 
 function inShell(shell: number[], x: number, y: number): boolean {
@@ -115,35 +115,45 @@ function drawShin(p: PixelArt, a: number, P: LegPal): void {
   const d = new JPen(p, SEG_C, SEG_C, a);
   const s = litSide(a);
   // shock absorber with a coil spring on the +y side
-  d.cap(6, 7.5, 23, 7.5, 2.6, P.stD);
-  for (let x = 7; x < 23; x += 2) {
-    d.rect(x, 5, 1, 5, P.stL);
-    d.rect(x + 1, 5, 1, 5, P.stDD);
+  d.cap(6, 9.5, 24, 9.5, 3.2, P.stD);
+  for (let x = 7; x < 24; x += 2) {
+    d.rect(x, 6.5, 1, 6, P.stL);
+    d.rect(x + 1, 6.5, 1, 6, P.stDD);
   }
-  d.cap(23, 7, LS - 7, 4, 1.2, P.chrome);
+  d.cap(24, 9, LS - 6, 5, 1.5, P.chrome);
   // strut
-  d.cap(0, 0, LS, 0, 4.5, P.stD);
-  d.cap(0, -0.5, LS, -0.5, 3, P.st);
-  d.rect(2, -2.5 * s - 0.5, LS - 6, 1, P.stL);
+  d.cap(0, 0, LS, 0, 6, P.stD);
+  d.cap(0, -0.5, LS, -0.5, 4.2, P.st);
+  d.rect(2, -3.5 * s - 0.5, LS - 6, 1, P.stL);
   // armoured shin guard on the -y side
-  const guard = [1, -8, LS - 12, -7.5, LS - 5, -4, LS - 5, -1, 1, -1.5];
+  const guard = [0, -11, LS - 13, -10, LS - 4, -5, LS - 4, -1, 0, -2];
   d.poly(guard, P.mr);
-  d.shape(0, -9, LS, 0, s < 0 ? P.mrL : P.mrD, (x, y) => inShell(guard, x, y) && y < -5.5);
-  if (s < 0) d.shape(0, -9, LS, 0, P.mrLL, (x, y) => inShell(guard, x, y) && y < -7 && x > 3 && x < LS - 14);
-  d.shape(0, -9, LS, 0, P.mrDD, (x, y) => inShell(guard, x, y) && y > -2.5);
-  for (let x = 5; x < LS - 10; x += 7) d.px(x, -5, s < 0 ? P.mrLL : P.mrL);
+  d.shape(-1, -12, LS, 0, s < 0 ? P.mrL : P.mrD, (x, y) => inShell(guard, x, y) && y < -7);
+  if (s < 0) d.shape(-1, -12, LS, 0, P.mrLL, (x, y) => inShell(guard, x, y) && y < -9.2 && x > 3 && x < LS - 15);
+  d.shape(-1, -12, LS, 0, P.mrDD, (x, y) => inShell(guard, x, y) && y > -3.5);
+  for (let x = 5; x < LS - 12; x += 7) d.px(x, -6, s < 0 ? P.mrLL : P.mrL);
   // hazard band above the ankle
-  hazardStripes(d, LS - 11, -6, 4, 6, P.hz, P.bk, 4);
+  hazardStripes(d, LS - 12, -8, 5, 7, P.hz, P.bk, 4);
   // ankle end
-  d.circle(LS, 0, 4.5, P.stD);
+  d.circle(LS, 0, 5.5, P.stD);
 }
 
 // ------------------------------------------------------------------ foot
 
-const FOOT_C = 36;
+const FOOT_C = 44;
 
 function drawFoot(p: PixelArt, tilt: number, P: LegPal): void {
-  const d = new JPen(p, FOOT_C, FOOT_C, tilt);
+  // Authored at 1x, scaled up 1.25 x 1.17 around the ankle (the sole ends ANKLE px below it).
+  const base = new JPen(p, FOOT_C, FOOT_C, tilt);
+  const K = 1.25;
+  const KY = 1.17;
+  const d = {
+    poly: (pts: number[], c: string) => base.poly(pts.map((v, i) => v * (i % 2 ? KY : K)), c),
+    rect: (x: number, y: number, w: number, h: number, c: string) => base.poly([x * K, y * KY, (x + w) * K, y * KY, (x + w) * K, (y + h) * KY, x * K, (y + h) * KY], c),
+    px: (x: number, y: number, c: string) => base.px(x * K, y * KY, c),
+    circle: (x: number, y: number, r: number, c: string) => base.circle(x * K, y * KY, r * K, c),
+    shape: (x0: number, y0: number, x1: number, y1: number, c: string, f: (x: number, y: number) => boolean) => base.shape(x0 * K, y0 * KY, x1 * K, y1 * KY, c, (x, y) => f(x / K, y / KY)),
+  };
   // far toe (behind)
   d.poly([6, 3, 20, 5, 25, 8, 22, 10, 8, 9], P.stDD);
   d.poly([20, 5, 25, 8, 27, 11, 23, 9], P.stD);
@@ -157,7 +167,8 @@ function drawFoot(p: PixelArt, tilt: number, P: LegPal): void {
   d.shape(-16, 0, 19, 13, P.mrL, (x, y) => inShell(body, x, y) && y < 3.5);
   d.shape(-16, 0, 19, 13, P.mrLL, (x, y) => inShell(body, x, y) && y < 2.2 && x < 6);
   d.shape(-16, 0, 19, 13, P.mrD, (x, y) => inShell(body, x, y) && y > 7.5);
-  hazardStripes(d, -13, 6, 6, 4, P.hz, P.bk, 4);
+  for (let y = 6; y < 10; y++)
+    for (let x = -13; x < -7; x++) d.px(x, y, ((x + y) & 3) < 2 ? P.hz : P.bk);
   // near toe with a steel claw
   d.poly([9, 5, 22, 7, 28, 10, 26, 12, 10, 12], P.mrD);
   d.poly([9, 5, 22, 7, 24, 8.5, 10, 8], P.mr);
@@ -166,7 +177,7 @@ function drawFoot(p: PixelArt, tilt: number, P: LegPal): void {
   d.px(29, 10, P.stLL);
   d.px(30, 12, P.chrome);
   // sole tread
-  d.rect(-15, 11, 41, 2, P.irD);
+  d.rect(-15, 11, 41, 1.6, P.irD);
   for (let x = -13; x < 24; x += 4) d.px(x, 11, P.ir);
   // ankle housing + joint
   d.poly([-6, 1, 6, 1, 4, -3, -4, -3], P.stD);
@@ -174,8 +185,7 @@ function drawFoot(p: PixelArt, tilt: number, P: LegPal): void {
   d.circle(-0.6, -0.6, 3.6, P.st);
   d.circle(0, 0, 1.6, P.br);
   d.px(-2, -2, P.stLL);
-  // rivets on the body
-  for (const x of [-8, -2, 4]) bolt(d, x, 3, P.stLL, P.stDD);
+  for (const x of [-8, -2, 4]) bolt(base, x * K, 3 * KY, P.stLL, P.stDD);
 }
 
 // ------------------------------------------------------------------ joints
@@ -234,6 +244,6 @@ for (const [suffix, P] of [
     frames: FOOT_TILTS.length,
     draw: (p, f) => drawFoot(p, FOOT_TILTS[f], P),
   });
-  sprites.define({ name: `bm6_hip_${suffix}`, w: 22, h: 22, ox: 11, oy: 11, draw: (p) => drawJoint(p, 10, P, true) });
-  sprites.define({ name: `bm6_knee_${suffix}`, w: 16, h: 16, ox: 8, oy: 8, draw: (p) => drawJoint(p, 7, P, false) });
+  sprites.define({ name: `bm6_hip_${suffix}`, w: 24, h: 24, ox: 12, oy: 12, draw: (p) => drawJoint(p, 11, P, true) });
+  sprites.define({ name: `bm6_knee_${suffix}`, w: 20, h: 20, ox: 10, oy: 10, draw: (p) => drawJoint(p, 9, P, false) });
 }
