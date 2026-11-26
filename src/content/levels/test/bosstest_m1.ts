@@ -30,7 +30,7 @@ registerLevel({
     {
       x: L,
       boss: true,
-      waves: [{ spawns: [{ type: 'boss_m1', x: L + 236 }] }],
+      waves: [{ spawns: [{ type: 'boss_m1', x: L + 282 }] }],
     },
   ],
   decor: [{ kind: 'sign', x: 90, y: GY }],

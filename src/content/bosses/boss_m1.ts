@@ -60,7 +60,8 @@ const INTRO_TIME = 2.6;
 const CHARGE_ACCEL = 600;
 const DUST = '#b89c70';
 
-type Attack = 'volley' | 'deploy' | 'charge' | 'flame';
+export type GrinderAttack = 'volley' | 'deploy' | 'charge' | 'flame';
+type Attack = GrinderAttack;
 type Group = 'hull' | 'boiler' | 'turret' | 'stack' | 'blade';
 
 /** A soldier leaping out of the hatch; becomes a real rifleman when he lands. */
@@ -557,6 +558,12 @@ export class Grinder extends BigBoss {
     }
   }
 
+  /** Debug / tests: perform this attack next (as soon as the Grinder is idle). */
+  forceAttack(a: GrinderAttack): void {
+    this.nextAttack = a;
+    if (this.state === 'idle') this.stateTime = 99;
+  }
+
   aliveTroopers(): number {
     this.troopers = this.troopers.filter((t) => !t.dead && t.hittable);
     return this.troopers.length + this.world.query((e) => e instanceof HatchTrooper && e.boss === this).length;
@@ -701,6 +708,10 @@ export class Grinder extends BigBoss {
     const speed = Math.min(st.charge, Math.abs(this.vxMove) + CHARGE_ACCEL * dt);
     this.vxMove = this.facing * speed;
     this.x += this.vxMove * dt;
+    // Never overshoot the stop line (the blade must not poke into the safe pocket, even for a frame).
+    const stop = this.stopX;
+    const atStop = (this.facing < 0 && this.frontX <= stop) || (this.facing > 0 && this.frontX >= stop);
+    if (atStop) this.x = stop - this.facing * GR.BLADE_TIP;
     this.beacon = 'red';
     this.headGlow = 1;
     this.rpm = 10;
@@ -722,9 +733,7 @@ export class Grinder extends BigBoss {
       this.sndT = 0.16;
       bsfx(this, 'tank_tread', { vol: 0.7 });
     }
-    const stop = this.stopX;
-    if ((this.facing < 0 && this.frontX <= stop) || (this.facing > 0 && this.frontX >= stop)) {
-      this.x = stop - this.facing * GR.BLADE_TIP;
+    if (atStop) {
       this.vxMove = 0;
       this.setState('slam');
     }
