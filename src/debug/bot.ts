@@ -80,6 +80,15 @@ export class Bot {
     }
     // Aim up at enemies overhead.
     if (!flying && (aimUp || (nearest && nearest.cy < ctrl.cy - 40 && Math.abs(nearest.cx - ctrl.cx) < 70))) mask.up = true;
+    // Crouch-shoot low targets (mines, ground turrets, crawling things) that pass under the standing
+    // muzzle line (~22 px above the feet); only on foot, so DOWN never means "eject" or "drop".
+    if (!p.vehicle && !mask.up && p.onGround && nearest && Math.abs(nearest.cx - p.x) < 220) {
+      const hb = nearest.hurtboxes();
+      const boxes = hb.length ? hb : [nearest.box];
+      const top = Math.min(...boxes.map((b) => b.y));
+      const bottom = Math.max(...boxes.map((b) => b.y + b.h));
+      if (top > p.y - 21 && bottom > p.y - 16) mask.down = true;
+    }
     // Flying vehicles: keep left-ish on screen and line up vertically with the nearest enemy.
     if (flying) {
       const want = cam.x + VIEW_W * 0.28;
