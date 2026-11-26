@@ -7,15 +7,16 @@
 //  - STINGER SWEEP: lines its chin gun up in front of you, a red sight line sweeps the ground away
 //    from it (boss_charge), then a stream of slow bullets walks back toward the gunship.
 //    Safe: under / behind the hull (the gun cannot reach behind the nose).
-//  - MISSILE SALVO: the wing pod opens (weak point x1.7), then 3-5 lock-on missiles drop out, ignite
-//    and steer onto the spot you stood on at launch (blinking bracket marker). Keep moving or shoot
-//    them down (1 HP).
+//  - MISSILE SALVO: the wing pod opens (weak point x1.7), then 3-5 missiles drop out one by one, each
+//    locking the spot you stand on at its launch (blinking bracket marker); they ignite slowly, cruise
+//    above head height and dive onto the marker (m2/parts TopMissile). Keep moving or shoot them (1 HP).
 //  - CARPET RUN: climbs to one edge, bomb bay opens (alarm, weak point x1.8), crosses the arena
 //    dropping high-drag bombs every 64 px; each one has a growing ground shadow. Stand between.
 //  - After salvos / bomb runs it sinks LOW over you while re-arming: the grenade window.
-//  - 50 %: the aft rotor tears off, spins away and crashes. Phase 2: wobbly, erratic flight, faster
-//    and more aggressive: double sweeps, 4-missile salvos, faster runs and MISSILE RAIN (missiles
-//    climb, then dive onto marked 48-px slots; free slots are always left next to you).
+//  - 50 %: the aft rotor tears off, spins away and crashes (cosmetic, lands clear of the player).
+//    Phase 2: wobbly, erratic flight, faster and more aggressive: double sweeps, 4-missile salvos,
+//    faster runs and MISSILE RAIN (missiles climb, cruise along the top and dive onto marked 48-px
+//    slots; a free slot is always left right next to you).
 //  - 20 %: engine fire, burning, everything faster (phase 3).
 //  - Death: spools down, falls and crashes into the salt flat, burns, final blast, burning wreck.
 // Weak points (from below): open missile pod, open bomb bay, the belly breach and torn rotor stump
@@ -275,8 +276,8 @@ export class HornetKing extends BigBoss {
     const r = super.applyHit(d, mul, id);
     if (r) {
       if ((id === 'hull' || id === 'belly' || id === 'head' || id === 'pylon') && this.hullFlashCd <= 0) {
-        this.hullFlash = 0.05;
-        this.hullFlashCd = 0.2;
+        this.hullFlash = 0.034;
+        this.hullFlashCd = 0.18;
       }
       if (d.kind === 'explosion' || d.amount >= 4) {
         this.joltX += (d.dir ?? 0) * 1.5;
@@ -1027,7 +1028,7 @@ export class HornetKing extends BigBoss {
     sprites.get('bm2_blur').draw(g, hf.x, hf.y, TILT0, { alpha: 0.28 });
     if (this.pylonOn) sprites.get('bm2_rotor').draw(g, hr.x, hr.y, TILT0 * ROT_N + rf(this.rotorB));
     sprites.get('bm2_front').draw(g, x, y, this.dmgState);
-    if (this.hullFlash > 0) sprites.get('bm2_front').draw(g, x, y, this.dmgState, { flash: true, alpha: 0.4 });
+    if (this.hullFlash > 0) sprites.get('bm2_front').draw(g, x, y, this.dmgState, { flash: true, alpha: 0.35 });
     sprites.get('bm2_rotor').draw(g, hf.x, hf.y, TILT0 * ROT_N + rf(this.rotorA));
     sprites.get('bm2_hub').draw(g, hf.x, hf.y, Math.floor(this.rotorA * 2) % 2);
     if (Math.floor(this.age * 2.2) % 3 === 0) {
@@ -1064,7 +1065,7 @@ export class HornetKing extends BigBoss {
     // Hull.
     const hull = sprites.get('bm2_hull');
     hull.draw(g, this.x + this.joltX, this.y + this.joltY, this.dmgState * NT + ti, { flip });
-    if (this.hullFlash > 0 && !this.dying) hull.draw(g, this.x + this.joltX, this.y + this.joltY, this.dmgState * NT + ti, { flip, flash: true, alpha: 0.4 });
+    if (this.hullFlash > 0 && !this.dying) hull.draw(g, this.x + this.joltX, this.y + this.joltY, this.dmgState * NT + ti, { flip, flash: true, alpha: 0.35 });
     // Bomb bay, wing pod, chin gun.
     const bay = R(P.bay[0], P.bay[1]);
     sprites.get('bm2_bay').draw(g, bay.x, bay.y, Math.min(BAY_N - 1, this.bayState) * NT + ti, { flip, flash: this.flashing('bay') });
@@ -1139,5 +1140,5 @@ registerEntity(
   'boss_m2',
   'boss',
   () => new HornetKing(),
-  'HORNET KING twin-rotor heavy gunship (Mission 2 boss, flying, 320 HP x difficulty, 30000 pts). Flies in from the RIGHT edge on its own (props.from = "left" for the other side; spawn x/y are ignored), not hittable during its ~2.6 s entrance. Telegraphed chin-gun sweeps (red sight line; safe under/behind the hull), lock-on missile salvos (keep moving / shoot them), carpet-bombing runs with ground shadows every 64 px, low re-arm hover after salvos/runs (grenade window); 50%: aft rotor tears off and crashes -> erratic flight, double sweeps, missile rain on marked 48 px slots; 20%: burning, faster. Crashes and burns on death. ARENA: flat open ground over the whole locked screen [lock.x, lock.x+384] (ground y ~184 in a 216-tall level, camera at the bottom, no camera keys), no platforms/solids/water/pits there (bombs, missiles and shadows need the floor; nothing to stand on above it), 150+ px of flat ground beyond both edges is nice for the torn rotor; sky clear. Lock: { boss: true, music: "boss", announce: "WARNING! ..." } - the boss never calls world.announce. Spawn it in the first wave (delay ~1 s), e.g. { type: "boss_m2", x: lock.x + 500 }.',
+  'HORNET KING twin-rotor heavy gunship (Mission 2 boss, flying, 380 HP x difficulty, 30000 pts). Flies in by itself from off the RIGHT edge of the locked screen (props.from = "left" for the other side; spawn x/y are ignored) and is not hittable during its ~2.6 s entrance. Telegraphed chin-gun sweeps (red sight line; safe under/behind the hull), top-attack missile salvos onto marked spots (keep moving / shoot them), carpet-bombing runs (bomb shadows every 64 px), low re-arm hover after salvos/runs (grenade window); 50%: the aft rotor tears off and crashes -> wobbly erratic flight, double sweeps, missile rain on marked 48 px slots; 20%: burning, faster. Crashes and burns on death (wreck stays). ARENA: flat open ground at ONE height across the whole locked screen [lock.x, lock.x + 384], ground about 30 px above the screen bottom (y 184 in a 216-tall level), camera at the level bottom (no camera keys there); NO platforms, solids, water, pits or tall foreground decor inside it (bombs, missiles and shadows need the floor; it flies 46-120 px above the ground); 150 px of flat ground beyond both edges is nice for the torn rotor. Lock: { x: L, boss: true, music: "boss", announce: "WARNING! ..." } (the boss itself never calls world.announce). Spawn it in the first wave (delay ~1 s), e.g. { type: "boss_m2", x: L + 500 }.',
 );
