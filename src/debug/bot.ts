@@ -15,6 +15,7 @@ export class Bot {
   private bombTimer = 0;
   private turnTimer = 0;
   private frame = 0;
+  private zoneDir = 0;
 
   constructor(public index: number) {}
 
@@ -50,8 +51,12 @@ export class Bot {
     }
     if (lvl.locked || lvl.bossActive) {
       const center = cam.x + VIEW_W * (lvl.bossActive ? 0.25 : 0.4);
-      dir = ctrl.x < center - 16 ? 1 : ctrl.x > center + 16 ? -1 : 0;
-    }
+      // Once walking back into the zone, go to its centre: stopping on the edge let the facing taps
+      // below push the bot out again, so it spent most of a fight walking back and facing away.
+      const tol = this.zoneDir !== 0 ? 4 : 16;
+      dir = ctrl.x < center - tol ? 1 : ctrl.x > center + tol ? -1 : 0;
+      this.zoneDir = dir;
+    } else this.zoneDir = 0;
     const flying = !!(p.vehicle as any)?.flying;
     // Bosses overhead: get under them and shoot up (on foot / ground vehicles).
     const boss = world.boss;
@@ -75,8 +80,12 @@ export class Bot {
     if (dir > 0) mask.right = true;
     if (dir < 0) mask.left = true;
     if (dir === 0 && nearest) {
-      if (nearest.cx > ctrl.cx) mask.right = this.frame % 30 < 2;
-      else mask.left = this.frame % 30 < 2;
+      // Tap toward the nearest enemy only when facing away (tapping while facing it just creeps forward).
+      const right = nearest.cx > ctrl.cx;
+      if (right ? ctrl.facing < 0 : ctrl.facing > 0) {
+        if (right) mask.right = this.frame % 30 < 2;
+        else mask.left = this.frame % 30 < 2;
+      }
     }
     // Aim up at enemies overhead.
     if (!flying && (aimUp || (nearest && nearest.cy < ctrl.cy - 40 && Math.abs(nearest.cx - ctrl.cx) < 70))) mask.up = true;
