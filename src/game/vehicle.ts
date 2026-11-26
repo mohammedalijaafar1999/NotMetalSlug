@@ -19,6 +19,8 @@ export abstract class Vehicle extends Actor {
   destroyTimer = 0;
   /** Secondary ammo (cannon shells / missiles) shown on the HUD; -1 hides it. */
   secondaryAmmo = -1;
+  /** Free-flying vehicle (up/down steer instead of aim/crouch). The autopilot reads this. */
+  flying = false;
   /** Seconds after eject before the same vehicle can be entered again. */
   private reenter = 0;
 

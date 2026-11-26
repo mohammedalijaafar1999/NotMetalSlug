@@ -52,6 +52,20 @@ export class Bot {
       const center = cam.x + VIEW_W * (lvl.bossActive ? 0.25 : 0.4);
       dir = ctrl.x < center - 16 ? 1 : ctrl.x > center + 16 ? -1 : 0;
     }
+    const flying = !!(p.vehicle as any)?.flying;
+    // Bosses overhead: get under them and shoot up (on foot / ground vehicles).
+    const boss = world.boss;
+    let aimUp = false;
+    if (boss && !boss.dead && lvl.bossActive && !flying) {
+      const hb = boss.hurtboxes();
+      const tgt = hb.length ? hb.reduce((a, b) => (b.y + b.h > a.y + a.h ? b : a)) : boss.box;
+      const tx = tgt.x + tgt.w / 2;
+      const ty = tgt.y + tgt.h / 2;
+      if (ty < ctrl.cy - 34) {
+        dir = ctrl.x < tx - 18 ? 1 : ctrl.x > tx + 18 ? -1 : 0;
+        aimUp = Math.abs(tx - ctrl.x) < 80;
+      }
+    }
     // Turn to face enemies behind us occasionally.
     if (nearest && nearest.cx < ctrl.cx - 10) {
       this.turnTimer += dt;
@@ -65,7 +79,17 @@ export class Bot {
       else mask.left = this.frame % 30 < 2;
     }
     // Aim up at enemies overhead.
-    if (nearest && nearest.cy < ctrl.cy - 40 && Math.abs(nearest.cx - ctrl.cx) < 70) mask.up = true;
+    if (!flying && (aimUp || (nearest && nearest.cy < ctrl.cy - 40 && Math.abs(nearest.cx - ctrl.cx) < 70))) mask.up = true;
+    // Flying vehicles: keep left-ish on screen and line up vertically with the nearest enemy.
+    if (flying) {
+      const want = cam.x + VIEW_W * 0.28;
+      mask.right = ctrl.x < want - 12;
+      mask.left = ctrl.x > want + 12;
+      const ty = nearest ? nearest.cy : cam.y + 100;
+      const dy = ty - ctrl.cy;
+      mask.up = dy < -8 && ctrl.top > cam.y + 20;
+      mask.down = dy > 8 && ctrl.bottom < cam.y + 200;
+    }
     // Fire (tap pattern works for semi-auto and auto weapons).
     mask.fire = this.frame % 6 < 3;
     // Stuck / wall / gap handling.
@@ -74,7 +98,7 @@ export class Bot {
     else this.stuck = 0;
     this.lastX = ctrl.x;
     const gapAhead = ctrl.onGround && moving && !ctrl.floorAhead(dir, 14, 60);
-    if (this.jumpHold <= 0 && (ctrl.hitWall !== 0 || this.stuck > 0.25 || gapAhead || (ctrl.onGround && this.frame % 97 === 0))) {
+    if (!flying && this.jumpHold <= 0 && (ctrl.hitWall !== 0 || this.stuck > 0.25 || gapAhead || (ctrl.onGround && this.frame % 97 === 0))) {
       this.jumpHold = 0.35;
     }
     if (this.jumpHold > 0) {
@@ -88,7 +112,7 @@ export class Bot {
       this.bombTimer = lvl.bossActive ? 1.2 : 2.5;
     }
     // Get into empty vehicles nearby.
-    if (!p.vehicle) {
+    if (!p.vehicle && !lvl.bossActive) {
       for (const e of world.query((x) => (x as any).isVehicle === true && !(x as any).driver)) {
         if (Math.abs(e.x - p.x) < 14) mask.down = true;
         else if (Math.abs(e.x - p.x) < 80 && !lvl.locked) {

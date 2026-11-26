@@ -165,13 +165,25 @@ export function applyUrlParams(): boolean {
   if (q.get('mute') === '1') audio.setMuted(true);
   const chars = q.get('chars')?.split(',');
   const diff = q.has('difficulty') ? (Math.max(0, Math.min(2, parseInt(q.get('difficulty')!, 10))) as Difficulty) : undefined;
+  let started = false;
   if (q.has('level')) {
     startMission(0, { levelId: q.get('level')!, chars, twoPlayer: q.get('2p') === '1', difficulty: diff });
-    return true;
-  }
-  if (q.has('mission')) {
+    started = true;
+  } else if (q.has('mission')) {
     startMission(parseInt(q.get('mission')!, 10) || 1, { chars, twoPlayer: q.get('2p') === '1', difficulty: diff });
-    return true;
+    started = true;
   }
-  return false;
+  if (started) {
+    const w = gameplay()?.world;
+    if (q.has('give') && w) setTimeout(() => w.players.forEach((p) => p.giveWeapon(q.get('give')!)), 600);
+    // ?spawn=type@xOffset[@y],type2@xOffset  (x relative to camera left; y absolute, default floor)
+    if (q.has('spawn') && w) {
+      for (const part of q.get('spawn')!.split(',')) {
+        const [type, xo, y] = part.split('@');
+        w.spawn(type, w.camera.x + (parseFloat(xo) || 260), y !== undefined ? parseFloat(y) : undefined);
+      }
+    }
+    if (q.has('warp') && w) (window as any).__game.warp(parseFloat(q.get('warp')!));
+  }
+  return started;
 }
