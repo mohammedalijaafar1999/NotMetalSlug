@@ -9,7 +9,7 @@ registerEntity(
   'boss_m5',
   'boss',
   (_w, s) => new Thunderhead(s.props ?? {}),
-  'THUNDERHEAD flagship airship (mission 5 boss, 400 HP x difficulty, 30000 pts), fought from the DRAGONFLY gyro. ' +
+  'THUNDERHEAD flagship airship (mission 5 boss, 380 HP x difficulty, 30000 pts), fought from the DRAGONFLY gyro. ' +
     'Holds a station relative to the CAMERA (ship centre at screen (270, 100); with its slow drift the body covers ' +
     'screen x ~168-386, y ~48-189), so its spawn x/y only need to be inside the boss lock wave (e.g. x = lockX + 300, ' +
     'y = 100). Entrance: slides in from the right for 2.6 s, not hittable. Arena: LevelDef.startVehicle "gyro"; open sky ' +

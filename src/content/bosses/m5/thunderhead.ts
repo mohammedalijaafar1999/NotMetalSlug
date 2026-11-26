@@ -36,7 +36,7 @@ export const STATION_Y = 100;
 const ENTRY_DX = 250;
 const ENTRY_DY = -24;
 export const INTRO_TIME = 2.6;
-export const BASE_HP = 400;
+export const BASE_HP = 380;
 const TURRET_HP = 16;
 const MAX_DRONES = 3;
 const MAX_MINES = 9;
@@ -348,11 +348,19 @@ export class Thunderhead extends BigBoss {
 
   private nextAttack(): void {
     const list = PATTERNS[Math.min(this.phase, 2)];
+    // Skip attacks that would add nothing right now (swarm or minefield already full).
+    const useful = (x: Attack) =>
+      x === 'drones' ? this.dronesAlive() < MAX_DRONES : x === 'mines' ? this.minesAlive() <= MAX_MINES - 4 : x === 'lightning' ? this.coreOpen : true;
     let a = list[this.cycle % list.length];
     this.cycle++;
-    if (a === 'drones' && this.dronesAlive() >= MAX_DRONES) a = this.phase >= 1 ? 'broadside' : 'mines';
-    if (a === 'mines' && this.minesAlive() > MAX_MINES - 4) a = this.phase >= 1 ? 'broadside' : 'drones';
-    if (a === 'lightning' && !this.coreOpen) a = 'broadside';
+    if (!useful(a)) {
+      const alt = list.find(useful);
+      if (!alt) {
+        this.setState('cruise');
+        return;
+      }
+      a = alt;
+    }
     this.launched = 0;
     this.volleys = 0;
     this.strikes = 0;
@@ -430,7 +438,7 @@ export class Thunderhead extends BigBoss {
       const alt = 66 + 38 * ((i + this.cycle) % 3);
       const d = w.spawn('drone', m.x, m.y, { kind, alt });
       if (d) {
-        d.vx = -30 - i * 12;
+        d.vx = this.facing * (30 + i * 12);
         d.vy = -110;
       }
       tb.fire = 0.18;
@@ -551,23 +559,23 @@ export class Thunderhead extends BigBoss {
 
   // ------------------------------------------------------------ interplay
 
-  /** Soft hull: flying players are nudged out of the envelope and the gondola. */
+  /** Soft hull: flying players are nudged out of the envelope and the gondola (toward the nose side, up or down). */
   private pushPlayers(): void {
     const solids = [this.rectAt(-80, -25, 96, 25), this.rectAt(8, 31, 88, 58)];
     for (const p of this.world.players) {
-      const v = p.vehicle as (Entity & { flying?: boolean }) | null;
+      const v = p.vehicle as Entity | null;
       if (!v || v.dead) continue;
-      const b = v.box;
       for (const r of solids) {
+        const b = v.box;
         if (!rectsOverlap(b, r)) continue;
-        const left = b.x + b.w - r.x;
+        const ahead = this.facing < 0 ? b.x + b.w - r.x : r.x + r.w - b.x;
         const up = b.y + b.h - r.y;
         const down = r.y + r.h - b.y;
-        const m = Math.min(left, up, down);
+        const m = Math.min(ahead, up, down);
         const step = Math.min(m, 3);
-        if (m === left) {
-          v.x -= step;
-          v.vx = Math.min(v.vx, 0);
+        if (m === ahead) {
+          v.x += step * this.facing;
+          v.vx = this.facing < 0 ? Math.min(v.vx, 0) : Math.max(v.vx, 0);
         } else if (m === up) {
           v.y -= step;
           v.vy = Math.min(v.vy, 0);
@@ -889,7 +897,7 @@ export class Thunderhead extends BigBoss {
     }
     // Gondola.
     S('bm5_gondola').draw(g, sx, sy, this.dmgFrame, { flip });
-    if (this.lit('gondola')) S('bm5_gondola').draw(g, sx, sy, this.dmgFrame, { flip, flash: true, alpha: 0.42 });
+    if (this.lit('gondola')) S('bm5_gondola').draw(g, sx, sy, this.dmgFrame, { flip, flash: true, alpha: 0.3 });
     S('bm5_bay').draw(g, sx, sy, this.bay, { flip });
     if (this.portsOpen) {
       PORTS.forEach(([px, py], i) => {
