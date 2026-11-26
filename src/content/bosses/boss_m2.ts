@@ -1004,6 +1004,13 @@ export class HornetKing extends BigBoss {
     for (let i = 0; i < 4; i++) this.throwPlate(fxRng.range(-70, 60), fxRng.range(-20, 0), i % 3, i < 2);
     const hub = this.toWorld(P.hubF[0], P.hubF[1]);
     for (const s of [-1, 1]) w.add(new FlyingPart('boss_debris', 3, hub.x + s * 20, hub.y, s * fxRng.range(100, 170), fxRng.range(-260, -180), { life: 2.4, vr: s * 16, burn: true }));
+    if (this.pylonOn) {
+      // Killed before the rotor tore off: the aft pylon snaps off on impact.
+      this.pylonOn = false;
+      this.dmgState = Math.max(2, this.dmgState);
+      const s = this.toWorld(P.hubR[0], P.hubR[1] + 22);
+      w.add(new FlyingPart('bm2_pylon', 1, s.x, s.y, -this.facing * fxRng.range(60, 110), fxRng.range(-230, -170), { life: 3.2, vr: -this.facing * 7, burn: true }));
+    }
     bsfxAt(w, 'metal_hit', this.x, { vol: 0.9, pitch: 0.5 });
     bsfx(this, 'glass_break', { vol: 0.7 });
   }
@@ -1064,7 +1071,7 @@ export class HornetKing extends BigBoss {
     // Rotor discs (translucent) behind everything.
     const hubF = R(P.hubF[0], P.hubF[1]);
     const hubR = R(P.hubR[0], P.hubR[1]);
-    const spinning = this.rotorSpd > 0.25;
+    const spinning = this.rotorSpd > 0.25 && !this.crashed;
     if (spinning) {
       sprites.get('bm2_blur').draw(g, hubF.x, hubF.y, ti, { flip, alpha: 0.28 * Math.min(1, this.rotorSpd) });
       if (this.pylonOn) sprites.get('bm2_blur').draw(g, hubR.x, hubR.y, ti, { flip, alpha: 0.28 });
