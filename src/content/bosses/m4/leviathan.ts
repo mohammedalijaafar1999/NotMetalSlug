@@ -28,7 +28,7 @@ import { Torpedo, PodMissile, LaserBeam, m4sfx } from './weapons';
 export const LEVIATHAN_HP = 360;
 /** How far the sub sinks for phase 2 (deck under water, tower out). */
 export const DIVE_SINK = 40;
-/** The hull rides this far below its painted waterline (low profile: standing shots clear the head). */
+/** Default float depth: the hull rides this far below its painted waterline (dock 10 px above the water). */
 export const FLOAT = 6;
 /** Start depth of the intro (fully hidden). */
 const INTRO_DEPTH = 112;
@@ -58,6 +58,9 @@ export class Leviathan extends BigBoss {
   pierTip = 0;
   pierFar = 0;
   homeX = 0;
+  /** How deep the hull rides below the water surface: low enough that shots fired standing on the
+   *  dock pass over the armoured head into the pods / tower (FLOAT for the documented arena). */
+  float = FLOAT;
   // ---- body pose
   sink = INTRO_DEPTH;
   sinkTarget = 0;
@@ -148,9 +151,12 @@ export class Leviathan extends BigBoss {
     const dy = T.groundTopAt(tip + this.facing * 24);
     this.deckY = isFinite(dy) ? dy : this.waterY - 10;
     this.pierFar = this.facing < 0 ? this.arenaL + 8 : this.arenaR - 8;
+    // Standing muzzle line is ~22 px above the deck; keep the head's brow (34 px above the hull
+    // waterline) a few px below it.
+    this.float = clamp(Math.round(this.deckY + 16 - this.waterY), 4, 14);
     this.homeX = this.x;
     this.sink = INTRO_DEPTH;
-    this.y = this.waterY + FLOAT + this.sink;
+    this.y = this.waterY + this.float + this.sink;
     this.beam = this.world.add(new LaserBeam(this));
     this.setState('intro');
     this.layoutZones();
@@ -342,7 +348,7 @@ export class Leviathan extends BigBoss {
       this.sink = approach(this.sink, want, 26 * dt);
     }
     const bob = this.state === 'intro' ? 0 : Math.sin(this.t * 2.2) * 1.2;
-    this.y = this.waterY + FLOAT + this.sink + bob;
+    this.y = this.waterY + this.float + this.sink + bob;
   }
 
   private updateParts(dt: number): void {
@@ -376,7 +382,7 @@ export class Leviathan extends BigBoss {
     let sink = INTRO_DEPTH * (1 - rise);
     if (t > T1) sink += -2.5 * Math.sin((t - T1) * 7) * Math.exp(-(t - T1) * 3);
     this.sink = sink;
-    this.y = this.waterY + FLOAT + sink;
+    this.y = this.waterY + this.float + sink;
     // Boiling water and a deep rumble.
     this.sndT -= dt;
     if (this.sndT <= 0 && t < 1.9) {
@@ -396,15 +402,15 @@ export class Leviathan extends BigBoss {
       this.introFlags |= bit;
       return true;
     };
-    if (sink + FLOAT < 101 && flag(1)) {
+    if (sink + this.float < 101 && flag(1)) {
       this.world.particles.splash(this.lx2w(A.SCOPE_X), this.waterY, 8, '#d8f0ff');
       m4sfx(this.world, 'splash', this.x, { vol: 0.5, pitch: 1.3 });
     }
-    if (sink + FLOAT < 86 && flag(2)) {
+    if (sink + this.float < 86 && flag(2)) {
       for (let lx = -20; lx <= 20; lx += 6) this.world.particles.splash(this.lx2w(lx), this.waterY, 6, '#d8f0ff');
       m4sfx(this.world, 'splash', this.x, { vol: 0.8 });
     }
-    if (sink + FLOAT < 22 && flag(4)) {
+    if (sink + this.float < 22 && flag(4)) {
       for (let lx = -150; lx <= 100; lx += 8) {
         this.world.particles.splash(this.lx2w(lx), this.waterY, 7, '#e8f8ff');
         if (fxRng.chance(0.4)) puffFoam(this.world, this.lx2w(lx), this.waterY - 2, 4, 170, 40);
@@ -892,7 +898,7 @@ export class Leviathan extends BigBoss {
       }
     }
     if (st >= 0.3) this.sinkTarget = DIVE_SINK;
-    if (this.sink + FLOAT > 22 && !(this.introFlags & 8)) {
+    if (this.sink + this.float > 22 && !(this.introFlags & 8)) {
       this.introFlags |= 8;
       for (let lx = -150; lx <= 100; lx += 10) this.world.particles.splash(this.lx2w(lx), this.waterY, 6, '#e8f8ff');
       this.world.shake(3, 0.5);
@@ -1041,7 +1047,7 @@ export class Leviathan extends BigBoss {
     }
     const shudder = t < 2.5 ? Math.round((fxRng.next() - 0.5) * 3) : 0;
     this.x = this.homeX + this.facing * this.advance + shudder;
-    this.y = this.waterY + FLOAT + this.sink;
+    this.y = this.waterY + this.float + this.sink;
     // Fires all over while above water.
     if (fxRng.chance(0.5)) {
       const lx = fxRng.range(-120, 90);

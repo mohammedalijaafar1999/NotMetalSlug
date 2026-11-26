@@ -187,9 +187,13 @@ export class ClawArm {
     boom(g, px, py, ex, ey, 11, upper, true);
     boom(g, ex, ey, rx, ry, 9, fore, true);
     const joint = sprites.get('bm4_joint');
-    joint.draw(g, px, py, 0, { flash });
-    joint.draw(g, ex, ey, 0, { flash });
-    sprites.get('bm4_claw').draw(g, rx, ry, this.frame, { flip: this.facing < 0, flash });
-    joint.draw(g, rx, ry, 1, { flash });
+    const claw = sprites.get('bm4_claw');
+    const flip = this.facing < 0;
+    joint.draw(g, px, py, 0);
+    joint.draw(g, ex, ey, 0);
+    claw.draw(g, rx, ry, this.frame, { flip });
+    // Hit flash: a translucent white pass over the claw (no full-white strobe under sustained fire).
+    if (flash) claw.draw(g, rx, ry, this.frame, { flip, flash: true, alpha: 0.45 });
+    joint.draw(g, rx, ry, 1);
   }
 }
