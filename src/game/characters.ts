@@ -1,7 +1,7 @@
 // Playable characters (the Ruckus Squad). Each has a look (humanoid style) and a small perk.
 // Sprite sets are named `char_<id>` (player 1 colors) and `char_<id>_p2` (player 2 colors).
 
-import { defineHumanoidSet, type HumanoidStyle } from '../art/humanoid';
+import { defineHumanoidSet, PLAYER_GUNS, type HumanoidStyle } from '../art/humanoid';
 
 export interface CharacterDef {
   id: string;
@@ -29,8 +29,9 @@ const chars = new Map<string, CharacterDef>();
 
 export function registerCharacter(c: CharacterDef): void {
   chars.set(c.id, c);
-  defineHumanoidSet(`char_${c.id}`, c.style, ['pistol', 'heavy', 'rocket', 'shotgun', 'flamer']);
-  defineHumanoidSet(`char_${c.id}_p2`, { ...c.style, ...c.p2 }, ['pistol', 'heavy', 'rocket', 'shotgun', 'flamer']);
+  // One upper-body set per player gun kind (pistol, heavy, rocket, shotgun, flamer, laser, homing, bouncer).
+  defineHumanoidSet(`char_${c.id}`, c.style, PLAYER_GUNS);
+  defineHumanoidSet(`char_${c.id}_p2`, { ...c.style, ...c.p2 }, PLAYER_GUNS);
 }
 
 export function getCharacter(id: string): CharacterDef {
