@@ -47,9 +47,10 @@ const WHEELS = 24;
 /** Pivot margins that keep the whole hull on screen (nose side / tail side). */
 const NOSE_M = 92;
 const TAIL_M = 100;
-/** Carpet bombs: spacing on the ground, fall gravity. */
+/** Carpet bombs: spacing on the ground, fall gravity, min distance of a landing spot from the edges. */
 const BOMB_GAP = 64;
 const BOMB_G = 230;
+const BOMB_EDGE = 44;
 /** Missile-rain slots. */
 const SLOT = 48;
 /** Never lower than this pivot height (the wheels stay well above a standing player's head). */
@@ -517,7 +518,8 @@ export class HornetKing extends BigBoss {
         if (this.stateTime > this.delay(0.7)) {
           this.setState('carpetRun');
           const edge = this.runDir > 0 ? this.arenaL : this.arenaR;
-          this.nextDropX = edge + this.runDir * (18 + this.world.rng.range(0, 34));
+          // Landing spots: first one 44-64 px in from the edge (a safe pocket either side), then every BOMB_GAP.
+          this.nextDropX = edge + this.runDir * (BOMB_EDGE + this.world.rng.range(0, 20));
         }
         break;
       }
@@ -528,8 +530,9 @@ export class HornetKing extends BigBoss {
         maxV = sp;
         this.ty = this.alt(ALT_HIGH) + Math.sin(this.bob * 2.3) * 2;
         const bay = this.toWorld(P.bay[0], P.bay[1]);
-        if ((bay.x - this.nextDropX) * this.runDir >= 0) {
-          if (bay.x > this.arenaL + 10 && bay.x < this.arenaR - 10) this.dropBomb(bay.x, bay.y + 3);
+        const land = this.bombLanding(bay.x, bay.y + 3);
+        if ((land.x - this.nextDropX) * this.runDir >= 0) {
+          if (land.x >= this.arenaL + BOMB_EDGE && land.x <= this.arenaR - BOMB_EDGE) this.dropBomb(bay.x, bay.y + 3);
           this.nextDropX += this.runDir * BOMB_GAP;
         }
         const end = this.runDir > 0 ? this.arenaR - 34 : this.arenaL + 34;
@@ -807,15 +810,19 @@ export class HornetKing extends BigBoss {
     bsfx(this, 'enemy_rocket', { vol: 0.4, pitch: 1.2 });
   }
 
+  /** Where (and after how long) a bomb released now at (x, y) hits the floor. */
+  private bombLanding(x: number, y: number): { x: number; gy: number; t: number } {
+    const vxb = this.vx * 0.35;
+    const T = Math.sqrt((2 * Math.max(20, this.floorAt(x) - y)) / BOMB_G);
+    const lx = x + vxb * T;
+    const gy = this.floorAt(lx);
+    return { x: lx, gy, t: Math.sqrt((2 * Math.max(20, gy - y)) / BOMB_G) };
+  }
+
   private dropBomb(x: number, y: number): void {
     if (!this.world.activePlayers().length) return;
-    const vxb = this.vx * 0.35;
-    const gy0 = this.floorAt(x);
-    const T = Math.sqrt((2 * Math.max(20, gy0 - y)) / BOMB_G);
-    const tx = x + vxb * T;
-    const gy = this.floorAt(tx);
-    const Tf = Math.sqrt((2 * Math.max(20, gy - y)) / BOMB_G);
-    this.world.add(new CarpetBomb(this, x, y, tx, gy, Tf, BOMB_G));
+    const l = this.bombLanding(x, y);
+    this.world.add(new CarpetBomb(this, x, y, l.x, l.gy, l.t, BOMB_G));
     bsfx(this, 'mortar_whistle', { vol: 0.4, pitch: 1.15 });
   }
 
