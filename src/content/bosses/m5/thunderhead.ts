@@ -95,7 +95,14 @@ export class SkyTurret extends BossPiece {
     this.scoreValue = 1000;
   }
 
-  /** Aim limits relative to "straight left" (+ = upward). */
+  override damage(d: Damage): boolean {
+    const ok = super.damage(d);
+    // Destroyed: its points go to whoever shot it off.
+    if (ok && this.hp <= 0) this.world.addScore(d.owner, this.scoreValue, { x: this.x, y: this.y - 12 });
+    return ok;
+  }
+
+  /** Aim limits relative to "straight ahead" (+ = upward). */
   private arc(): [number, number] {
     return this.def.mount === 0 ? [-0.55, 1.45] : [-1.45, 0.55];
   }
@@ -211,6 +218,9 @@ export class Thunderhead extends BigBoss {
   private boomStage = 0;
   /** Throttled hit flashes per part (a held vulcan would otherwise white the whole ship out). */
   private hitFx: Record<string, { t: number; cd: number }> = {};
+  /** Damage accumulated toward the next plate knocked off, and the bomb-hit jolt (px). */
+  private chip = 0;
+  private jolt = 0;
 
   constructor(_props: Record<string, any> = {}) {
     super('THUNDERHEAD', BASE_HP);
@@ -275,7 +285,8 @@ export class Thunderhead extends BigBoss {
     if (this.wobble > 0) this.wobble = Math.max(0, this.wobble - dt);
     const shake = this.wobble > 0 ? Math.sin(t * 47) * 2 * Math.min(1, this.wobble) : 0;
     this.shipX = c.x + this.sx + shake;
-    this.shipY = c.y + this.sy + Math.sin(t * 1.6) * 2.2 + this.listY + this.sink;
+    this.jolt *= Math.pow(0.002, dt);
+    this.shipY = c.y + this.sy + Math.sin(t * 1.6) * 2.2 + this.listY + this.sink + this.jolt;
   }
 
   private placeTurrets(): void {
@@ -805,7 +816,20 @@ export class Thunderhead extends BigBoss {
         f.cd = key === 'hull' ? 0.22 : 0.15;
       }
     }
-    if (ok && id === 'core' && d.x !== undefined && d.y !== undefined && fxRng.chance(0.3)) sparkBurst(this.world, d.x, d.y, 3, '#c8f4ff', 120);
+    if (!ok) return ok;
+    const amt = d.amount * mul * this.armorMul;
+    if (d.kind === 'explosion' && amt >= 4) this.jolt = Math.min(3, this.jolt + 1.5);
+    if (d.x !== undefined && d.y !== undefined) {
+      if (id === 'core' && fxRng.chance(0.3)) sparkBurst(this.world, d.x, d.y, 3, '#c8f4ff', 120);
+      // Plates and rivets come off as the damage piles up.
+      this.chip += amt;
+      if (this.chip >= 22) {
+        this.chip = 0;
+        const fr = id === 'hull' || id === 'tube' ? fxRng.int(0, 1) : id === 'core' ? fxRng.int(2, 3) : 4;
+        this.world.add(new FlyingPart('bm5_debris', fr, d.x, d.y, this.facing * fxRng.range(30, 90), -fxRng.range(70, 150), { life: 1.8, smoke: true }));
+        sparkBurst(this.world, d.x, d.y, 6, '#ffe080', 140);
+      }
+    }
     return ok;
   }
 
