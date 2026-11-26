@@ -19,11 +19,11 @@ import { fxRng } from '../../../engine/rng';
 import { clamp, lerp, approach, easeInQuad, easeInOutSine, segmentRect, type Rect } from '../../../engine/math';
 import type { Damage, DamageKind } from '../../../game/constants';
 import type { Entity } from '../../../game/entity';
-import { BigBoss, LockMissile, GroundMarker as LandingMarker, FlyingPart, smoke, flames, sparkBurst } from '../common/kit';
+import { BigBoss, GroundMarker as LandingMarker, FlyingPart, smoke, flames, sparkBurst } from '../common/kit';
 import { GroundMarker as ShadowMarker, puffSteam, puffFoam, pixelEllipse } from '../common/fx';
 import * as A from './art';
 import { ClawArm } from './arm';
-import { Torpedo, LaserBeam, m4sfx } from './weapons';
+import { Torpedo, PodMissile, LaserBeam, m4sfx } from './weapons';
 
 export const LEVIATHAN_HP = 360;
 /** How far the sub sinks for phase 2 (deck under water, tower out). */
@@ -35,6 +35,10 @@ const INTRO_DEPTH = 112;
 const POD_HP = 24;
 /** Laser sweep ends this far from the arena's far edge. */
 const SWEEP_END_MARGIN = 24;
+/** Rake telegraph (claw clenches before dragging back toward the water). */
+export const CLENCH_TIME = 0.5;
+/** The claw stops tracking and hangs (spread, glinting) this long before it slams. */
+export const CLAW_LOCK = 0.4;
 
 interface Pod {
   id: 'podF' | 'podA';
@@ -74,8 +78,9 @@ export class Leviathan extends BigBoss {
   ];
   beam!: LaserBeam;
   // ---- attack state
-  private step = '';
-  private stepT = 0;
+  /** Sub-step of the current attack (e.g. claw 'track' / 'slam' / 'rake', laser 'aim' / 'fire'). */
+  step = '';
+  stepT = 0;
   private shots = 0;
   private launchT = 0;
   private podIdx = 0;
@@ -88,7 +93,8 @@ export class Leviathan extends BigBoss {
   private sweepEnd = 0;
   private clawX = 0;
   private clawFrom = { x: 0, y: 0 };
-  private shadow: ShadowMarker | null = null;
+  /** The claw's landing shadow while a slam is coming. */
+  shadow: ShadowMarker | null = null;
   private beamCd = new Map<number, number>();
   // ---- fx state
   private fxT = 0;
@@ -466,7 +472,8 @@ export class Leviathan extends BigBoss {
   private startMissiles(): void {
     this.setState('missiles');
     const alive = this.pods.filter((p) => p.alive).length;
-    this.shots = alive * (this.phase >= 1 ? 3 : 2);
+    // Short tracking salvo (the dock is narrow): one more missile per intact pod.
+    this.shots = (this.phase >= 1 ? 2 : 1) + alive;
     this.launchT = 0.6;
     this.podIdx = 0;
     for (const p of this.pods) if (p.alive) p.target = 1;
@@ -484,7 +491,7 @@ export class Leviathan extends BigBoss {
           this.fireMissile(alive[this.podIdx % alive.length]);
           this.podIdx++;
           this.shots--;
-          this.launchT = 0.24 * this.world.difficulty.enemyFireDelay;
+          this.launchT = 0.3 * this.world.difficulty.enemyFireDelay;
         }
         if (this.shots === 0) this.stepT = 0;
       }
@@ -502,31 +509,15 @@ export class Leviathan extends BigBoss {
     const y = this.y + A.DECK_Y - 22;
     const lo = Math.min(this.pierFar + this.facing * -10, this.pierTip - this.facing * 8);
     const hi = Math.max(this.pierFar + this.facing * -10, this.pierTip - this.facing * 8);
-    const tx = clamp(this.targetX() + rng.range(-14, 14), lo, hi);
+    const tx = clamp(this.targetX() + rng.range(-10, 10), lo, hi);
     const ty = this.surfaceAt(tx);
-    const sp = this.world.difficulty.enemyShotSpeed;
-    const m = this.world.add(
-      new LockMissile({
-        owner: this,
-        x,
-        y,
-        vx: this.facing * rng.range(20, 50),
-        vy: -rng.range(185, 215),
-        tx,
-        ty,
-        sprite: 'bm4_missile',
-        drop: 0.42,
-        speed: 50,
-        topSpeed: 200 * sp,
-        accel: 300,
-        turn: 4.2,
-        steer: 0.65,
-        radius: 14,
-      }),
-    );
-    const mk = this.world.add(new LandingMarker(tx, ty, 1.45, 14));
+    const fall = 210 * this.world.difficulty.enemyShotSpeed;
+    const wait = 0.2;
+    const m = this.world.add(new PodMissile(this, x, y, tx, ty, wait, fall));
+    const mk = this.world.add(new LandingMarker(tx, ty, PodMissile.flightTime(y, this.world.camera.y, ty, wait, fall), 12));
     mk.watch = m;
     smoke(this.world, x, y, { n: 3, color: '#d8d0c8', color2: '#8a8480', vy: -10 });
+    this.world.effect('muzzle_flash', x, y - 2, { fps: 30 }).rot = -Math.PI / 2;
     m4sfx(this.world, 'enemy_rocket', x, { vol: 0.6 });
   }
 
@@ -686,7 +677,7 @@ export class Leviathan extends BigBoss {
     const p = this.pivot();
     const reach = this.arm.reachAt(y);
     const far = p.x + this.facing * reach;
-    const near = this.pierTip - this.facing * 16;
+    const near = this.pierTip + this.facing * 14;
     let lo = Math.min(far, near);
     let hi = Math.max(far, near);
     lo = Math.max(lo, this.arenaL + 14);
@@ -713,7 +704,7 @@ export class Leviathan extends BigBoss {
           this.clawX = clamp(this.targetX(), lo, hi);
           this.clawFrom = { x: arm.wx, y: arm.wy };
           this.shadow?.remove();
-          this.shadow = this.world.add(new ShadowMarker(this.clawX, this.deckY, 0.55 + 0.5 + 0.32 + 0.12, 'shadow', 20));
+          this.shadow = this.world.add(new ShadowMarker(this.clawX, this.deckY, 0.55 + 0.5 + CLAW_LOCK + 0.12, 'shadow', 20));
           arm.frame = 0;
         }
         const k = easeInOutSine(clamp(st / 0.55, 0, 1));
@@ -739,12 +730,12 @@ export class Leviathan extends BigBoss {
       case 'lock': {
         arm.wx = this.clawX + (Math.floor(st * 30) % 2 ? 1 : -1) * 0.6;
         arm.wy = this.hoverY() - st * 10;
-        if (st >= 0.32) this.next('slam');
+        if (st >= CLAW_LOCK) this.next('slam');
         break;
       }
       case 'slam': {
         const k = easeInQuad(clamp(st / 0.12, 0, 1));
-        const y0 = this.hoverY() - 3.2;
+        const y0 = this.hoverY() - CLAW_LOCK * 10;
         arm.wx = this.clawX;
         arm.wy = lerp(y0, slamY, k);
         arm.frame = 0;
@@ -765,14 +756,16 @@ export class Leviathan extends BigBoss {
         }
         break;
       case 'clench':
-        arm.frame = st < 0.15 ? 1 : 2;
-        arm.wx = this.clawX + (Math.floor(st * 40) % 2 ? 0.5 : -0.5);
-        if (fxRng.chance(0.5)) sparkBurst(this.world, this.clawX + fxRng.range(-10, 10), this.deckY - 1, 2, '#ffe080', 80);
-        if (st >= 0.35) this.next('rake');
+        // Rake telegraph: the fingers bite into the planks, the claw shudders and throws sparks.
+        arm.frame = st < 0.18 ? 1 : 2;
+        arm.wx = this.clawX + (Math.floor(st * 40) % 2 ? 1 : -1);
+        arm.wy = slamY + (Math.floor(st * 30) % 2);
+        if (fxRng.chance(0.6)) sparkBurst(this.world, this.clawX + fxRng.range(-10, 10), this.deckY - 1, 2, '#ffe080', 80);
+        if (st >= CLENCH_TIME) this.next('rake');
         break;
       case 'rake': {
         const dir = -this.facing;
-        const stop = this.pierTip - this.facing * 12;
+        const stop = this.pierTip + this.facing * 12;
         this.clawX += dir * 130 * dt;
         const done = (this.clawX - stop) * dir >= 0;
         if (done) this.clawX = stop;
@@ -824,7 +817,7 @@ export class Leviathan extends BigBoss {
     const y = this.deckY;
     this.shadow?.remove();
     this.shadow = null;
-    this.hurtPlayers({ x: x - 18, y: y - A.CLAW_H, w: 36, h: A.CLAW_H }, 'crush', 25);
+    this.hurtPlayers({ x: x - 16, y: y - A.CLAW_H, w: 32, h: A.CLAW_H }, 'crush', 25);
     this.world.shake(6, 0.35);
     this.world.hitstop(0.03);
     this.world.particles.dust(x - 10, y, 6, '#b8a888');
@@ -1110,13 +1103,13 @@ export class Leviathan extends BigBoss {
       else if (p.target > 0 || (this.dmgLevel >= 2 && Math.floor(this.t * 3) % 2 === 0)) frame = 1;
       const px = this.lx2w(p.lx);
       pod.draw(g, px, Y + A.DECK_Y, frame, { flip, alpha });
-      if (fl(p.id)) pod.draw(g, px, Y + A.DECK_Y, frame, { flip, flash: true, alpha: 0.5 });
+      if (fl(p.id)) pod.draw(g, px, Y + A.DECK_Y, frame, { flip, flash: true, alpha: 0.38 });
     }
     // Conning tower + fittings.
     const ty = Y + A.DECK_Y;
     const tower = sprites.get('bm4_tower');
     tower.draw(g, X, ty, dmg, { flip, alpha });
-    if (fl('tower')) tower.draw(g, X, ty, dmg, { flip, flash: true, alpha: 0.45 });
+    if (fl('tower')) tower.draw(g, X, ty, dmg, { flip, flash: true, alpha: 0.38 });
     if (!this.dying || this.deathTime < 1.3) {
       // Radar bar.
       const rx = Math.round(this.lx2w(A.RADAR_X));

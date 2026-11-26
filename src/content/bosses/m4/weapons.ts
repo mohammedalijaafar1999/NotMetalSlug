@@ -99,11 +99,14 @@ export class Torpedo extends Projectile {
         // Underwater run (phase 2): rises to the surface while closing in.
         this.vx = want * 0.9;
         this.x += this.vx * dt;
-        this.y = Math.max(this.waterY - 2, this.y - 22 * dt);
+        this.y = Math.max(this.waterY - 2, this.y - 34 * dt);
         if (this.fxT <= 0) {
           this.fxT = 0.05;
           this.world.particles.add({ kind: 'px', x: this.x - this.dir * 8, y: this.y, vx: fxRng.range(-6, 6), vy: -fxRng.range(20, 40), life: 0.5, color: '#c8ecff', size: 1 });
         }
+        // Never run into the dock's submerged face: pop up to the surface first.
+        const wall = T.groundTopAt(this.x + this.dir * (this.w / 2 + 14)) < this.y + 3;
+        if (wall) this.y = this.waterY - 2;
         if (this.y <= this.waterY - 2) {
           this.setMode('water');
           this.world.particles.splash(this.x, this.waterY, 8, '#d8f0ff');
@@ -198,6 +201,117 @@ export class Torpedo extends Projectile {
   }
 }
 
+// ------------------------------------------------------------------ pod missile
+
+export type PodMissilePhase = 'up' | 'wait' | 'down';
+
+/**
+ * Pod missile: blasts straight up out of the launcher and off the top of the screen, then drops
+ * vertically onto its locked spot on the dock (a landing marker shows the spot the whole time), so
+ * the only danger is right at the marker. Shootable on the way up and on the way down.
+ */
+export class PodMissile extends Projectile {
+  phase: PodMissilePhase = 'up';
+  readonly tx: number;
+  readonly ty: number;
+  private waitT: number;
+  private fall: number;
+  private smokeT = 0;
+
+  constructor(owner: Entity, x: number, y: number, tx: number, ty: number, wait: number, fall: number) {
+    super({
+      team: 'enemy',
+      owner,
+      x,
+      y,
+      vx: 0,
+      vy: -70,
+      w: 6,
+      h: 10,
+      damage: 1,
+      kind: 'explosion',
+      sprite: 'bm4_missile',
+      rotate: true,
+      fps: 16,
+      life: 8,
+      hitsTerrain: false,
+      explode: { radius: 12, damage: 1, size: 'small', shake: 2, sfx: 'explosion' },
+    });
+    this.tx = tx;
+    this.ty = ty;
+    this.waitT = wait;
+    this.fall = fall;
+    this.hittable = true;
+    this.hp = this.maxHp = 1;
+    this.scoreValue = 100;
+    this.offscreenMargin = 400;
+  }
+
+  /** Seconds from launch to impact (for the landing marker), from a launch at y0. */
+  static flightTime(y0: number, camY: number, ty: number, wait: number, fall: number): number {
+    const up = Math.max(0, y0 - (camY - 24));
+    const tUp = (-70 + Math.sqrt(70 * 70 + 4 * 450 * up)) / 900;
+    const down = ty - 2 - (camY - 16);
+    const tAcc = (fall - 80) / 520;
+    const dAcc = 80 * tAcc + 260 * tAcc * tAcc;
+    const tDown = down <= dAcc ? (-80 + Math.sqrt(80 * 80 + 4 * 260 * down)) / 520 : tAcc + (down - dAcc) / fall;
+    return tUp + wait + tDown;
+  }
+
+  protected override move(dt: number): void {
+    const cam = this.world.camera;
+    if (this.phase === 'up') {
+      this.vy -= 900 * dt;
+      this.x += this.vx * dt;
+      this.y += this.vy * dt;
+      if (this.y < cam.y - 24) {
+        this.phase = 'wait';
+        this.hittable = false;
+        this.world.invalidateTargets();
+      }
+    } else if (this.phase === 'wait') {
+      this.waitT -= dt;
+      if (this.waitT <= 0) {
+        this.phase = 'down';
+        this.x = this.tx;
+        this.y = cam.y - 16;
+        this.vx = 0;
+        this.vy = 80;
+        this.hittable = true;
+        this.world.invalidateTargets();
+        m4sfx(this.world, 'mortar_whistle', this.x, { vol: 0.5, pitch: 1.3 });
+      }
+      return;
+    } else {
+      this.vy = Math.min(this.fall, this.vy + 520 * dt);
+      this.y += this.vy * dt;
+      if (this.y >= this.ty - 2) {
+        this.y = this.ty - 2;
+        this.detonate();
+        return;
+      }
+    }
+    this.smokeT -= dt;
+    if (this.smokeT <= 0) {
+      this.smokeT = 0.03;
+      const by = this.y - Math.sign(this.vy) * 6;
+      this.world.particles.add({ kind: 'smoke', x: this.x + fxRng.range(-1, 1), y: by, vx: fxRng.range(-6, 6), vy: fxRng.range(-6, 6), life: 0.4, color: '#d8d0c8', color2: '#7a7470', size: 1, size2: 3, drag: 2 });
+      if (this.phase === 'up') this.world.particles.add({ kind: 'px', x: this.x, y: by, vx: 0, vy: 40, life: 0.08, color: fxRng.chance(0.5) ? '#ffe070' : '#ff8a30', size: 2 });
+    }
+  }
+
+  override die(): void {
+    this.world.explode(this.x, this.y, { radius: 8, damage: 0, team: 'enemy', size: 'small', shake: 0, sfx: 'explosion_small' });
+    this.remove();
+  }
+
+  override render(g: CanvasRenderingContext2D): void {
+    if (this.phase === 'wait') return;
+    const s = sprites.get('bm4_missile');
+    s.draw(g, this.x, this.y, Math.floor(this.age * 16), { rot: this.vy < 0 ? -Math.PI / 2 : Math.PI / 2, flash: this.flash > 0 });
+  }
+}
+
 // ------------------------------------------------------------------ laser beam (visual)
 
 export type BeamMode = 'off' | 'aim' | 'fire';
@@ -258,9 +372,13 @@ export class LaserBeam extends Entity {
       const prev = g.globalAlpha;
       g.globalAlpha = on ? 0.95 : 0.45;
       pixelLine(g, this.ex, this.ey, this.ix, this.iy, this.charge > 0.75 ? '#ffffff' : '#ff3a3a', 1);
-      g.globalAlpha = 0.8;
+      // Swept path: chevron dots racing along the surface in the sweep direction.
+      const ph = -this.sweepDir * t * 40;
       for (let i = 0; i + 3 < this.path.length; i += 2) {
-        dottedLine(g, this.path[i], this.path[i + 1], this.path[i + 2], this.path[i + 3], '#ff5a4a', 5, 2, -this.sweepDir * t * 30, 1);
+        g.globalAlpha = 0.55;
+        dottedLine(g, this.path[i], this.path[i + 1] - 1, this.path[i + 2], this.path[i + 3] - 1, '#7a0a14', 8, 4, ph, 2);
+        g.globalAlpha = 0.95;
+        dottedLine(g, this.path[i], this.path[i + 1] - 1, this.path[i + 2], this.path[i + 3] - 1, on ? '#ff6a4a' : '#ffb080', 8, 3, ph, 1);
       }
       g.globalAlpha = prev;
       // Lens glint and a target pip at the start point.
