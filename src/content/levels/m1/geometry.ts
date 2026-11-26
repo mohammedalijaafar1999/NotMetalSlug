@@ -60,15 +60,17 @@ export const GROUND: Array<[number, number]> = [
 
 export const PLATFORMS: PlatformDef[] = [
   // Beach outpost watchtower deck.
-  { x: 930, y: 262, w: 40, style: 'pier:37' },
+  { x: 930, y: 262, w: 40, style: 'pier:0' },
   // Stilt village boardwalk: ramp up, two decks with a gap, ramp down.
   { x: 1606, y: G, w: 54, y2: 288, style: 'pier:4' },
   { x: 1660, y: 288, w: 240, style: 'pier:25' },
   { x: 1930, y: 288, w: 370, style: 'pier:25' },
   { x: 2300, y: 288, w: 52, y2: G, style: 'pier:6' },
-  // Hut roof ridges.
-  { x: 1766, y: 246, w: 50, style: 'bamboo:0' },
-  { x: 2096, y: 246, w: 50, style: 'bamboo:0' },
+  // Hut roof ridges (54 px above the deck) and the fish-drying racks that lead up to them.
+  { x: 1765, y: 234, w: 52, style: 'bamboo:0' },
+  { x: 1840, y: 258, w: 32, style: 'bamboo:26' },
+  { x: 2095, y: 234, w: 52, style: 'bamboo:0' },
+  { x: 2171, y: 258, w: 32, style: 'bamboo:26' },
   // Jungle road: bamboo lookout.
   { x: 3290, y: 266, w: 44, style: 'bamboo:33' },
   // Broken river bridge (32 px gap in the middle).
@@ -76,10 +78,11 @@ export const PLATFORMS: PlatformDef[] = [
   { x: 4060, y: 300, w: 106, style: 'pier:17' },
   // Fuel depot catwalk.
   { x: 4690, y: P - 40, w: 82, style: 'metal:35' },
-  // Gauntlet: bamboo platform.
+  // Gauntlet: bamboo platform and a watchtower deck.
   { x: 5690, y: 262, w: 60, style: 'bamboo:37' },
+  { x: 5840, y: 262, w: 40, style: 'pier:0' },
   // Stockade approach: watchtower deck.
-  { x: 6150, y: 258, w: 40, style: 'pier:41' },
+  { x: 6150, y: 262, w: 40, style: 'pier:0' },
 ];
 
 export const SOLIDS: SolidDef[] = [
