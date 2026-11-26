@@ -43,7 +43,7 @@ import { Z, type Damage } from '../../game/constants';
 import { registerEntity } from '../../game/registry';
 import { SF } from '../../art/soldier';
 import { BigBoss, FlyingPart, Lobbed, Wreck, bsfx, flames, smoke, sparkBurst, type Zone } from './common/kit';
-import { puffSteam } from './common/fx';
+import { pixelEllipse, puffSteam } from './common/fx';
 import { GR, bladeBottomRel, bladeFrameBottomRel } from './m1/grinder_art';
 
 /** Per-phase tuning. Times in s, speeds in px/s, distances in px. */
@@ -1073,6 +1073,8 @@ export class Grinder extends BigBoss {
       const B = Math.round(this.groundY + this.bob + this.sinkY);
       this.renderBeam(g, X + this.facing * GR.LAMP_FX, B + GR.LAMP_FY);
     }
+    // Contact shadow anchoring the treads to the ground.
+    if (!this.turretGone || this.deathTime < 3.5) pixelEllipse(g, this.x - this.facing * 6, this.groundY + 1, 98, 3, '#140c1c', 0.28);
     this.drawParts(g, null);
     // Hit flash: only the part that was hit (around the impact point on the big hull/boiler).
     if (!this.dying) {
