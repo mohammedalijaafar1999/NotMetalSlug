@@ -268,7 +268,7 @@ export class Grinder extends BigBoss {
   private nextAttack: Attack | null = null;
   private usedFlame = false;
   /** Last impact point per zone (localised hit flash). */
-  private hitAt: Record<string, { x: number; y: number }> = {};
+  private hitAt: Record<string, { x: number; y: number; big: boolean }> = {};
 
   constructor() {
     super('GRINDER', BASE_HP);
@@ -434,7 +434,11 @@ export class Grinder extends BigBoss {
       const t = p.vehicle ?? p;
       if (t.dead || t.bottom < top) continue;
       if (t.right > lo && t.left < hi) {
-        if (this.facing < 0) {
+        if ((t as { flying?: boolean }).flying) {
+          // Flyers may hover over the hull but not sink into it.
+          t.y -= t.bottom - top;
+          if (t.vy > 0) t.vy = 0;
+        } else if (this.facing < 0) {
           t.x = lo - t.w / 2;
           if (t.vx > 0) t.vx = 0;
         } else {
@@ -824,8 +828,14 @@ export class Grinder extends BigBoss {
     const n = this.nozzle();
     if (this.state === 'flame_tel') {
       if (this.crossed(0, dt)) bsfx(this, 'fire_burst', { vol: 0.5, pitch: 0.7 });
-      if (fxRng.chance(0.5)) flames(this.world, n.x + this.facing * 2, n.y, { n: 1, vx: this.facing * 20, vy: -10, size: 1.5, life: 0.25 });
+      const k = Math.min(1, t / Math.max(0.1, st.flameTel));
+      if (fxRng.chance(0.4 + 0.5 * k)) flames(this.world, n.x + this.facing * 3, n.y - fxRng.pick([0, 8]), { n: 1, vx: this.facing * (20 + 50 * k), vy: -12, size: 1.5 + 1.5 * k, life: 0.2 + 0.15 * k });
       if (fxRng.chance(0.35)) puffSteam(this.world, n.x, n.y - 3, this.facing * 20, -20, 1, 2);
+      this.sndT -= dt;
+      if (this.sndT <= 0) {
+        this.sndT = 0.3;
+        bsfx(this, 'enemy_flame', { vol: 0.3 + 0.3 * k, pitch: 1.4 });
+      }
       if (t >= st.flameTel * (0.85 + 0.15 * this.world.difficulty.enemyFireDelay) && this.bladeLow > 0.95) {
         this.setState('flame');
         bsfx(this, 'fire_burst', { vol: 0.9 });
@@ -996,10 +1006,11 @@ export class Grinder extends BigBoss {
     if (ev(0.8)) {
       this.hatchGone = true;
       this.world.add(new Scrap('grinder_parts', 2, this.wx(GR.HATCH_CX), this.wy(GR.HATCH_Y), -this.facing * 40, -300, { vr: 10, life: 3, groundY: this.groundY }));
-      this.world.add(new Bailout(this.wx(GR.HATCH_CX), this.wy(GR.HATCH_Y + 2), -this.facing * 70, -260, this.groundY));
+      // The crew bails out: one leaps off the front and flees past the player, one jumps off the back.
+      this.world.add(new Bailout(this.wx(GR.HATCH_CX), this.wy(GR.HATCH_Y + 2), this.facing * 150, -300, this.groundY));
       bsfx(this, 'enemy_alert', { vol: 0.6 });
     }
-    if (ev(1.25)) this.world.add(new Bailout(this.wx(GR.HATCH_CX), this.wy(GR.HATCH_Y + 2), -this.facing * 95, -230, this.groundY));
+    if (ev(1.25)) this.world.add(new Bailout(this.wx(GR.HATCH_CX), this.wy(GR.HATCH_Y + 2), -this.facing * 80, -280, this.groundY));
     if (ev(1.6)) {
       this.barrelGone = true;
       this.world.add(new Scrap('grinder_parts', 4, this.wx(GR.BARREL_X + 20), this.wy(GR.BARREL_Y - 10), this.facing * 90, -260, { vr: 6, life: 3, burn: true, groundY: this.groundY }));
@@ -1062,34 +1073,38 @@ export class Grinder extends BigBoss {
       for (const z of this.zones) {
         if ((this.zoneFlash[z.id] ?? 0) <= 0.035) continue;
         g.save();
-        if (z.id === 'hull' || z.id === 'boiler') {
-          const h = this.hitAt[z.id];
-          const x0 = Math.max(z.x - 1, (h?.x ?? z.x) - 14);
-          const x1 = Math.min(z.x + z.w + 1, (h?.x ?? z.x + z.w) + 14);
-          const y0 = Math.max(z.y - 1, (h?.y ?? z.y) - 11);
-          const y1 = Math.min(z.y + z.h + 1, (h?.y ?? z.y + z.h) + 11);
-          g.beginPath();
-          g.rect(Math.floor(x0), Math.floor(y0), Math.max(0, Math.ceil(x1 - x0)), Math.max(0, Math.ceil(y1 - y0)));
-          g.clip();
-        }
-        g.globalAlpha = z.id === 'hull' || z.id === 'boiler' ? 0.6 : 0.45;
+        // A round hot spot around the impact, inside the zone (big blasts light up more).
+        const h = this.hitAt[z.id] ?? { x: z.x + z.w / 2, y: z.y + z.h / 2, big: false };
+        g.beginPath();
+        g.rect(Math.floor(z.x) - 1, Math.floor(z.y) - 1, Math.ceil(z.w) + 2, Math.ceil(z.h) + 2);
+        g.clip();
+        g.beginPath();
+        g.ellipse(Math.round(h.x), Math.round(h.y), h.big ? 22 : 11, h.big ? 16 : 8, 0, 0, Math.PI * 2);
+        g.clip();
+        g.globalAlpha = 0.6;
         this.drawParts(g, z.id as Group);
         g.restore();
       }
     }
     // Flame jet.
     if (this.flameLen > 1) this.renderFlame(g);
-    // Nozzle glow while the vents build pressure.
-    if (this.state === 'flame_tel' && Math.floor(this.age * 12) % 2 === 0) {
+    // Vent glow while the nozzles build pressure: blinking faster and hotter until the jet fires.
+    if (this.state === 'flame_tel') {
       const n = this.nozzle();
-      g.fillStyle = '#ffb040';
-      g.fillRect(Math.round(n.x) - 1, Math.round(n.y) - 8, 2, 2);
-      g.fillRect(Math.round(n.x) - 1, Math.round(n.y) - 1, 2, 2);
+      const k = Math.min(1, this.stateTime / Math.max(0.1, this.stats.flameTel));
+      const on = Math.floor(this.age * (8 + 14 * k)) % 2 === 0;
+      const nx = Math.round(n.x) - (this.facing < 0 ? 2 : 0);
+      for (const dy of [-9, -1]) {
+        g.fillStyle = on ? '#ffe070' : '#ff7a2a';
+        g.fillRect(nx - 1, Math.round(n.y) + dy - 1, 4, 4);
+        g.fillStyle = on ? '#ffffff' : '#ffd060';
+        g.fillRect(nx, Math.round(n.y) + dy, 2, 2);
+      }
     }
   }
 
   override applyHit(d: Damage, mul: number, id: string): boolean {
-    if (d.x !== undefined && d.y !== undefined) this.hitAt[id] = { x: d.x, y: d.y };
+    if (d.x !== undefined && d.y !== undefined) this.hitAt[id] = { x: d.x, y: d.y, big: d.kind === 'explosion' || d.amount >= 5 };
     return super.applyHit(d, mul, id);
   }
 
