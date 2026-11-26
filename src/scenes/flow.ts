@@ -11,6 +11,10 @@ export interface MissionStats {
   shotsFired: number;
   /** Per-player rescued counts for this mission. */
   playerRescues: number[];
+  /** Per-player enemies defeated this mission (optional). */
+  playerKills?: number[];
+  /** Level that was played (optional; used for the hostage total / rank). */
+  levelId?: string;
 }
 
 export const flow = {

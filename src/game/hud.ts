@@ -1,12 +1,21 @@
-// In-game HUD: scores, lives, ammo/bombs, timer, boss bar, vehicle gauge, rescued hostages,
-// banners ("MISSION 1 START!", "WARNING!"), the GO arrow and continue countdowns.
+// In-game HUD: player panels (portrait, lives, rolling score, weapon + ammo with low-ammo flash,
+// bomb type/count), the checkpoint timer, boss bar (intro fill + damage trail), rescued hostage
+// icons, the GO arrow, animated banners ("MISSION 1" / "START!" / "WARNING!") and continue
+// prompts, including the full-screen CONTINUE? countdown when every joined player is out.
 
 import { drawText, textWidth } from '../engine/font';
+import { input } from '../engine/input';
 import { VIEW_H, VIEW_W } from '../engine/renderer';
 import { pad } from '../engine/math';
 import { sprites } from '../engine/sprites';
 import type { World } from './world';
 import type { Player } from './player';
+import type { GameSession } from './session';
+import { getCharacter } from './characters';
+import { C, PLAYER_COLORS, blink, easeOut, easeOutBack, panel, rect, stripes, text, twoTone, uiSfx } from '../scenes/ui';
+import { faceSprite } from '../content/ui/art';
+
+export type BannerStyle = 'drop' | 'slide' | 'small' | 'warning';
 
 interface Banner {
   text: string;
@@ -15,6 +24,38 @@ interface Banner {
   time: number;
   max: number;
   scale: number;
+  style: BannerStyle;
+  dir: 1 | -1;
+}
+
+interface PanelState {
+  shown: number;
+  weapon: string;
+  weaponPop: number;
+  bombs: number;
+  bombPop: number;
+  lives: number;
+  livesPop: number;
+}
+
+/** Short HUD names for weapons (falls back to initials for long names). */
+export function weaponShortName(id: string, name: string): string {
+  const known: Record<string, string> = { pistol: 'PISTOL', hmg: 'H.M.G.', rocket: 'ROCKET', shotgun: 'SHOTGUN', flame: 'FLAME', laser: 'LASER', homing: 'CHASER', bouncer: 'BOUNCER' };
+  if (known[id]) return known[id];
+  if (name.length <= 8) return name;
+  return name
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join('.') + '.';
+}
+
+/** Continue-countdown summary for a session. */
+export function continueState(session: GameSession, timers: number[]): { allOut: boolean; counting: boolean; time: number } {
+  const joined = session.players.filter((p) => p.joined);
+  const allOut = joined.length > 0 && joined.every((p) => p.out);
+  let time = -1;
+  for (const p of joined) if (p.out && timers[p.index] >= 0) time = Math.max(time, timers[p.index]);
+  return { allOut, counting: time >= 0, time };
 }
 
 export class Hud {
@@ -23,153 +64,347 @@ export class Hud {
   continueTimers = [-1, -1];
   /** Whether player 2 can join (shows PRESS START). */
   allowJoin = true;
+  /** Attract-mode demo: hide join/continue prompts. */
+  demo = false;
   time = 0;
+  private panels: PanelState[] = [0, 1].map(() => ({ shown: 0, weapon: '', weaponPop: 0, bombs: -1, bombPop: 0, lives: -1, livesPop: 0 }));
+  private rescueShown = 0;
+  private rescuePop = 0;
+  private boss: unknown = null;
+  private bossIntro = 0;
+  private bossTrail = 1;
+  private bossTrailHold = 0;
+  private bannerCount = 0;
 
-  banner(text: string, opts: { sub?: string; color?: string; time?: number; scale?: number } = {}): void {
+  banner(text: string, opts: { sub?: string; color?: string; time?: number; scale?: number; style?: BannerStyle } = {}): void {
     this.banners = this.banners.filter((b) => b.text !== text);
-    this.banners.push({ text, sub: opts.sub, color: opts.color ?? '#ffd040', time: opts.time ?? 2, max: opts.time ?? 2, scale: opts.scale ?? 3 });
+    const scale = opts.scale ?? 3;
+    const style: BannerStyle = opts.style ?? (/^WARNING/.test(text) ? 'warning' : scale >= 3 ? 'drop' : scale === 2 ? 'slide' : 'small');
+    const time = opts.time ?? 2;
+    this.bannerCount++;
+    this.banners.push({ text, sub: opts.sub, color: opts.color ?? C.gold, time, max: time, scale, style, dir: this.bannerCount % 2 ? 1 : -1 });
+    if (scale >= 2 || style === 'warning') uiSfx(style === 'warning' ? 'alarm' : 'banner', { vol: 0.8 });
   }
 
   clearBanners(): void {
     this.banners = [];
   }
 
-  update(dt: number): void {
+  update(dt: number, world?: World): void {
     this.time += dt;
     for (const b of this.banners) b.time -= dt;
     this.banners = this.banners.filter((b) => b.time > 0);
+    if (!world) return;
+    for (const p of world.players) {
+      const st = this.panels[p.index];
+      if (!st) continue;
+      const score = p.profile.score;
+      if (st.shown > score) st.shown = score;
+      else if (st.shown < score) st.shown = Math.min(score, st.shown + Math.max(10, Math.ceil((score - st.shown) * 0.2)));
+      if (st.weapon !== p.weapon.id) {
+        if (st.weapon) st.weaponPop = 0.5;
+        st.weapon = p.weapon.id;
+      }
+      if (st.bombs !== p.bombs) {
+        if (st.bombs >= 0 && p.bombs > st.bombs) st.bombPop = 0.5;
+        st.bombs = p.bombs;
+      }
+      if (st.lives !== p.profile.lives) {
+        if (st.lives >= 0) st.livesPop = 0.6;
+        st.lives = p.profile.lives;
+      }
+      st.weaponPop = Math.max(0, st.weaponPop - dt);
+      st.bombPop = Math.max(0, st.bombPop - dt);
+      st.livesPop = Math.max(0, st.livesPop - dt);
+    }
+    // Rescued hostages.
+    let rescues = 0;
+    for (const prof of world.session.players) rescues += prof.missionRescues;
+    if (rescues > this.rescueShown) this.rescuePop = 0.4;
+    this.rescueShown = rescues;
+    this.rescuePop = Math.max(0, this.rescuePop - dt);
+    // Boss bar.
+    const boss = world.boss && !world.boss.dead ? world.boss : null;
+    if (boss !== this.boss) {
+      this.boss = boss;
+      this.bossIntro = 0;
+      this.bossTrail = 1;
+    }
+    if (boss) {
+      this.bossIntro = Math.min(1, this.bossIntro + dt * 0.9);
+      const frac = Math.max(0, boss.hp / Math.max(1, boss.maxHp));
+      if (this.bossTrail < frac) this.bossTrail = frac;
+      if (this.bossTrail > frac) {
+        this.bossTrailHold += dt;
+        if (this.bossTrailHold > 0.35) this.bossTrail = Math.max(frac, this.bossTrail - dt * 0.45);
+      } else this.bossTrailHold = 0;
+    }
   }
 
   render(g: CanvasRenderingContext2D, world: World): void {
     g.setTransform(1, 0, 0, 1, 0, 0);
-    const players = world.players;
+    const session = world.session;
+    const cs = continueState(session, this.continueTimers);
     for (let i = 0; i < 2; i++) {
-      const p = players.find((x) => x.index === i);
-      if (p && p.profile.joined) this.playerPanel(g, p, i === 0 ? 'left' : 'right');
-      else if (i === 1 && this.allowJoin) {
-        if (Math.floor(this.time * 2) % 2 === 0) drawText(g, '2P PRESS START', VIEW_W - 4, 4, { align: 'right', color: '#a0a0b0' });
-      }
+      const prof = session.players[i];
+      const p = world.players.find((x) => x.index === i);
+      const side = i === 0 ? 'left' : 'right';
+      if (prof.joined && p && !prof.out) this.playerPanel(g, p, side);
+      else if (prof.joined && prof.out && !cs.allOut) this.outPanel(g, i, prof.score, side);
+      else if (!prof.joined && i === 1 && this.allowJoin && !this.demo) this.joinPrompt(g);
     }
-    // Timer.
     const lvl = world.level;
+    // Timer.
     if (lvl && lvl.timerEnabled) {
       const t = lvl.timeLeft;
-      const col = t <= 10 && Math.floor(this.time * 4) % 2 === 0 ? '#ff4040' : '#ffffff';
-      drawText(g, pad(t, 2), VIEW_W / 2, 3, { align: 'center', scale: 2, color: col, outline: '#140c1c' });
+      const low = t <= 10;
+      panel(g, VIEW_W / 2 - 14, 1, 28, 19, 'dark', 0.75);
+      const col = low && blink(this.time, 4) ? C.red : C.white;
+      twoTone(g, pad(t, 2), VIEW_W / 2, 4, col, low ? '#ffb0b0' : '#c8d8f0', { scale: 2, align: 'center', split: 3 });
     }
-    // Boss bar.
-    if (world.boss && !world.boss.dead) this.bossBar(g, world);
-    // Rescued hostages (bottom-left).
-    let rescues = 0;
-    for (const p of players) rescues += p.profile.missionRescues;
-    if (rescues > 0) {
-      const hs = sprites.tryGet('hud_hostage');
-      for (let i = 0; i < Math.min(rescues, 12); i++) {
-        if (hs) hs.draw(g, 8 + i * 8, VIEW_H - 4, 0);
-        else {
-          g.fillStyle = '#140c1c';
-          g.fillRect(4 + i * 8, VIEW_H - 11, 6, 8);
-          g.fillStyle = '#e8782a';
-          g.fillRect(5 + i * 8, VIEW_H - 7, 4, 3);
-          g.fillStyle = '#f0c098';
-          g.fillRect(5 + i * 8, VIEW_H - 10, 4, 3);
+    if (world.boss && !world.boss.dead && this.boss) this.bossBar(g, world);
+    this.hostages(g);
+    // GO arrow.
+    if (lvl && lvl.goTimer > 0) {
+      const k = Math.floor(this.time * 3) % 2 === 0;
+      const dx = Math.round(((this.time * 18) % 10));
+      if (k) {
+        sprites.get('ui_go_arrow').draw(g, VIEW_W - 40 + dx, VIEW_H / 2 + 4);
+        twoTone(g, 'GO!', VIEW_W - 30, VIEW_H / 2 - 18, C.white, C.gold, { scale: 2, align: 'center', split: 3 });
+      }
+    }
+    this.renderBanners(g);
+    if (cs.allOut && cs.counting && !this.demo) this.continueScreen(g, session, cs.time);
+  }
+
+  // ------------------------------------------------------------------ player panels
+
+  private playerPanel(g: CanvasRenderingContext2D, p: Player, side: 'left' | 'right'): void {
+    const st = this.panels[p.index];
+    const prof = p.profile;
+    const L = side === 'left';
+    const pw = 126;
+    const px = L ? 2 : VIEW_W - 2 - pw;
+    const col = PLAYER_COLORS[p.index];
+    panel(g, px, 1, pw, 25, 'dark', 0.72);
+    // Portrait.
+    const fx = L ? px + 2 : px + pw - 20;
+    rect(g, fx, 3, 18, 20, '#000000', 0.35);
+    rect(g, fx, 3, 18, 1, col);
+    const face = sprites.get(faceSprite(p.char.id, p.index === 1));
+    const pop = st.livesPop > 0 ? Math.round(Math.sin(st.livesPop * 30) * 1) : 0;
+    face.draw(g, fx + 9, 22 + pop, 0, { flip: !L });
+    // Row 1: tag, lives, score.
+    const tx = L ? px + 23 : px + pw - 23;
+    const al = L ? 'left' : 'right';
+    const tag = `${p.index + 1}P`;
+    const tw = drawText(g, tag, tx, 4, { color: col, outline: C.out, align: al });
+    const lifeCol = st.livesPop > 0 && blink(this.time, 8) ? C.gold : C.white;
+    drawText(g, `×${Math.max(0, prof.lives)}`, tx + (L ? 1 : -1) * (tw + 3), 4, { color: lifeCol, outline: C.out, align: al });
+    drawText(g, pad(st.shown, 8), L ? px + pw - 4 : px + 4, 4, { color: C.gold, outline: C.out, align: L ? 'right' : 'left' });
+    // Row 2: weapon / vehicle + bombs.
+    const y2 = 14;
+    const v = p.vehicle;
+    const inner = L ? px + 23 : px + 4;
+    const innerW = pw - 27;
+    if (v) {
+      const frac = Math.max(0, v.hp / Math.max(1, v.maxHp));
+      drawText(g, v.vehicleName.slice(0, 8), inner, y2, { color: C.blue, outline: C.out });
+      const bx = inner + 50;
+      const bw = innerW - 52 - (v.secondaryAmmo >= 0 ? 22 : 0);
+      rect(g, bx - 1, y2, bw + 2, 7, C.out);
+      rect(g, bx, y2 + 1, bw, 5, '#3a2030');
+      const fc = frac > 0.5 ? '#40e060' : frac > 0.25 ? C.gold : blink(this.time, 6) ? C.red : '#a02020';
+      rect(g, bx, y2 + 1, Math.round(bw * frac), 5, fc);
+      rect(g, bx, y2 + 1, Math.round(bw * frac), 1, '#ffffff', 0.35);
+      for (let k = 1; k < 8; k++) rect(g, bx + Math.round((bw * k) / 8), y2 + 1, 1, 5, C.out, 0.5);
+      if (v.secondaryAmmo >= 0) drawText(g, String(v.secondaryAmmo), inner + innerW, y2, { align: 'right', color: C.white, outline: C.out });
+      return;
+    }
+    const w = p.weapon;
+    const base = isFinite(w.ammo) ? w.ammo * (w.heavy ? p.char.heavyAmmoMul : 1) : Infinity;
+    const ammo = isFinite(p.ammo) ? Math.max(0, Math.floor(p.ammo)) : Infinity;
+    const low = isFinite(ammo) && ammo <= Math.max(5, base * 0.2);
+    // Weapon chip (crate letter in the weapon color), name, ammo | bomb icon + count.
+    // Player 2's panel is mirrored: bombs | ammo, name, chip.
+    const popK = st.weaponPop > 0 ? easeOutBack(1 - st.weaponPop / 0.5) : 1;
+    const chipX = L ? inner : inner + innerW - 9;
+    rect(g, chipX, y2 - 2, 9, 11, C.out);
+    rect(g, chipX + 1, y2 - 1, 7, 9, st.weaponPop > 0 && blink(this.time, 10) ? '#ffffff' : w.color);
+    rect(g, chipX + 1, y2 - 1, 7, 1, '#ffffff', 0.5);
+    drawText(g, w.letter, chipX + 5, y2, { align: 'center', color: C.out, shadow: null });
+    const nm = weaponShortName(w.id, w.name);
+    const nameCol = st.weaponPop > 0 ? C.gold : C.white;
+    const slide = Math.round((1 - popK) * 6);
+    if (L) drawText(g, nm, chipX + 11 + slide, y2, { color: nameCol, outline: C.out });
+    else drawText(g, nm, chipX - 2 - slide, y2, { color: nameCol, outline: C.out, align: 'right' });
+    const ammoStr = isFinite(ammo) ? String(ammo) : '∞';
+    const ammoCol = low ? (blink(this.time, 5) ? C.red : C.white) : isFinite(ammo) ? C.gold : C.white;
+    const bombX = L ? inner + innerW - 22 : inner;
+    if (L) drawText(g, ammoStr, bombX - 5, y2, { align: 'right', color: ammoCol, outline: C.out });
+    else drawText(g, ammoStr, bombX + 27, y2, { color: ammoCol, outline: C.out });
+    // Bombs.
+    const fire = p.bombKind === 'firebomb';
+    const bspr = sprites.get(fire ? 'ui_icon_firebomb' : 'ui_icon_grenade');
+    const bpop = st.bombPop > 0 ? Math.round(Math.sin(st.bombPop * 25) * 1.5) : 0;
+    rect(g, L ? bombX - 2 : bombX + 22, y2 - 1, 1, 9, '#5a4a6a', 0.8);
+    bspr.draw(g, bombX + 3, y2 + 8 + bpop);
+    drawText(g, String(p.bombs), bombX + 8, y2, { color: p.bombs <= 0 ? C.red : fire ? '#ffb070' : '#b0f070', outline: C.out });
+  }
+
+  /** A player who is out while the other keeps playing: countdown or "press start". */
+  private outPanel(g: CanvasRenderingContext2D, i: number, score: number, side: 'left' | 'right'): void {
+    const L = side === 'left';
+    const pw = 126;
+    const px = L ? 2 : VIEW_W - 2 - pw;
+    const t = this.continueTimers[i];
+    panel(g, px, 1, pw, 25, 'dark', 0.72);
+    const cx = px + pw / 2;
+    drawText(g, `${i + 1}P ${pad(score, 8)}`, cx, 4, { align: 'center', color: PLAYER_COLORS[i], outline: C.out });
+    if (this.demo) return;
+    if (t >= 0) {
+      drawText(g, `CONTINUE? ${Math.max(0, Math.floor(t))}`, cx, 14, { align: 'center', color: blink(this.time, 2) ? C.gold : C.white, outline: C.out });
+    } else if (blink(this.time, 1.5, 0.7)) {
+      drawText(g, 'PRESS START', cx, 14, { align: 'center', color: C.white, outline: C.out });
+    }
+  }
+
+  private joinPrompt(g: CanvasRenderingContext2D): void {
+    // Touch players can't drop in a second player (and the pause button lives there).
+    if (input.lastDevice === 'touch' || !blink(this.time, 1, 0.7)) return;
+    text(g, '2P PRESS START', VIEW_W - 5, 4, { align: 'right', color: C.grey });
+  }
+
+  // ------------------------------------------------------------------ boss bar
+
+  private bossBar(g: CanvasRenderingContext2D, world: World): void {
+    const b = world.boss!;
+    const frac = Math.max(0, b.hp / Math.max(1, b.maxHp));
+    const intro = easeOut(this.bossIntro);
+    const shown = Math.min(frac, intro);
+    const w = 160;
+    const x = Math.round(VIEW_W / 2 - w / 2);
+    const y = 24;
+    panel(g, x - 4, y - 2, w + 8, 21, 'dark', 0.8);
+    rect(g, x - 1, y, w + 2, 8, C.out);
+    rect(g, x, y + 1, w, 6, '#3a1018');
+    // Damage trail.
+    if (this.bossTrail > shown) rect(g, x + Math.round(w * shown), y + 1, Math.round(w * (Math.min(this.bossTrail, intro) - shown)), 6, '#ffffff', 0.85);
+    const low = frac < 0.3;
+    const col = low ? (blink(this.time, 6) ? '#ff3a2a' : C.gold) : '#ff5a2a';
+    rect(g, x, y + 1, Math.round(w * shown), 6, col);
+    rect(g, x, y + 1, Math.round(w * shown), 2, low ? '#ffd0a0' : '#ffb080');
+    rect(g, x, y + 6, Math.round(w * shown), 1, '#a02010');
+    for (let k = 1; k < 10; k++) rect(g, x + Math.round((w * k) / 10), y + 1, 1, 6, C.out, 0.45);
+    const name = world.bossName || 'BOSS';
+    drawText(g, `◆ ${name} ◆`, VIEW_W / 2, y + 10, { align: 'center', color: '#ffb0a0', outline: C.out });
+  }
+
+  // ------------------------------------------------------------------ hostages
+
+  private hostages(g: CanvasRenderingContext2D): void {
+    const n = this.rescueShown;
+    if (n <= 0) return;
+    const spr = sprites.tryGet('hud_hostage') ?? sprites.get('ui_hostage');
+    const shown = Math.min(n, 16);
+    for (let i = 0; i < shown; i++) {
+      const last = i === shown - 1;
+      const bounce = last && this.rescuePop > 0 ? Math.round(Math.sin((0.4 - this.rescuePop) * 20) * 3 * (this.rescuePop / 0.4)) : 0;
+      spr.draw(g, 7 + i * 8, VIEW_H - 3 - bounce);
+    }
+    if (n > 16) text(g, `+${n - 16}`, 7 + 16 * 8, VIEW_H - 10, { color: C.white });
+  }
+
+  // ------------------------------------------------------------------ banners
+
+  private renderBanners(g: CanvasRenderingContext2D): void {
+    let by = Math.round(VIEW_H * 0.3);
+    for (const b of this.banners) {
+      const age = b.max - b.time;
+      const out = b.time < 0.3 ? 1 - b.time / 0.3 : 0;
+      const h = 7 * b.scale;
+      if (b.style === 'warning') by += 9;
+      switch (b.style) {
+        case 'warning': {
+          const a = Math.min(1, age / 0.15, b.time / 0.25);
+          g.globalAlpha = a;
+          rect(g, 0, by - 8, VIEW_W, h + 16, '#200408', 0.6);
+          stripes(g, 0, by - 8, VIEW_W, 4, this.time, C.red, '#200408');
+          stripes(g, 0, by + h + 4, VIEW_W, 4, -this.time, C.red, '#200408');
+          g.globalAlpha = 1;
+          if (blink(this.time, 3, 0.75)) text(g, b.text, VIEW_W / 2, by, { align: 'center', scale: b.scale, color: b.color, alpha: a });
+          break;
+        }
+        case 'drop': {
+          // Letters drop in one by one, then slide away.
+          const w = textWidth(b.text, b.scale);
+          let x = VIEW_W / 2 - w / 2 - out * out * VIEW_W * 0.7 * b.dir;
+          let i = 0;
+          for (const ch of b.text) {
+            const cw = textWidth(ch, b.scale);
+            const k = easeOutBack((age - i * 0.04) / 0.28);
+            if (k > 0) {
+              const dy = Math.round((1 - k) * -30);
+              twoTone(g, ch, Math.round(x), by + dy, C.white, b.color, { scale: b.scale, split: 3, alpha: Math.min(1, k * 2) * (1 - out) });
+            }
+            x += cw + b.scale;
+            i++;
+          }
+          break;
+        }
+        case 'slide': {
+          const k = easeOutBack(age / 0.25);
+          const ox = Math.round((1 - k) * VIEW_W * 0.6 * b.dir - out * out * VIEW_W * 0.6 * b.dir);
+          twoTone(g, b.text, VIEW_W / 2 + ox, by, C.white, b.color, { scale: b.scale, align: 'center', split: 3, alpha: 1 - out * 0.5 });
+          break;
+        }
+        default: {
+          const a = Math.min(1, age / 0.15) * (1 - out);
+          text(g, b.text, VIEW_W / 2, by + Math.round((1 - Math.min(1, age / 0.15)) * 6), { align: 'center', color: b.color, alpha: a });
         }
       }
-      if (rescues > 12) drawText(g, '+' + (rescues - 12), 4 + 12 * 8 + 2, VIEW_H - 10, { color: '#ffffff' });
-    }
-    // GO arrow.
-    if (lvl && lvl.goTimer > 0 && Math.floor(this.time * 3) % 2 === 0) {
-      drawText(g, 'GO', VIEW_W - 34, VIEW_H / 2 - 12, { scale: 2, color: '#ffd040', outline: '#140c1c' });
-      drawText(g, '→', VIEW_W - 30, VIEW_H / 2 + 4, { scale: 2, color: '#ffd040', outline: '#140c1c' });
-    }
-    // Continue prompts.
-    for (let i = 0; i < 2; i++) {
-      const t = this.continueTimers[i];
-      if (t < 0) continue;
-      const x = i === 0 ? VIEW_W * 0.25 : VIEW_W * 0.75;
-      drawText(g, `${i + 1}P CONTINUE?`, x, VIEW_H / 2 - 20, { align: 'center', color: '#ffffff', outline: '#140c1c' });
-      drawText(g, String(Math.ceil(t)), x, VIEW_H / 2 - 8, { align: 'center', scale: 3, color: '#ffd040', outline: '#140c1c' });
-      drawText(g, 'PRESS START', x, VIEW_H / 2 + 18, { align: 'center', color: Math.floor(this.time * 3) % 2 ? '#ffffff' : '#a0a0a0', outline: '#140c1c' });
-    }
-    // Banners.
-    let by = VIEW_H * 0.34;
-    for (const b of this.banners) {
-      const a = Math.min(1, b.time / 0.25, (b.max - b.time) / 0.12 + 0.3);
-      const wob = b.max - b.time < 0.15 ? (0.15 - (b.max - b.time)) * 40 : 0;
-      drawText(g, b.text, VIEW_W / 2, by - wob, { align: 'center', scale: b.scale, color: b.color, outline: '#140c1c', alpha: a });
-      by += 7 * b.scale + 4;
+      by += h + 5 + (b.style === 'warning' ? 9 : 0);
       if (b.sub) {
-        drawText(g, b.sub, VIEW_W / 2, by, { align: 'center', scale: 1, color: '#ffffff', outline: '#140c1c', alpha: a });
+        const k = Math.min(1, Math.max(0, (age - 0.2) / 0.2));
+        const shownLen = Math.floor(b.sub.length * Math.min(1, Math.max(0, (age - 0.25) / 0.4)));
+        if (k > 0) text(g, b.sub.slice(0, shownLen), VIEW_W / 2, by, { align: 'center', color: C.white, alpha: k * (1 - out) });
         by += 12;
       }
     }
   }
 
-  private playerPanel(g: CanvasRenderingContext2D, p: Player, side: 'left' | 'right'): void {
-    const prof = p.profile;
-    const L = side === 'left';
-    const x = L ? 4 : VIEW_W - 4;
-    const al = L ? 'left' : 'right';
-    const col = p.char.color;
-    const tag = `${p.index + 1}UP`;
-    // Row 1: tag, lives, score.
-    if (L) {
-      let cx = x;
-      cx += drawText(g, tag, cx, 3, { color: col, outline: '#140c1c' }) + 2;
-      cx += drawText(g, '=' + Math.max(0, prof.lives), cx, 3, { color: '#ffffff', outline: '#140c1c' }) + 6;
-      drawText(g, pad(prof.score, 8), cx, 3, { color: '#ffe060', outline: '#140c1c' });
-    } else {
-      let cx = x;
-      cx -= drawText(g, '=' + Math.max(0, prof.lives), cx, 3, { color: '#ffffff', outline: '#140c1c', align: 'right' }) + 2;
-      cx -= drawText(g, tag, cx, 3, { color: col, outline: '#140c1c', align: 'right' }) + 6;
-      drawText(g, pad(prof.score, 8), cx, 3, { color: '#ffe060', outline: '#140c1c', align: 'right' });
-    }
-    if (p.state === 'out') return;
-    // Row 2: ARMS / BOMB panel.
-    const v = p.vehicle;
-    const arms = v ? (v.secondaryAmmo >= 0 ? String(v.secondaryAmmo) : '∞') : isFinite(p.ammo) ? String(Math.max(0, Math.floor(p.ammo))) : '∞';
-    const bombs = String(p.bombs);
-    const panelW = 92;
-    const px = L ? x : x - panelW;
-    g.fillStyle = 'rgba(20,12,28,0.72)';
-    g.fillRect(px, 12, panelW, 11);
-    g.fillStyle = '#5a4a6a';
-    g.fillRect(px, 12, panelW, 1);
-    drawText(g, 'ARMS', px + 3, 14, { color: '#9ad0ff', shadow: null });
-    drawText(g, arms, px + 45, 14, { color: '#ffffff', align: 'right', shadow: null });
-    drawText(g, 'BOMB', px + 50, 14, { color: p.bombKind === 'firebomb' ? '#ff9a4a' : '#a0e060', shadow: null });
-    drawText(g, bombs, px + panelW - 3, 14, { color: '#ffffff', align: 'right', shadow: null });
-    // Vehicle gauge.
-    if (v) {
-      const gy = 25;
-      g.fillStyle = 'rgba(20,12,28,0.72)';
-      g.fillRect(px, gy, panelW, 8);
-      const frac = Math.max(0, v.hp / v.maxHp);
-      const bw = panelW - 34;
-      g.fillStyle = '#3a2a2a';
-      g.fillRect(px + 31, gy + 2, bw, 4);
-      g.fillStyle = frac > 0.5 ? '#40e060' : frac > 0.25 ? '#ffd040' : Math.floor(this.time * 6) % 2 ? '#ff4040' : '#a02020';
-      g.fillRect(px + 31, gy + 2, Math.round(bw * frac), 4);
-      drawText(g, v.vehicleName.slice(0, 5), px + 2, gy + 1, { color: '#ffffff', shadow: null });
-    }
-  }
+  // ------------------------------------------------------------------ continue screen
 
-  private bossBar(g: CanvasRenderingContext2D, world: World): void {
-    const b = world.boss!;
-    const frac = Math.max(0, b.hp / b.maxHp);
-    const w = 150;
-    const x = Math.round(VIEW_W / 2 - w / 2);
-    const y = 22;
-    g.fillStyle = '#140c1c';
-    g.fillRect(x - 2, y - 1, w + 4, 8);
-    g.fillStyle = '#4a1a1a';
-    g.fillRect(x, y + 1, w, 4);
-    g.fillStyle = frac > 0.3 || Math.floor(this.time * 6) % 2 ? '#ff4a2a' : '#ffd040';
-    g.fillRect(x, y + 1, Math.round(w * frac), 4);
-    g.fillStyle = '#ffb0a0';
-    g.fillRect(x, y + 1, Math.round(w * frac), 1);
-    const name = world.bossName;
-    drawText(g, name, VIEW_W / 2, y + 8, { align: 'center', color: '#ffb0a0', outline: '#140c1c' });
-    void textWidth;
+  private continueScreen(g: CanvasRenderingContext2D, session: GameSession, t: number): void {
+    rect(g, 0, 0, VIEW_W, VIEW_H, '#06030c', 0.72);
+    const cx = VIEW_W / 2;
+    twoTone(g, 'CONTINUE?', cx, 30, C.white, C.gold, { scale: 3, align: 'center', split: 3 });
+    const digit = Math.max(0, Math.floor(t));
+    const frac = t - Math.floor(t);
+    // Ring that drains each second.
+    const r = 30;
+    const cy = 92;
+    g.lineWidth = 3;
+    g.strokeStyle = '#3a2a4a';
+    g.beginPath();
+    g.arc(cx, cy, r, 0, Math.PI * 2);
+    g.stroke();
+    g.strokeStyle = digit <= 3 ? C.red : C.gold;
+    g.beginPath();
+    g.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac);
+    g.stroke();
+    g.lineWidth = 1;
+    const sc = frac > 0.85 ? 7 : 6;
+    twoTone(g, String(digit), cx, cy - Math.round((7 * sc) / 2), C.white, digit <= 3 ? '#ff8a7a' : C.gold, { scale: sc, align: 'center', split: 3 });
+    if (blink(this.time, 1.6, 0.7)) text(g, 'PRESS START OR FIRE', cx, 134, { align: 'center', color: C.white });
+    session.players.forEach((p, i) => {
+      if (!p.joined) return;
+      const x = session.twoPlayer ? (i === 0 ? cx - 90 : cx + 90) : cx;
+      const c = getCharacter(p.character);
+      sprites.get(faceSprite(c.id, i === 1)).draw(g, x, 170);
+      drawText(g, `${i + 1}P ${c.name}`, x, 173, { align: 'center', color: PLAYER_COLORS[i], outline: C.out });
+      drawText(g, pad(p.score, 8), x, 183, { align: 'center', color: C.gold, outline: C.out });
+    });
+    drawText(g, 'CREDITS: FREE PLAY', cx, VIEW_H - 12, { align: 'center', color: C.grey, outline: C.out });
   }
 }
