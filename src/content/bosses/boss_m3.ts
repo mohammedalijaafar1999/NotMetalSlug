@@ -32,9 +32,9 @@ import type { Damage } from '../../game/constants';
 import type { Solid } from '../../game/terrain';
 import { EnemyBullet } from '../../game/projectile';
 import { BigBoss, BossPiece, FlyingPart, Lobbed, Wreck, flames, smoke, sparkBurst, type Zone } from './common/kit';
-import { GroundMarker as FloorMark, puffSteam, puffSnow } from './common/fx';
+import { puffSteam, puffSnow } from './common/fx';
 import { MG_FRAMES, WALL } from './m3/art';
-import { Boulder, FallingIcicle, FlakShell, FrostLance, SPIKE_ACTIVE, SPIKE_LEAD, SPIKE_SPEED, SpikeWave, iceBurst, snd } from './m3/parts';
+import { Boulder, FallingIcicle, FlakShell, FloorMark, FrostLance, SPIKE_ACTIVE, SPIKE_LEAD, SPIKE_SPEED, SpikeWave, iceBurst, snd } from './m3/parts';
 
 // ------------------------------------------------------------------ tuning
 
@@ -59,6 +59,10 @@ const ATTACK_DELAY = 0.5;
 const LANCE_CHARGE = 1.0;
 const LANCE_FIRE = 0.7;
 const SPIKE_TELE = 0.6;
+/** Flak shells burst this high above the floor after FLAK_FLIGHT seconds. */
+const FLAK_BURST_H = 92;
+const FLAK_FLIGHT = 0.85;
+const MORTAR_FLIGHT = 1.35;
 const MG_EVERY = [2.9, 2.4, 2.1];
 const FLAK_EVERY = [4.7, 3.9, 3.5];
 const MORTAR_EVERY = [5.6, 4.7, 4.3];
@@ -96,8 +100,11 @@ class Turret extends BossPiece {
   lockAng = 0;
   locked = false;
   recoil = 0;
-  /** Burst target for the flak (world). */
+  /** Burst target for the flak (world) and its barrel elevation (degrees above the horizon). */
   bx = 0;
+  elev = 45;
+  /** Floor mark of an attack still being aimed (removed if the turret dies first). */
+  mark: Entity | null = null;
   lastHitBy: Entity | null = null;
 
   constructor(boss: FrostBastion, kind: TurretKind, w: number, h: number, hp: number, cd: number) {
@@ -308,7 +315,7 @@ export class FrostBastion extends BigBoss {
     const n = this.attackCount++;
     if (this.phase <= 0) return 'lance';
     if (this.phase === 1) return n % 2 === 0 ? 'spikes' : 'lance';
-    return (['lance', 'spikes', 'boulders'] as const)[n % 3];
+    return (['boulders', 'lance', 'spikes'] as const)[n % 3];
   }
 
   // ---------------------------------------------------------------- update
@@ -553,6 +560,10 @@ export class FrostBastion extends BigBoss {
     const ph = Math.min(2, this.phase);
     // Smoke from damaged turrets.
     if (t.hp < t.maxHp * 0.5 && fxRng.chance(dt * 8)) smoke(w, t.x + fxRng.range(-4, 4), t.y - 4, { n: 1, size: 1.5, size2: 5, life: 0.8 });
+    if (t.kind === 'flak') {
+      const bx = t.stage === 'idle' ? (tgt ? this.flakBurstX(tgt.cx) : this.fx(120)) : t.bx;
+      t.elev = approach(t.elev, this.flakElevation(bx), dt * 70);
+    }
     if (t.kind === 'mg') {
       const want = tgt ? Math.atan2(tgt.cy - t.y, tgt.cx - t.x) : Math.PI * 0.8;
       const a = clamp(want < -Math.PI / 2 ? want + Math.PI * 2 : want, Math.PI * 0.25, Math.PI * 1.08);
@@ -572,8 +583,8 @@ export class FrostBastion extends BigBoss {
         t.locked = false;
         if (t.kind === 'mg') snd(w, 'enemy_alert', t.x, 0.35, 0.7);
         if (t.kind === 'flak') {
-          t.bx = clamp(tgt.cx + w.rng.range(-8, 8), this.arenaL + 18, this.fx(GALLERY_TIP + 8));
-          w.add(new FloorMark(t.bx, this.G, 0.45 + 0.85, 'cross', 9));
+          t.bx = this.flakBurstX(tgt.cx + w.rng.range(-8, 8));
+          t.mark = w.add(new FloorMark(t.bx, this.G, 0.45 + FLAK_FLIGHT, 'cross', 9));
         }
         break;
       }
@@ -606,11 +617,10 @@ export class FrostBastion extends BigBoss {
           }
           if (t.shots >= n && t.stageT >= n * 0.12 + 0.1) t.setStage('recover');
         } else if (t.kind === 'flak') {
-          const f = this.flakPos();
-          const mx = f.x - 12;
-          const my = f.y - 22;
-          w.add(new FlakShell(this, mx, my, t.bx, this.G - 92, 0.85, this.G));
-          t.ang = Math.atan2(-1, t.bx < mx ? -1 : 1);
+          const m = this.flakMuzzle(t.elev);
+          const mx = m.x;
+          const my = m.y;
+          w.add(new FlakShell(this, mx, my, t.bx, this.G - FLAK_BURST_H, FLAK_FLIGHT, this.G));
           t.recoil = 3;
           snd(w, 'tank_cannon', t.x, 0.55, 1.35);
           smoke(w, mx - 3, my - 3, { n: 3, color: '#c8ccd6', color2: '#7a8090', size: 2, size2: 6, vy: -20, life: 0.7 });
@@ -625,7 +635,8 @@ export class FrostBastion extends BigBoss {
             const o = this.mortarPos();
             const mx = o.x - 6;
             const my = o.y - 20;
-            w.add(new Lobbed({ owner: this, x: mx, y: my, tx, ty: this.G - 2, time: 1.35, sprite: 'bm3_mshell', radius: 17, size: 'medium', marker: true, trail: '#c0c8d4', shake: 2 }));
+            const shell = w.add(new Lobbed({ owner: this, x: mx, y: my, tx, ty: this.G - 2, time: MORTAR_FLIGHT, sprite: 'bm3_mshell', radius: 17, size: 'medium', marker: false, trail: '#c0c8d4', shake: 2 }));
+            w.add(new FloorMark(tx, this.G, MORTAR_FLIGHT, 'cross', 10, shell));
             t.recoil = 3;
             snd(w, 'mortar_fire', t.x, 0.7, 1);
             if (t.shots === 1) snd(w, 'mortar_whistle', tx, 0.5, 1);
@@ -646,6 +657,28 @@ export class FrostBastion extends BigBoss {
     }
   }
 
+  /** Where the flak bursts for a target at x (never over the gallery, the shell must clear it). */
+  private flakBurstX(x: number): number {
+    return clamp(x, this.arenaL + 18, this.fx(GALLERY_TIP + 8));
+  }
+
+  /** Flak muzzle (world) for a barrel elevation in degrees. */
+  private flakMuzzle(elev: number): { x: number; y: number } {
+    const f = this.flakPos();
+    const e = (elev * Math.PI) / 180;
+    return { x: f.x - 1 - Math.cos(e) * 22, y: f.y - 13 - Math.sin(e) * 22 };
+  }
+
+  /** Barrel elevation (degrees) that launches a flak shell onto its burst point at bx. */
+  private flakElevation(bx: number): number {
+    const f = this.flakPos();
+    const mx = f.x - 16;
+    const my = f.y - 28;
+    const vx = (bx - mx) / FLAK_FLIGHT;
+    const vy = (this.G - FLAK_BURST_H - my - 0.5 * FlakShell.GRAV * FLAK_FLIGHT * FLAK_FLIGHT) / FLAK_FLIGHT;
+    return clamp((Math.atan2(-vy, Math.abs(vx)) * 180) / Math.PI, 15, 75);
+  }
+
   /** Seconds from now until a turret attack against `tgt` is over (for the director). */
   private turretResolve(t: Turret, tgt: Entity): number {
     if (t.kind === 'mg') {
@@ -653,7 +686,7 @@ export class FrostBastion extends BigBoss {
       return 0.6 + 0.5 + d / (150 * this.world.difficulty.enemyShotSpeed) + 0.15;
     }
     if (t.kind === 'flak') return 0.45 + 0.85 + 0.9;
-    return 0.5 + 0.44 + 1.35 + 0.1;
+    return 0.5 + 0.44 + MORTAR_FLIGHT + 0.1;
   }
 
   private enemyShot(x: number, y: number, a: number, speed: number): void {
@@ -662,6 +695,7 @@ export class FrostBastion extends BigBoss {
 
   private turretDestroyed(t: Turret): void {
     const w = this.world;
+    if (t.stage === 'aim') t.mark?.remove();
     this.destroyed++;
     w.explode(t.x, t.y, { radius: 16, damage: 0, team: 'enemy', size: 'large', shake: 4, sfx: 'explosion_big' });
     sparkBurst(w, t.x, t.y, 10, '#ffd060', 150);
@@ -738,6 +772,7 @@ export class FrostBastion extends BigBoss {
 
   onPhase(phase: number, _prev: number): void {
     const w = this.world;
+    this.attackCount = 0;
     snd(w, 'boss_roar', this.face, 1, phase === 2 ? 0.7 : 0.8);
     w.shake(5, 0.7);
     w.flash('#ffffff', 0.35);
@@ -955,7 +990,7 @@ export class FrostBastion extends BigBoss {
     const fx = X(WALL.FLAK.x);
     const fy = Y(WALL.FLAK.y) + pop;
     if (!fl.dead) {
-      const ef = fl.stage === 'aim' ? 4 : fl.stage === 'fire' || fl.recoil > 1 ? 2 : 1;
+      const ef = clamp(Math.round((fl.elev - 15) / 15), 0, 4);
       const firing = fl.recoil > 2 ? 5 : 0;
       sprites.get('bm3_flak').draw(g, fx + Math.round(fl.recoil * 0.6), fy, ef + firing, { flip: true, flash: this.blink(fl) });
     } else sprites.get('bm3_wreck').draw(g, fx, fy, 1, { flip: true });

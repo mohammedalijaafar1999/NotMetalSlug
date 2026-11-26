@@ -18,7 +18,7 @@ import { ExplosionEffect } from '../../../game/effects';
 import { Z, type Damage, type DamageKind } from '../../../game/constants';
 import type { World } from '../../../game/world';
 import type { SfxName } from '../../sfx/canonical';
-import { GroundMarker as FloorMark, dottedLine, pixelEllipse, puffSnow } from '../common/fx';
+import { GroundMarker, dottedLine, pixelEllipse, puffSnow, type MarkerStyle } from '../common/fx';
 import { CORE, ICE, ICICLE_LEN } from './art';
 
 /** Spike wave: speed (px/s), delay of the spikes behind the frost crack, time each spike stays up. */
@@ -75,6 +75,28 @@ export function hurtSegmentOnce(w: World, x0: number, y0: number, x1: number, y1
     }
   }
   return n;
+}
+
+/**
+ * Floor marker for anything about to land ('cross' = blinking brackets, 'shadow' = growing shadow).
+ * Optionally vanishes early when the projectile it announces (`watch`) is gone.
+ */
+export class FloorMark extends GroundMarker {
+  readonly m3hazard = true;
+  watch: Entity | null = null;
+
+  constructor(x: number, y: number, life: number, style: MarkerStyle = 'cross', radius = 8, watch: Entity | null = null) {
+    super(x, y, life, style, radius);
+    this.watch = watch;
+  }
+
+  override update(dt: number): void {
+    if (this.watch && this.watch.dead) {
+      this.remove();
+      return;
+    }
+    super.update(dt);
+  }
 }
 
 /** Ice splinters flying out of an impact. */
@@ -212,9 +234,11 @@ export class FlakShell extends Projectile {
     [34, 30],
   ];
   static readonly FRAG_G = 190;
+  /** Shell gravity. */
+  static readonly GRAV = 150;
 
   constructor(owner: Entity | null, x: number, y: number, bx: number, by: number, time: number, groundY: number) {
-    const g = 150;
+    const g = FlakShell.GRAV;
     const vx = (bx - x) / time;
     const vy = (by - y - 0.5 * g * time * time) / time;
     super({ team: 'enemy', owner, x, y, vx, vy, gravity: g, w: 5, h: 5, sprite: 'bm3_flakshell', fps: 12, life: time });
