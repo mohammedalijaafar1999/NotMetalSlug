@@ -120,6 +120,7 @@ for (const [a, b, depth] of PITS) {
   const fy = yOn(LOWER, a);
   const sy = fy + depth;
   water.push({ x: a, y: sy, w: b - a, h: M6_H - sy, deadly: true });
+  D('pit', a, fy, { w: b - a, surface: sy, behindTerrain: true });
   add(E('m6_molten', (a + b) / 2, sy, { w: b - a, floor: fy }, a - 60));
 }
 
@@ -352,6 +353,7 @@ add(
   E('robot', 4380, undefined, { behavior: 'sleep', facing: -1 }),
   E('robot', 4420, undefined, { behavior: 'sleep', facing: -1 }),
   E('robot', 4460, undefined, { behavior: 'sleep', facing: -1 }),
+  E('pickup', 4540, undefined, { item: 'bomb' }),
   E('mortar', 4630, 386, { facing: -1 }),
   E('light_tank', 4700, undefined, { behavior: 'hold', facing: -1 }),
   E('rifleman', 4672, undefined, { behavior: 'guard', facing: -1 }),

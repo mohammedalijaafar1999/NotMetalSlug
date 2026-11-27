@@ -1365,6 +1365,53 @@ const crane: DecorRenderer = (g, d, time) => {
   sprites.get('m6d_hook').draw(g, tx, y + 18 + len);
 };
 
+// ------------------------------------------------------------------ molten pit interior
+
+/**
+ * Pit sunk into the floor around a molten channel: d.x = left edge, d.y = floor y, props.w, props.surface
+ * (molten surface y). Drawn behind the terrain (behindTerrain) so catwalks over it stay visible; the
+ * molten body itself is the level's deadly water, the bubbles/sparks/burning are the m6_molten entity.
+ */
+const pit: DecorRenderer = (g, d, time) => {
+  const x0 = Math.round(d.x);
+  const x1 = Math.round(d.x + (d.props?.w ?? 28));
+  const fy = Math.round(d.y);
+  const sy = Math.round(d.props?.surface ?? d.y + 12);
+  for (let y = fy; y < sy + 2; y++) {
+    const k = (y - fy) / Math.max(1, sy - fy);
+    g.fillStyle = k > 0.7 ? '#5a1e10' : k > 0.4 ? '#3a1410' : '#1e0e10';
+    g.fillRect(x0, y, x1 - x0, 1);
+  }
+  g.fillStyle = '#7a2a12';
+  for (let y = fy + 2; y < sy; y += 2) {
+    const k = (y - fy) / Math.max(1, sy - fy);
+    if (k < 0.45) continue;
+    for (let x = x0 + ((y >> 1) % 2); x < x1; x += 2) g.fillRect(x, y, 1, 1);
+  }
+  // brick side walls (3 px) with mortar lines; the inner faces glow near the surface
+  for (const [wx, dir] of [
+    [x0, 1],
+    [x1 - 3, -1],
+  ] as const) {
+    for (let y = fy; y < sy + 2; y++) {
+      const k = (y - fy) / Math.max(1, sy - fy);
+      const mortar = (y - fy) % 5 === 4;
+      g.fillStyle = mortar ? M6.mortar : k > 0.6 ? '#8a3a22' : M6.brickD;
+      g.fillRect(wx, y, 3, 1);
+      g.fillStyle = k > 0.5 ? '#c8642a' : M6.brick;
+      g.fillRect(dir > 0 ? wx + 2 : wx, y, 1, 1);
+    }
+  }
+  // heat glow above the channel (flickers)
+  const fl = 0.1 + 0.04 * Math.sin(time * 9 + d.x) + 0.03 * Math.sin(time * 21);
+  g.fillStyle = M6.glow;
+  g.globalAlpha = fl;
+  g.fillRect(x0 - 4, fy - 14, x1 - x0 + 8, 14);
+  g.globalAlpha = fl * 0.6;
+  g.fillRect(x0 - 8, fy - 26, x1 - x0 + 16, 12);
+  g.globalAlpha = 1;
+};
+
 // ------------------------------------------------------------------ registry
 
 const simple =
@@ -1393,4 +1440,5 @@ export const M6_DECOR: Record<string, DecorRenderer> = {
   crane,
   panel,
   hangar_door: hangarDoor,
+  pit,
 };

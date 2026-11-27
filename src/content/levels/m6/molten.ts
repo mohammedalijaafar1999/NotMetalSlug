@@ -100,45 +100,9 @@ export class MoltenPool extends Entity {
   override render(g: CanvasRenderingContext2D): void {
     const x0 = Math.round(this.x0);
     const x1 = Math.round(this.x1);
-    const fy = Math.round(this.floorY);
     const sy = Math.round(this.y);
     const t = this.world.time;
-    // pit interior: dark back wall lit from below (dithered bands)
-    for (let y = fy; y < sy + 2; y++) {
-      const k = (y - fy) / Math.max(1, sy - fy);
-      g.fillStyle = k > 0.7 ? '#5a1e10' : k > 0.4 ? '#3a1410' : '#1e0e10';
-      g.fillRect(x0, y, x1 - x0, 1);
-    }
-    g.fillStyle = '#7a2a12';
-    for (let y = fy + 2; y < sy; y += 2) {
-      const k = (y - fy) / Math.max(1, sy - fy);
-      if (k < 0.45) continue;
-      for (let x = x0 + ((y >> 1) % 2); x < x1; x += 2) g.fillRect(x, y, 1, 1);
-    }
-    // brick side walls (3 px) with mortar lines, the inner faces glowing warm near the surface
-    for (const [wx, dir] of [
-      [x0, 1],
-      [x1 - 3, -1],
-    ] as const) {
-      for (let y = fy; y < sy + 2; y++) {
-        const k = (y - fy) / Math.max(1, sy - fy);
-        const mortar = (y - fy) % 5 === 4;
-        g.fillStyle = mortar ? M6.mortar : k > 0.6 ? '#8a3a22' : M6.brickD;
-        g.fillRect(wx, y, 3, 1);
-        g.fillStyle = k > 0.5 ? '#c8642a' : M6.brick;
-        g.fillRect(dir > 0 ? wx + 2 : wx, y, 1, 1);
-      }
-      g.fillStyle = M6.outline;
-      g.fillRect(dir > 0 ? wx - 1 : wx + 3, fy, 1, sy - fy + 2);
-    }
-    // heat glow above the channel (flickers)
-    const fl = 0.1 + 0.04 * Math.sin(t * 9 + this.x) + 0.03 * Math.sin(t * 21);
-    g.fillStyle = M6.glow;
-    g.globalAlpha = fl;
-    g.fillRect(x0 - 4, fy - 14, x1 - x0 + 8, 14);
-    g.globalAlpha = fl * 0.6;
-    g.fillRect(x0 - 8, fy - 26, x1 - x0 + 16, 12);
-    g.globalAlpha = 1;
+    // (the pit's walls, interior and heat glow are drawn behind the terrain by the theme's 'pit' decor)
     // bubbles swelling and popping on the surface (drawn just above it)
     for (let i = 0; i < Math.max(2, Math.floor(this.w / 12)); i++) {
       const per = 0.9 + hash01(i, 7, this.id) * 0.9;
