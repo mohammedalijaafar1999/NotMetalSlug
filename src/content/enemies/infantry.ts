@@ -17,6 +17,7 @@ import { sprites } from '../../engine/sprites';
 import { fxRng } from '../../engine/rng';
 import { VIEW_W } from '../../engine/renderer';
 import type { PlayOpts } from '../../engine/audio';
+import type { Rect } from '../../engine/math';
 import { SF } from '../../art/soldier';
 import { Enemy } from '../../game/enemy';
 import { Entity } from '../../game/entity';
@@ -165,6 +166,9 @@ export function snapAngle(a: number, steps = 8): number {
 
 // ------------------------------------------------------------------ base class
 
+/** Extra hurt area above an infantryman's head (px), see Infantry.hurtboxes. */
+export const INFANTRY_HEAD_ROOM = 8;
+
 export abstract class Infantry extends Enemy {
   /** SF sprite set used by the default rendering. */
   sprite: string;
@@ -224,6 +228,17 @@ export abstract class Infantry extends Enemy {
       }
       if (best && this.props.facing === undefined) this.facing = best.x < this.x ? -1 : 1;
     }
+  }
+
+  /**
+   * Body plus a little head-room (genre-standard generous enemy hit area). Straight shots fly ~22 px
+   * above the shooter's feet while rifles aim slightly toward targets roughly level, so without it a
+   * soldier one step (6-13 px) below a player could hit them while every straight shot sailed over
+   * his helmet (m4's first guard, seen from the promenade).
+   */
+  override hurtboxes(): Rect[] {
+    const b = this.box;
+    return [{ x: b.x, y: b.y - INFANTRY_HEAD_ROOM, w: b.w, h: b.h + INFANTRY_HEAD_ROOM }];
   }
 
   /** State to start in, from props.behavior. */
