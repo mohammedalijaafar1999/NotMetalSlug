@@ -96,8 +96,9 @@ export const DECOR: DecorDef[] = [
   d('silo', 4904, P),
   d('banner', 4966, P),
   d('crates', 5010, P, { v: 1 }),
-  // ---- Down the slope to the jungle floor.
-  d('jtree', 5150, 241),
+  // ---- Down the slope to the jungle floor. The tree grows out of the hillside: its downhill roots
+  // touch the slope and the uphill ones are buried (drawn behind the terrain).
+  d('jtree', 5150, 268, { behindTerrain: true }),
   d('banana', 5270, G, { v: 1 }),
   d('sign', 5300, G, { v: 1 }), // MINES warning before the minefield
   d('jtree', 5390, G),
