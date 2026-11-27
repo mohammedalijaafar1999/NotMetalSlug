@@ -130,7 +130,7 @@ sprites.define({
   },
 });
 
-/** Seconds of shuddering before the doors give way (also the minimum warning). */
+/** The doors start to shudder (and shed dust) when the blade is this close (px). */
 const SHAKE_RANGE = 70;
 
 export class StockadeGate extends Entity {
