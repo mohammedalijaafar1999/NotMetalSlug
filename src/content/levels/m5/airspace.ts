@@ -14,8 +14,8 @@
 // 3. Parachutes. A pickup that tumbles off a deck into the open sky (a hostage's gift tossed
 //    toward a gyro beside the ship, an enemy's drop) is swapped for a slowly drifting supply drop
 //    with the same contents, so it can still be caught.
-// 4. Take-off. Players start in a gyro just under the top edge of the view (where the HUD is), so
-//    the first helper eases each starting gyro down into open sky during the mission banner.
+// 4. Take-off. Players start (and drop in as player 2, or respawn) in a gyro just under the top
+//    edge of the view, where the HUD is: each fresh gyro up there is eased down into open sky.
 // Place a few along the level (x = trigger point); extras remove themselves.
 
 import { VIEW_H, VIEW_W } from '../../../engine/renderer';
@@ -37,7 +37,8 @@ const SPARE_SPEED = 150;
 /** Bombs in a spare gyro. */
 export const SPARE_AMMO = 6;
 
-/** Take-off target: screen y of the gyro's skids, and how long the glide may take. */
+/** Take-off: fresh gyros above this screen y glide down to TAKEOFF_Y (for at most TAKEOFF_TIME s). */
+const TAKEOFF_ABOVE = 72;
 const TAKEOFF_Y = 104;
 const TAKEOFF_TIME = 1.6;
 
@@ -52,8 +53,10 @@ export class Airspace extends Entity {
   private afoot = new Map<number, number>();
   /** Spare gyros on their way (by player index). */
   private ferries = new Map<number, Ferry>();
-  /** Starting gyros still gliding down from under the HUD. */
-  private takeoff: Vehicle[] = [];
+  /** Fresh gyros still gliding down from under the HUD (with seconds since they were seen). */
+  private takeoff: { v: Vehicle; t: number }[] = [];
+  /** Player vehicles already considered for a take-off glide. */
+  private seen = new WeakSet<Vehicle>();
 
   constructor() {
     super();
@@ -66,16 +69,7 @@ export class Airspace extends Entity {
 
   override spawned(): void {
     const others = this.world.query((e) => e !== this && e instanceof Airspace);
-    if (others.length) {
-      this.remove();
-      return;
-    }
-    if (this.world.time < 0.5) {
-      for (const p of this.world.players) {
-        const v = p.vehicle as Vehicle | null;
-        if (v && v.flying) this.takeoff.push(v);
-      }
-    }
+    if (others.length) this.remove();
   }
 
   /** Free y (feet) for vehicle v near its current y, inside the camera's flying band; null if none. */
@@ -95,6 +89,7 @@ export class Airspace extends Entity {
   }
 
   override update(dt: number): void {
+    this.watchTakeoffs();
     if (this.takeoff.length) this.glide(dt);
     this.chutes();
     for (const p of this.world.players) {
@@ -125,13 +120,29 @@ export class Airspace extends Entity {
     }
   }
 
-  /** Ease the starting gyros down to open sky (until the pilot steers vertically). */
+  /** Queue every fresh player gyro that appears near the top of the view for a take-off glide. */
+  private watchTakeoffs(): void {
+    const cam = this.world.camera;
+    for (const p of this.world.players) {
+      const v = p.vehicle as Vehicle | null;
+      if (!v || !v.flying || this.seen.has(v)) continue;
+      this.seen.add(v);
+      if (v.y - cam.y < TAKEOFF_ABOVE) this.takeoff.push({ v, t: 0 });
+    }
+  }
+
+  /** Ease fresh gyros down to open sky (until the pilot steers vertically or a hull is below). */
   private glide(dt: number): void {
+    const T = this.world.terrain;
     const ty = this.world.camera.y + TAKEOFF_Y;
-    this.takeoff = this.takeoff.filter((v) => {
+    this.takeoff = this.takeoff.filter((g) => {
+      const v = g.v;
       const d = v.driver;
-      if (!d || v.dead || v.destroyed || this.world.time > TAKEOFF_TIME || d.inp.dirY !== 0 || v.y >= ty - 1) return false;
-      v.y += Math.max(1, (ty - v.y) * Math.min(1, dt * 4));
+      g.t += dt;
+      if (!d || v.dead || v.destroyed || g.t > TAKEOFF_TIME || d.inp.dirY !== 0 || v.y >= ty - 1) return false;
+      const ny = v.y + Math.max(1, (ty - v.y) * Math.min(1, dt * 4));
+      if (T.solidOverlap({ x: v.x - v.w / 2, y: ny - v.h, w: v.w, h: v.h - 0.5 }, v)) return false;
+      v.y = ny;
       v.vy = Math.max(0, v.vy);
       return true;
     });
