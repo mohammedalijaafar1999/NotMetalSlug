@@ -1,26 +1,30 @@
 # PROGRESS m4 - delete when done
 
 ## Done
-- Branch wave2/m4 created, boss merged (wave2/boss_m4).
-- Salvaged theme art kept: src/content/themes/m4/art.ts (palette P4, quay/curb/brick/coping textures,
-  cloud/skyline/harbour/near parallax art, m4Platform 'pier'/'catwalk'), weather.ts (background
-  renderer with lightning + blinking lights, rain/splash/ripple overlay).
+- Branch wave2/m4, boss merged (wave2/boss_m4).
+- Theme 'm4' registered (src/content/themes/m4.ts): art.ts (palette, textures, parallax incl. openArt),
+  weather.ts (background w/ BASE_CAM_Y=0, near-layer underfill, 'openharbour' zones; rain overlay),
+  decor.ts (16 kinds: lamp bollard tires fender net wreck firebarrel crates sign crane container
+  warehouse canal ship fence drydock keelblocks deepwater openharbour).
+- Mission entities (src/content/levels/m4/): m4_harbor (deep-water splashes), m4_pontoon (bobbing
+  one-way deck), m4_magnet (gantry magnet takes the tank at x 3420), m4_bridge (lift bridge over the
+  slip in lock 4, lowers on the last wave).
+- Level 'm4' (src/content/levels/m4.ts): 7400 x 352, 5 locks (canal ambush, warehouse yard, dry
+  dock, slip gauntlet, boss), 11 hostages, dry dock vertical section with camera keys.
+- Headless autopilot completes in ~200 s (tests/m4_debug.test.ts = TEMPORARY, delete before final).
+- Browser checks done: all sections, magnet, bridge, lock 1, boss fight. Pontoons brightened,
+  dry dock hull reshaped, underwater canal wall.
 
-## Plan
-- Level height 352 (216 + 136): normal ground y=180 with camera top 0; the vertical section goes DOWN
-  into a dry dock (floor y~320) with camera keys. Boss arena at the end keeps the literal contract
-  (dock y=180, camera top 0). Background base camera y must be 0 (not level.height-216).
-- Deep water = pits (no ground) with deadly water drawn over them (the engine does not kill in
-  deadly water; falling below killY does). Canal backdrop decor drawn behindTerrain.
-- Mission entities (src/content/levels/m4/): m4_harbor (splash FX when actors fall into deep water),
-  m4_pontoon (bobbing floating platform), m4_magnet (crane magnet that snatches the tank at the end
-  of the warehouse district - the bot never ejects, so the vehicle must be taken from it).
-- Sections: promenade (0-760) -> canal + frogmen lock -> tank beat in warehouses (lock) -> magnet ->
-  dry dock (vertical) + canals/pontoons + container stacks -> gauntlet lock (basin: gunboats, heli)
-  -> calm pier -> boss lock (L = width-440).
+## Next
+- tests/mission_m4.test.ts (level validity + contract, autopilot completes, mechanics).
+- Full npm test + typecheck; smoke.mjs --missions=4; final polish; delete PROGRESS + debug test.
 
 ## Gotchas
 - Scratchpad is shared with other agents: prefix helper files with m4_ (png.ts is shared; keep its
-  API: writePng(out,img,W,H,scale), blend(dst,src,alpha)).
-- Bot: jumps on wall/stuck/gap (floorAhead 14px, 60 drop); lock zone centre = cam.x+0.4*384 (boss
-  0.25) - must be solid ground in every arena. Never ejects from vehicles.
+  API: writePng(out,img,W,H,scale), blend(dst,src,alpha)). Scripts: m4_shots.mjs, m4_scn.mjs,
+  m4_montage.py, m4_sheet.ts, m4_preview.ts.
+- Debug warp skips spawns whose trigger is inside the warped view (pontoons/magnet!): warp earlier.
+- Riflemen only advance while > 170 px away: left-side wave entrants must spawn inside the view.
+- Enemies don't step down ledges > 24 px; frogmen in water are only hittable by knife/grenades/
+  jump-shots (bot uses knife when they surface within ~30 px: wave frogmen use range 28).
+- Gunboats need water <= 4 px below the street to be hit by crouch shots (canals at y 182).

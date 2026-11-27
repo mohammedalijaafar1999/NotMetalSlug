@@ -279,7 +279,7 @@ back('sign', 3530, G, { v: 'warn' });
 
 far('drydock', 3800, G, { w: 634, depth: 140 });
 // The Legion hull on its keel blocks (backdrop) with scaffold catwalks along its side.
-far('ship', 3986, 306, { w: 230, h: 66, name: 'LGN-9', seed: 11 });
+far('ship', 3984, 308, { w: 236, h: 70, name: 'LGN-9', seed: 11, dock: true });
 far('keelblocks', 4040, 320, { w: 120 });
 far('keelblocks', 4170, 320, { w: 80 });
 platforms.push({ x: 3984, y: 290, w: 60, style: 'catwalk' });

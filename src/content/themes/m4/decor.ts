@@ -16,7 +16,7 @@
 //   container {w,h,c,doors,mark,seed}  shipping container (skin for solids or background stacks)
 //   warehouse {w,h,door,name,seed}     brick warehouse facade (behind terrain)
 //   canal {w, water}            far canal wall + dark water body (behind terrain, fills a pit)
-//   ship {w,h,name}             moored ship hull side (behind terrain)
+//   ship {w,h,name,dock}        ship hull side (behind terrain; dock = under construction)
 //   fence {w}                   chain-link fence with barbed wire
 //   drydock {w, floor}          back wall of the dry dock (behind terrain)
 //   keelblocks {w}              timber keel blocks on the dry dock floor
@@ -856,7 +856,14 @@ function canalArt(w: number, depth: number, waterOff: number, seed: number): Pix
     const a = 2 + Math.round(hash01(x >> 1, seed) * 3);
     p.rect(x, waterOff - a, 1, a, P4.algae);
   }
-  p.rect(0, waterOff, w, depth - waterOff, '#0c1220');
+  // Under the surface the wall continues, fading into the murk; a few drifting specks.
+  p.mapPixels((v, _x, y) => {
+    if (y < waterOff) return v;
+    const t = Math.min(1, (y - waterOff) / 64);
+    const k = 0.3 + 0.7 * t;
+    const mix = (a: number, b: number) => Math.round(a + (b - a) * k);
+    return ((255 << 24) | (mix((v >>> 16) & 255, 0x20) << 16) | (mix((v >>> 8) & 255, 0x12) << 8) | mix(v & 255, 0x0c)) >>> 0;
+  });
   for (let i = 0; i < w / 10; i++) p.rect(r.int(0, w - 4), waterOff + r.int(2, depth - waterOff - 1), r.int(2, 6), 1, '#16203a');
   // Mooring rings, a ladder, a drain outlet.
   for (let x = 20 + r.int(0, 20); x < w - 10; x += 70 + r.int(0, 40)) {
@@ -872,44 +879,74 @@ function canalArt(w: number, depth: number, waterOff: number, seed: number): Pix
   return p;
 }
 
-/** Moored ship hull side (behind terrain): hull from the deck line down to the water. */
-function shipArt(w: number, h: number, name: string, seed: number): PixelArt {
-  const p = new PixelArt(w, h + 12);
-  const r = new Rng(seed);
+/**
+ * Ship hull side (behind terrain): deck line at row 12, keel at the bottom. Rounded stern on the
+ * left, raked bow on the right. `dock` = under construction in the dry dock: missing plates show
+ * the frames, rudder and screw exposed, a bare wheelhouse frame on deck.
+ */
+function shipArt(w: number, h: number, name: string, seed: number, dock: boolean): PixelArt {
   const top = 12;
+  const p = new PixelArt(w, h + top);
+  const r = new Rng(seed);
   const { hull, hullL, boot } = D4;
-  // Railing.
-  for (let x = 2; x < w - 2; x++) {
-    p.px(x, 2, '#4a4658');
-    if (x % 6 === 0) p.rect(x, 2, 1, top - 2, '#3a3646');
+  const B = top + h - 1;
+  // Hull silhouette.
+  p.poly([3, top, w - 1, top - 2, w - 8, top + h * 0.45, w - 26, B + 1, 22, B + 1, 8, top + h * 0.55, 2, top + h * 0.2], hull);
+  const inside = (x: number, y: number) => p.opaque(x, y);
+  // Plate seams, a lit sheer strake under the deck edge (top-left light).
+  for (let y = top; y <= B; y++)
+    for (let x = 0; x < w; x++) {
+      if (!inside(x, y)) continue;
+      if (y < top + 3) p.px(x, y, hullL);
+      else if (x % 24 === 0 || (y - top) % 12 === 0) p.px(x, y, shade(hull, -0.2));
+      else if (y >= B - 12) p.px(x, y, y === B - 12 ? shade(boot, 0.2) : boot);
+    }
+  // Bow highlight along the stem.
+  for (let y = top; y < B - 8; y++) {
+    const t = (y - top) / Math.max(1, h * 0.45);
+    const x = Math.round(w - 1 - t * 7 - (y > top + h * 0.45 ? (y - top - h * 0.45) * 1.1 : 0));
+    if (inside(x - 1, y)) p.px(x - 1, y, shade(hull, 0.18));
   }
-  p.rect(2, 6, w - 4, 1, '#3a3646');
-  // Hull plates.
-  p.rect(0, top, w, h, hull);
-  p.rect(0, top, w, 2, hullL);
-  for (let x = 0; x < w; x += 24) p.rect(x, top + 2, 1, h - 2, shade(hull, -0.2));
-  for (let y = top + 10; y < top + h; y += 12) p.rect(0, y, w, 1, shade(hull, -0.15));
-  // Boot-top stripe near the waterline.
-  p.rect(0, top + h - 12, w, 12, boot);
-  p.rect(0, top + h - 12, w, 1, shade(boot, 0.2));
-  // Portholes.
-  for (let x = 14; x < w - 10; x += 18) {
+  // Portholes along the upper hull.
+  for (let x = 16; x < w - 22; x += 18) {
     p.circle(x, top + 9, 2.5, '#1a1622');
     p.ring(x, top + 9, 2.5, '#6a6680', 1);
-    if (r.chance(0.3)) p.circle(x, top + 9, 1.5, shade(P4.win, -0.2));
+    if (!dock && r.chance(0.3)) p.circle(x, top + 9, 1.5, shade(P4.win, -0.2));
   }
-  // Name and draft marks.
-  if (name) stencil(p, name, 10, top + 18, '#c8c4d8', 0.15, seed);
-  const mx = w - 18;
+  // Name and draft marks on the bow.
+  if (name) stencil(p, name, 18, top + 16, '#c8c4d8', 0.15, seed);
   for (let k = 0; k < 4; k++) {
-    const y = top + h - 8 - k * 7;
-    if (y < top + 4) break;
-    stencil(p, String(8 - k), mx, y - 6, '#d8d4e4', 0.1, seed + k);
+    const y = B - 8 - k * 7;
+    if (y < top + 14) break;
+    stencil(p, String(6 - k), w - 34, y - 6, '#d8d4e4', 0.1, seed + k);
   }
-  // Rust streaks from the scuppers.
+  // Rust streaks.
   for (let i = 0; i < w / 8; i++) {
-    const x = r.int(2, w - 3);
-    for (let y = top + 3; y < top + 3 + r.int(6, Math.max(8, h - 14)); y++) if (r.chance(0.65)) p.px(x, y, r.chance(0.5) ? D4.rust : D4.rustD);
+    const x = r.int(4, w - 10);
+    for (let y = top + 3; y < top + 3 + r.int(6, Math.max(8, h - 14)); y++) if (inside(x, y) && r.chance(0.65)) p.px(x, y, r.chance(0.5) ? D4.rust : D4.rustD);
+  }
+  // Railing along the deck.
+  for (let x = 4; x < w - 4; x++) {
+    p.px(x, 3, '#4a4658');
+    if (x % 6 === 0) p.rect(x, 3, 1, top - 3, '#3a3646');
+  }
+  p.rect(4, 7, w - 8, 1, '#3a3646');
+  if (dock) {
+    // Missing plates: an open bay showing the frames.
+    const bx = Math.floor(w * 0.52);
+    const bw = Math.floor(w * 0.22);
+    for (let y = top + 4; y < B - 14; y++)
+      for (let x = bx; x < bx + bw; x++) if (inside(x, y)) p.px(x, y, (x - bx) % 6 === 0 ? '#3a3646' : '#120e18');
+    // Bare wheelhouse frame on deck.
+    const wx = 26;
+    p.rect(wx, 0, 30, 1, '#4a4658');
+    for (const fx of [wx, wx + 10, wx + 20, wx + 29]) p.rect(fx, 0, 1, top, '#4a4658');
+    // Rudder and screw at the stern.
+    p.rect(14, B - 16, 4, 14, '#3a3646');
+    p.rect(14, B - 16, 1, 14, '#5a5670');
+    p.circle(22, B - 8, 3.5, '#8a6a3a');
+    p.rect(21, B - 13, 2, 10, '#a8844a');
+    p.px(22, B - 8, '#2a2632');
   }
   return p;
 }
@@ -1121,7 +1158,8 @@ export const M4_DECOR: Record<string, DecorRenderer> = {
     const h = Math.round(num(d.props?.h, 60));
     const name = d.props?.name ? String(d.props.name) : '';
     const seed = num(d.props?.seed, Math.round(d.x));
-    const c = baked(`s:${w}x${h}:${name}:${seed}`, () => shipArt(w, h, name, seed));
+    const dock = !!d.props?.dock;
+    const c = baked(`s:${w}x${h}:${name}:${seed}:${dock}`, () => shipArt(w, h, name, seed, dock));
     // Anchor: left edge, d.y = the waterline.
     drawBaked(g, c, d.x, d.y - h - 12);
   },

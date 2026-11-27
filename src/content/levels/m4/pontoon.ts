@@ -9,7 +9,7 @@ import { registerEntity } from '../../../game/registry';
 import { Actor, Entity } from '../../../game/entity';
 import { Z } from '../../../game/constants';
 import { fxRng } from '../../../engine/rng';
-import { PixelArt, shade } from '../../../engine/pixelart';
+import { PixelArt } from '../../../engine/pixelart';
 import type { Surface } from '../../../game/terrain';
 import { D4 } from '../../themes/m4/decor';
 
@@ -24,22 +24,28 @@ export function pontoonArt(w: number): PixelArt {
   const p = new PixelArt(w + 2, H + 2);
   const X = 1;
   const Y = 1;
-  // Drums under the deck (mostly submerged; the water overlay tints them).
+  // Floats under the deck: orange-painted drums (mostly submerged; the water overlay tints them).
   for (let dx = 5; dx < w - 4; dx += 14) {
     const cx = X + dx + 3;
-    p.ellipse(cx, Y + 9, 5.5, 4.5, D4.rust);
-    p.ellipse(cx - 1, Y + 8, 3.5, 2.5, D4.rustL);
-    p.rect(cx - 5, Y + 8, 11, 1, D4.rustD);
+    p.ellipse(cx, Y + 9, 5.5, 4.5, '#a8582c');
+    p.ellipse(cx - 1, Y + 8, 3.5, 2.5, '#d07a3a');
+    p.rect(cx - 5, Y + 8, 11, 1, '#6a3420');
   }
-  // Deck: planks with a dark gap between boards, a lit top edge (top-left light).
-  p.rect(X, Y, w, 5, D4.wood);
-  p.rect(X, Y, w, 1, D4.woodL);
-  p.rect(X, Y + 4, w, 1, D4.woodD);
-  for (let x = X + 6; x < X + w - 1; x += 7) p.rect(x, Y + 1, 1, 3, D4.woodD);
-  for (let x = X + 3; x < X + w - 1; x += 11) p.px(x, Y + 2, shade(D4.wood, 0.14));
-  // Cleats at the ends.
-  p.rect(X + 1, Y - 1, 3, 1, D4.iron);
-  p.rect(X + w - 4, Y - 1, 3, 1, D4.iron);
+  // Deck: pale weathered planks with dark gaps, bright top edge (top-left light) so it reads as
+  // something to land on against the dark water.
+  p.rect(X, Y, w, 5, '#a87a4a');
+  p.rect(X, Y, w, 1, '#e0bc80');
+  p.rect(X, Y + 1, w, 1, '#c49a62');
+  p.rect(X, Y + 4, w, 1, '#5a3a24');
+  for (let x = X + 6; x < X + w - 1; x += 7) {
+    p.rect(x, Y + 1, 1, 3, '#6a4428');
+    p.px(x + 1, Y + 1, '#ecd09a');
+  }
+  // Painted safety ends (white) and cleats.
+  p.rect(X, Y, 2, 4, '#e8e4f0');
+  p.rect(X + w - 2, Y, 2, 4, '#e8e4f0');
+  p.rect(X + 3, Y - 1, 3, 1, D4.iron);
+  p.rect(X + w - 6, Y - 1, 3, 1, D4.iron);
   p.outline(D4.ink);
   return p;
 }
