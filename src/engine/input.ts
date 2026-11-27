@@ -250,11 +250,10 @@ class TouchControls {
     };
     // Hug the screen edges (clear of notches) so the controls sit in the letterbox bars as much
     // as possible instead of over the action (see layout()).
-    const R = (px: number) => `right:calc(${px}px + env(safe-area-inset-right, 0px));`;
     this.fireBtn = mkBtn('FIRE', 'fire', '');
     this.jumpBtn = mkBtn('JUMP', 'jump', '');
     this.bombBtn = mkBtn('BOMB', 'bomb', 'font-size:11px;');
-    mkBtn('II', 'start', R(10) + 'top:calc(10px + env(safe-area-inset-top, 0px));width:40px;height:40px;border-radius:8px;');
+    this.pauseBtn = mkBtn('II', 'start', 'top:calc(10px + env(safe-area-inset-top, 0px));width:40px;height:40px;border-radius:8px;');
     this.layout();
     window.addEventListener('resize', () => this.layout());
 
@@ -314,6 +313,7 @@ class TouchControls {
   private fireBtn: HTMLDivElement | null = null;
   private jumpBtn: HTMLDivElement | null = null;
   private bombBtn: HTMLDivElement | null = null;
+  private pauseBtn: HTMLDivElement | null = null;
 
   /**
    * Place FIRE / JUMP / BOMB. Normally FIRE and BOMB hug the right edge with JUMP beside them;
@@ -329,20 +329,47 @@ class TouchControls {
       b.style.width = b.style.height = `${size}px`;
     };
     const R = (px: number) => `calc(${px}px + env(safe-area-inset-right, 0px))`;
-    const bar = (window.innerWidth - (window.innerHeight * 384) / 216) / 2;
+    // The bar right of the 384x216 picture, which the renderer fits inside the safe area: use
+    // its safe part when a button fits there, else the whole bar (under a rounded corner).
+    const ins = this.safeInsets();
+    const aw = Math.max(1, window.innerWidth - ins.l - ins.r);
+    const ah = Math.max(1, window.innerHeight - ins.t - ins.b);
+    const gw = 384 * Math.min(aw / 384, ah / 216);
+    const full = window.innerWidth - (ins.l + (aw + gw) / 2);
+    const safe = full - ins.r;
+    const [bar, edge] = safe >= TOUCH_COLUMN_MIN_BAR ? [safe, ins.r] : [full, 0];
     if (bar >= TOUCH_COLUMN_MIN_BAR) {
       // Sizes exclude the 2 px border on each side.
       const fit = (s: number) => Math.min(s, Math.floor(bar) - 10);
       const [fs, js, bs] = [fit(78), fit(66), fit(58)];
-      const mid = (s: number) => `${Math.max(2, Math.floor((bar - s - 4) / 2))}px`;
+      const mid = (s: number) => `${Math.round(edge) + Math.max(2, Math.floor((bar - s - 4) / 2))}px`;
       place(bomb, mid(bs), 8, bs);
       place(jump, mid(js), 8 + bs + 8, js);
       place(fire, mid(fs), 8 + bs + 8 + js + 10, fs);
+      if (this.pauseBtn) this.pauseBtn.style.right = mid(40);
     } else {
       place(fire, R(12), 84, 78);
       place(jump, R(98), 20, 66);
       place(bomb, R(12), 8, 58);
+      if (this.pauseBtn) this.pauseBtn.style.right = R(10);
     }
+  }
+
+  private insetProbe: HTMLElement | null = null;
+
+  /** Safe-area insets in CSS px (env(safe-area-inset-*) read through a hidden probe). */
+  private safeInsets(): { l: number; t: number; r: number; b: number } {
+    if (!this.insetProbe) {
+      const p = document.createElement('div');
+      p.style.cssText =
+        'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;' +
+        'padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);';
+      document.body.appendChild(p);
+      this.insetProbe = p;
+    }
+    const cs = getComputedStyle(this.insetProbe);
+    const n = (v: string) => Math.max(0, parseFloat(v) || 0);
+    return { t: n(cs.paddingTop), r: n(cs.paddingRight), b: n(cs.paddingBottom), l: n(cs.paddingLeft) };
   }
 
   setVisible(v: boolean): void {
