@@ -166,14 +166,36 @@ export function stormPlatform(g: CanvasRenderingContext2D, x1: number, y1: numbe
     return;
   }
   if (style === 'girder') {
+    // Launch ramp / gantry girder: a hazard-edged steel deck plate; a sloped one stands on a
+    // triangular truss down to the level of its low end (where it meets the deck).
+    const foot = Math.max(yAt(xa), yAt(xb - 1)) + 4;
+    const sloped = Math.abs(y2 - y1) > 2;
+    if (sloped) {
+      for (let x = xa + 1; x < xb - 1; x++) {
+        const y = yAt(x) + 5;
+        if (foot - y < 2) continue;
+        const k = (x - xa) % 10;
+        const post = k === 0;
+        // Diagonal bracing between posts.
+        const by = Math.round(y + ((foot - y) * k) / 10);
+        if (post) {
+          px(g, P5.dark, x - 1, y, 3, foot - y + 1);
+          px(g, P5.hull, x, y, 1, foot - y);
+        } else {
+          px(g, P5.dark, x, by - 1, 1, 3);
+          px(g, P5.hullD, x, by);
+        }
+      }
+      for (let x = xa; x < xb; x++) if (foot - yAt(x) > 6) px(g, P5.hullDD, x, foot - 1, 1, 2);
+    }
     for (let x = xa; x < xb; x++) {
       const y = yAt(x);
-      px(g, P5.dark, x, y - 1, 1, 8);
-      px(g, P5.brassL, x, y);
-      px(g, P5.brass, x, y + 1);
-      px(g, (x - xa) % 8 < 4 ? P5.hullL : P5.hull, x, y + 2, 1, 3);
-      px(g, (x - xa) % 8 === 2 ? P5.hullLL : P5.hullD, x, y + 3);
-      px(g, P5.brassD, x, y + 5);
+      px(g, P5.dark, x, y - 1, 1, 7);
+      px(g, P5.hullLL, x, y);
+      px(g, (x - xa) % 8 < 4 ? P5.hullL : P5.hull, x, y + 1, 1, 2);
+      // Hazard stripe along the edge.
+      px(g, Math.floor((x - xa + y) / 3) % 2 ? P5.brass : P5.dark, x, y + 3, 1, 2);
+      px(g, P5.hullD, x, y + 5);
     }
     return;
   }

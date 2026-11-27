@@ -14,7 +14,10 @@ export const P5 = {
   towerLight: '#4a3a64',
   towerRim: '#6c4e74',
   towerRimHot: '#94667c',
+  towerGlow1: '#4a3054',
+  towerGlow2: '#5e3a5c',
   rainShaft: '#1e1834',
+  rainShaftL: '#272040',
   /** Lightning-lit cloud interior. */
   litLow: '#5a4a8c',
   litMid: '#8a78c0',
@@ -30,16 +33,22 @@ export const P5 = {
   fleetLightDim: '#a8704a',
 
   // Mid cloud banks.
-  midShade: '#2a2144',
-  midBody: '#382c56',
-  midLight: '#4c3c6a',
-  midRim: '#6a5080',
+  midDeep: '#241c3c',
+  midShade: '#2e2448',
+  midBody: '#3a2e56',
+  midLight: '#4a3a66',
+  midRim: '#5e4a76',
+  midHigh: '#786088',
+  midGlow1: '#583a62',
+  midGlow2: '#704668',
 
   // Cloud sea (the "floor").
-  seaRim: '#e2acb2',
-  seaLight: '#b48eb0',
-  seaBody: '#8a6c9c',
-  seaShade: '#6a5488',
+  seaRim: '#ecbcbc',
+  seaHigh: '#cc9eb4',
+  seaLight: '#b08aac',
+  seaMid: '#967aa4',
+  seaBody: '#7c6496',
+  seaShade: '#655186',
   seaDeep: '#4e4072',
   seaDeeper: '#3c3260',
 

@@ -1,25 +1,28 @@
 # PROGRESS m5 (STORMFRONT) - working notes (delete when done)
 
 ## Done
-- Branch wave2/m5 created, boss merged (wave2/boss_m5).
+- Branch wave2/m5, boss merged (wave2/boss_m5). Salvaged theme/level/entities reviewed and kept.
+- Bot fix (src/debug/bot.ts, generic): a flying bot holding position turns to face the nearest
+  enemy (it used to keep facing left after overshooting when a lock stopped the scroll).
+- m5_airspace: hull push-out + spare gyro for pilots stranded on a deck (SPARE_AMMO 6 bombs, no
+  life lost) + take-off glide (starting gyro eased from under the HUD to screen y 104).
+- Backdrop rework: src/content/themes/m5/clouds.ts (volumetric blob clouds: dome lambert +
+  volume light + self-shadow + warm underside glow + rim), new towers / mid banks / cloud sea.
+- Girder platform restyled (hazard edge, truss under sloped ramps).
+- Level: start x 120, hostage modes mixed (tied/caged/wander), drops rebalanced, 2 weapon cases
+  (crate_prop H/R on decks), jetpacks moved off the calm approach, new briefing (<= 11 lines).
+- tests/mission_m5.test.ts: 14 tests green (structure, boss arena, theme, mechanics, autopilot).
 
-## Plan
-- Theme 'm5' (src/content/themes/m5.ts + themes/m5/*): dusk storm sky, custom renderBackground
-  (far storm towers w/ lightning flashes, far fleet silhouettes, mid clouds, cloud sea), rain +
-  near wisps overlay (fade out before boss lock), hull solid texture + deck edge, catwalk platforms,
-  decor: envelope, hullcap, cabin, mast/pennant, searchlight, lamp, engine pod, rigging, cargo.
-- Level 'm5' (src/content/levels/m5.ts + levels/m5/*): H = 216+112, camera y 112 (low) except a
-  vertical section; autoScroll everywhere except locks; boss lock at width-384.
-- Mission entities: m5_supply (parachute crate pickup), m5_fuel_zeppelin (set piece),
-  m5_airspace (anti-trap helper: pushes player gyros out of solids).
-- hostage.ts minimal fix: freed hostages running off a bottomless edge parachute away.
-- tests/mission_m5.test.ts
+## Next
+- Visual pass: girder ramp in game, wisps overlay, spare gyro arrival, hostage chute, zeppelin.
+- Full npm test, smoke run in browser (scripts/smoke.mjs --missions=5), 2P check.
+- Delete tests/tmp_m5_sim.test.ts (throwaway, untracked), PROGRESS file; final commit.
 
 ## Decisions / gotchas
-- Weapon pickups in a vehicle turn into points -> hostages drop fuel/bomb/life/points.
-- Pickups have gravity -> sky supplies need m5_supply.
+- Weapon pickups in a vehicle turn into points -> hostages drop fuel/bomb/life.
+- Pickups have gravity -> sky supplies use m5_supply (parachute).
 - Respawn: gyro spawns at (safeX, cam.y+60) -> may overlap solids -> m5_airspace pushes out.
 - Vehicle.clampToView squeezes a blocked gyro into solids -> m5_airspace pushes out.
-
-## Interrupted (usage limit)
-- The previous attempt was cut off; its uncommitted files were committed as 'WIP m5: salvaged after interruption'. Review them (`git show --stat HEAD`), keep what is good, delete throwaway debug tests, and continue.
+- hostage.ts (shared, additive): freed hostage running off a bottomless deck edge parachutes away.
+- Level.warp drops pending spawns with trigger <= x + 384 (tests spawn things directly).
+- Take-off glide moves the gyro during world.time < 1.6 s: tests step past it first.

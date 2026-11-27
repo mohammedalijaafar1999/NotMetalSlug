@@ -11,6 +11,8 @@
 //    (over open sky he falls into the clouds and respawns in a new gyro as usual). Rather than leave
 //    him stranded with a pistol on a deck that is scrolling away, a spare gyro (few bombs) drops in
 //    from the top of the screen after a moment, settles over him and he climbs in.
+// 3. Take-off. Players start in a gyro just under the top edge of the view (where the HUD is), so
+//    the first helper eases each starting gyro down into open sky during the mission banner.
 // Place a few along the level (x = trigger point); extras remove themselves.
 
 import { VIEW_H } from '../../../engine/renderer';
@@ -30,6 +32,10 @@ const SPARE_SPEED = 150;
 /** Bombs in a spare gyro. */
 export const SPARE_AMMO = 6;
 
+/** Take-off target: screen y of the gyro's skids, and how long the glide may take. */
+const TAKEOFF_Y = 104;
+const TAKEOFF_TIME = 1.6;
+
 interface Ferry {
   gyro: Vehicle;
   /** Seconds since it was sent. */
@@ -41,6 +47,8 @@ export class Airspace extends Entity {
   private afoot = new Map<number, number>();
   /** Spare gyros on their way (by player index). */
   private ferries = new Map<number, Ferry>();
+  /** Starting gyros still gliding down from under the HUD. */
+  private takeoff: Vehicle[] = [];
 
   constructor() {
     super();
@@ -53,7 +61,16 @@ export class Airspace extends Entity {
 
   override spawned(): void {
     const others = this.world.query((e) => e !== this && e instanceof Airspace);
-    if (others.length) this.remove();
+    if (others.length) {
+      this.remove();
+      return;
+    }
+    if (this.world.time < 0.5) {
+      for (const p of this.world.players) {
+        const v = p.vehicle as Vehicle | null;
+        if (v && v.flying) this.takeoff.push(v);
+      }
+    }
   }
 
   /** Free y (feet) for vehicle v near its current y, inside the camera's flying band; null if none. */
@@ -73,6 +90,7 @@ export class Airspace extends Entity {
   }
 
   override update(dt: number): void {
+    if (this.takeoff.length) this.glide(dt);
     for (const p of this.world.players) {
       this.unstick(p);
       this.spare(p, dt);
@@ -88,6 +106,18 @@ export class Airspace extends Entity {
     v.y += Math.max(-PUSH, Math.min(PUSH, d));
     if (d < 0 && v.vy > 0) v.vy = 0;
     if (d > 0 && v.vy < 0) v.vy = 0;
+  }
+
+  /** Ease the starting gyros down to open sky (until the pilot steers vertically). */
+  private glide(dt: number): void {
+    const ty = this.world.camera.y + TAKEOFF_Y;
+    this.takeoff = this.takeoff.filter((v) => {
+      const d = v.driver;
+      if (!d || v.dead || v.destroyed || this.world.time > TAKEOFF_TIME || d.inp.dirY !== 0 || v.y >= ty - 1) return false;
+      v.y += Math.max(1, (ty - v.y) * Math.min(1, dt * 4));
+      v.vy = Math.max(0, v.vy);
+      return true;
+    });
   }
 
   /** Stranded-pilot pickup (see header). */

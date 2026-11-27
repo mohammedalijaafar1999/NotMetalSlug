@@ -53,7 +53,7 @@ for (const x of [0, 1500, 3000, 4500, 6000]) b.add('m5_airspace', x, 0, {}, x ==
   b.deco('m5_lamp', s1.deck0 + 8, s1.deckY);
   b.add('rifleman', 606, s1.deckY, { behavior: 'chat', facing: 1 });
   b.add('rifleman', 626, s1.deckY, { behavior: 'chat', facing: -1 });
-  b.add('hostage', 662, s1.deckY, { mode: 'caged', drop: 'bomb', look: 0 });
+  b.add('hostage', 664, s1.deckY, { mode: 'tied', drop: 'bomb', look: 0, facing: -1 });
   b.add('rifleman', 690, s1.deckY, { behavior: 'sleep', facing: -1 });
 }
 
@@ -122,7 +122,7 @@ b.add('m5_supply', 3090, undefined, { item: 'fuel' }, 3150);
   b.add('airship_turret', 3100, f1.deckY, { mount: 'top' });
   b.add('airship_turret', 3232, f1.deckY, { mount: 'top' });
   b.add('rifleman', 3126, f1.deckY, { behavior: 'guard' });
-  b.add('hostage', 3164, f1.deckY, { mode: 'caged', drop: 'bomb', look: 0 });
+  b.add('hostage', 3164, f1.deckY, { mode: 'caged', drop: 'fuel', look: 0 });
   b.add('bazooka', 3204, f1.deckY, { behavior: 'guard' });
   b.add('rifleman', 3260, f1.deckY, { behavior: 'patrol' });
 }
@@ -151,7 +151,9 @@ b.deco('m5_searchlight', 3958, 150, { facing: -1 });
 b.deco('m5_banner', 3690, 156);
 b.deco('m5_banner', 3910, 156);
 b.platform(3812, 116, 64, 'girder', 150 - 4);
-b.add('hostage', 3866, 150, { mode: 'caged', drop: 'life', look: 1 });
+b.add('hostage', 3866, 150, { mode: 'caged', drop: 'bomb', look: 1 });
+// Weapon case lashed on the flight deck (points + a patch-up for a gyro, a gun for a stranded pilot).
+b.add('crate_prop', 3680, 150, { drop: 'H', size: 'small' });
 
 // ------------------------------------------------------------------ D: the dive and the storm front
 
@@ -193,19 +195,20 @@ b.barge(5050, 5200, S(176), 1, [5080, 5170]);
   b.add('airship_turret', 5560, f2.deckY, { mount: 'top' });
   b.add('airship_turret', 5706, f2.deckY, { mount: 'top' });
   b.add('rifleman', 5590, f2.deckY, { behavior: 'sleep', facing: -1 });
+  b.add('crate_prop', 5616, f2.deckY, { drop: 'R', size: 'small' });
   b.add('officer', 5634, f2.deckY - 32, { facing: -1 });
   b.add('rifleman', 5650, f2.deckY, { behavior: 'guard' });
   b.add('grenadier', 5680, f2.deckY, { behavior: 'guard' });
 }
 b.add('fighter', 5890, undefined, { facing: -1, passes: 2, alt: 92 });
-b.add('jetpack', 6020, S(70));
-b.add('jetpack', 6050, S(120), {}, 6060);
+b.add('jetpack', 5780, S(66));
+b.add('jetpack', 5820, S(118), {}, 5830);
 b.add('m5_supply', 6040, undefined, { item: 'fuel' }, 6100);
 {
   // Abandoned skiff adrift with the last prisoner; its lamp blinks SOS.
   const s2 = b.ship('skiff', 6190, S(148), 1);
   b.deco('m5_lamp', s2.deck1 - 6, s2.deckY, { facing: 1 });
-  b.add('hostage', 6176, s2.deckY, { mode: 'caged', drop: 'fuel', look: 1 });
+  b.add('hostage', 6176, s2.deckY, { mode: 'wander', drop: 'life', look: 1 });
 }
 b.add('m5_supply', 6470, undefined, { item: 'bomb' }, 6530);
 
@@ -215,19 +218,19 @@ registerLevel({
   id: 'm5',
   mission: 5,
   name: 'STORMFRONT',
-  subtitle: 'Sky battle above the clouds',
+  subtitle: 'SKY BATTLE ABOVE THE CLOUDS',
   briefing:
-    'THE LEGION AIR FLEET IS MASSING ABOVE THE STORM. ITS FLAGSHIP, THE THUNDERHEAD, IS HAULING OUR ' +
-    'KIDNAPPED MECHANICS TO THE CITADEL. TAKE THE DRAGONFLY GYROS UP THROUGH THE STORMFRONT, CUT ' +
-    'THROUGH THE ESCORTS AND BRING THAT FLAGSHIP DOWN. SHOOT THE CAGES OPEN ON THE DECKS - OUR PEOPLE ' +
-    'KNOW HOW TO JUMP. GRAB THE SUPPLY DROPS FOR REPAIRS.',
+    'THE LEGION AIR FLEET IS MASSING ABOVE THE STORM. ITS FLAGSHIP, THE THUNDERHEAD, IS FERRYING ' +
+    'OUR KIDNAPPED MECHANICS TO THE IRON CITADEL. TAKE THE DRAGONFLY GYROS UP THROUGH THE ' +
+    'STORMFRONT, SHOOT THE CAGES OPEN ON THEIR DECKS AND GRAB OUR SUPPLY DROPS FOR REPAIRS. ' +
+    'THEN BRING THAT FLAGSHIP DOWN.',
   theme: 'm5',
   music: 'm5',
   bossMusic: 'boss',
   bossName: 'THUNDERHEAD',
   width: M5_W,
   height: M5_H,
-  start: { x: 70 },
+  start: { x: 120 },
   startVehicle: 'gyro',
   timeLimit: 99,
   // Kill floor only: the cloud sea far below the view.

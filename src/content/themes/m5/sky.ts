@@ -14,6 +14,7 @@ import { bandedGradient } from '../../../art/textures';
 import type { LevelDef } from '../../../game/level';
 import type { ParallaxLayer } from '../../../game/theme';
 import { P5 } from './palette';
+import { cloudArt, cloudField, paintCloud, type Blob, type CloudLook } from './clouds';
 
 // ------------------------------------------------------------------ helpers
 
@@ -39,12 +40,6 @@ function ramp(colors: readonly string[], t: number, x: number, y: number): strin
   return f > bayer(x, y) ? colors[Math.min(colors.length - 1, i + 1)] : colors[i];
 }
 
-interface Puff {
-  x: number;
-  y: number;
-  r: number;
-}
-
 // ------------------------------------------------------------------ storm towers
 
 export interface Tower {
@@ -59,87 +54,119 @@ export interface Tower {
   fy: number;
 }
 
-/** One cumulonimbus: a puffy column on a broad base, a flat anvil top and a rain shaft below. */
+/** Far storm-tower shading: cool top-left light, warm dusk glow on the undersides. */
+const TOWER_LOOK: CloudLook = {
+  ramp: [P5.towerDeep, P5.towerShade, P5.towerBody, P5.towerMid, P5.towerLight, P5.towerRim],
+  ambient: 0.12,
+  shadow: 0.3,
+  glow: [P5.towerGlow1, P5.towerGlow2],
+  glowDepth: 8,
+  rim: P5.towerRim,
+  heightLight: 0.1,
+  volume: 16,
+  volumeMix: 0.6,
+};
+
+/**
+ * One cumulonimbus: a broad flat-bottomed skirt, a massive column of billows widening and leaning
+ * downwind as it rises, a thick anvil spreading downwind with a flat top that catches the last
+ * sunlight, and a rain shaft below.
+ */
 function makeTower(w: number, h: number, seed: number, shaftH: number): { body: PixelArt; lit: PixelArt; fx: number; fy: number } {
   const r = new Rng(seed);
   const H = h + shaftH;
-  const body = new PixelArt(w, H);
-  const baseY = h - 8;
-  const cx = w * r.range(0.36, 0.5);
-  const puffs: Puff[] = [];
-  // Broad dark base.
-  const baseW = w * r.range(0.55, 0.72);
-  for (let i = 0; i < 8; i++) puffs.push({ x: cx - baseW / 2 + (i / 7) * baseW + r.range(-4, 4), y: baseY - r.range(0, 7), r: r.range(8, 13) });
-  // Column of billows, leaning downwind (right) as it rises.
-  const anvilY = h * r.range(0.2, 0.3);
-  let y = baseY - 14;
-  while (y > anvilY + 10) {
+  const baseY = h - 6;
+  const cx = w * r.range(0.34, 0.42);
+  const anvilY = h * r.range(0.2, 0.26);
+  const flatTop = Math.round(anvilY - r.range(6, 9));
+  const blobs: Blob[] = [];
+  const S = Math.min(1.15, Math.max(0.7, h / 118));
+  // Skirt: broad flattened billows, bottoms cut flat.
+  const baseW = w * r.range(0.56, 0.7);
+  const nb = Math.max(4, Math.round(baseW / 18));
+  for (let i = 0; i < nb; i++) {
+    const t = i / (nb - 1);
+    const rad = r.range(12, 16) * S * (1.05 - Math.abs(t - 0.42) * 0.6);
+    blobs.push({ x: cx - baseW / 2 + t * baseW + r.range(-3, 3), y: baseY - rad * 0.2, r: rad * 1.25, ry: rad * 0.8, z: r.range(0, 2), cut: baseY });
+  }
+  // Column: big billows, widening toward the top and leaning downwind (right).
+  let y = baseY - 10 * S;
+  let topX = cx;
+  while (y > anvilY + 4) {
     const k = (baseY - y) / (baseY - anvilY);
-    const rad = 12 + k * 9 + r.range(-2, 2);
-    const x = cx + k * w * 0.08 + r.range(-5, 5);
-    puffs.push({ x, y, r: rad });
-    puffs.push({ x: x - rad * r.range(0.6, 0.9), y: y + r.range(2, 6), r: rad * r.range(0.55, 0.75) });
-    puffs.push({ x: x + rad * r.range(0.6, 0.9), y: y + r.range(2, 6), r: rad * r.range(0.55, 0.75) });
-    y -= rad * 0.62;
+    const rad = (13 + k * 9) * S + r.range(-1.5, 1.5);
+    const x = cx + k * k * w * 0.1 + r.range(-2, 2);
+    topX = x;
+    blobs.push({ x, y, r: rad, z: 4 + r.range(0, 2) });
+    blobs.push({ x: x - rad * r.range(0.6, 0.8), y: y + rad * 0.25, r: rad * r.range(0.62, 0.78), z: r.range(0, 2) });
+    blobs.push({ x: x + rad * r.range(0.6, 0.8), y: y + rad * 0.3, r: rad * r.range(0.58, 0.72), z: r.range(0, 2) });
+    y -= rad * 0.58;
   }
-  // Anvil: spreads far downwind with a flat top.
-  const aL = cx - w * r.range(0.22, 0.3);
-  const aR = Math.min(w - 8, cx + w * r.range(0.42, 0.52));
-  for (let i = 0; i <= 10; i++) puffs.push({ x: aL + (i / 10) * (aR - aL), y: anvilY + 6 + r.range(-2, 3) + (i > 7 ? (i - 7) * 1.5 : 0), r: r.range(6, 10) * (i > 8 ? 0.7 : 1) });
-  const flatTop = anvilY - 2;
-  // Paint bottom-up so higher billows overlap lower ones (puffy layering).
-  puffs.sort((a, b) => b.y - a.y);
-  for (const pf of puffs) {
-    const t = 1 - Math.max(0, Math.min(1, (pf.y - anvilY) / (baseY - anvilY)));
-    const shadeC = mixColor(P5.towerDeep, P5.towerShade, t);
-    const bodyC = mixColor(P5.towerShade, P5.towerBody, 0.4 + t * 0.6);
-    const lightC = mixColor(P5.towerBody, P5.towerLight, 0.3 + t * 0.7);
-    body.circle(pf.x, pf.y + 1, pf.r, shadeC);
-    body.circle(pf.x - 0.6, pf.y - 0.6, pf.r - 1.2, bodyC);
-    body.circle(pf.x - pf.r * 0.32, pf.y - pf.r * 0.36, pf.r * 0.5, lightC);
+  // Anvil: a thick wedge spreading downwind from the column top, thinning toward the tip, with a
+  // flat top (cut below) and a few lobes hanging under it.
+  const aL = topX - w * r.range(0.2, 0.26);
+  const aR = Math.min(w - 5, topX + w * r.range(0.44, 0.52));
+  const na = Math.max(5, Math.round((aR - aL) / 12));
+  for (let i = 0; i <= na; i++) {
+    const t = i / na;
+    const dCol = Math.abs(aL + t * (aR - aL) - topX) / (aR - aL);
+    const thick = 1.15 - dCol * 1.25;
+    const rx = r.range(15, 19) * S * Math.max(0.4, 1 - Math.max(0, t - 0.7) * 1.6);
+    const ry = Math.max(4, rx * 0.62 * Math.max(0.35, thick));
+    blobs.push({ x: aL + t * (aR - aL), y: anvilY + 2 - ry * 0.25 + t * 2, r: rx, ry, z: 8 });
+    if (t > 0.35 && t < 0.8 && r.chance(0.6)) blobs.push({ x: aL + t * (aR - aL) + r.range(-4, 4), y: anvilY + ry * 0.55 + 2, r: r.range(4, 6) * S, z: 7 });
   }
-  // Flatten the anvil top and give it a warm sunset rim.
-  for (let x = 0; x < w; x++) {
-    for (let yy = 0; yy < flatTop; yy++) body.setRaw(x, yy, 0);
-  }
-  for (let x = 0; x < w; x++) {
-    let top = -1;
-    for (let yy = 0; yy < H; yy++) {
-      if (body.opaque(x, yy)) {
-        top = yy;
-        break;
-      }
+  // Overshooting top: a dome punching up through the flat anvil above the updraft.
+  blobs.push({ x: topX + r.range(-4, 6), y: flatTop + 2, r: r.range(9, 12) * S, ry: r.range(7, 9) * S, z: 12 });
+  const field = cloudField(w, H, blobs, false);
+  // Flat anvil top (except the overshooting dome).
+  const dome = blobs[blobs.length - 1];
+  for (let yy = 0; yy < flatTop; yy++)
+    for (let x = 0; x < w; x++) {
+      const u = (x + 0.5 - dome.x) / dome.r;
+      const v = (yy + 0.5 - dome.y) / (dome.ry ?? dome.r);
+      if (u * u + v * v >= 1) field.hgt[yy * w + x] = -1e9;
     }
-    if (top < 0 || top > baseY - 6) continue;
-    const hot = top <= flatTop + 1;
-    body.px(x, top, hot ? P5.towerRimHot : P5.towerRim);
-    if (body.opaque(x, top + 1)) body.px(x, top + 1, hot ? P5.towerRim : P5.towerLight);
+  const body = new PixelArt(w, H);
+  paintCloud(body, field, TOWER_LOOK);
+  // The flat top catches the sunset (hot rim), the rest of the silhouette top a softer rim.
+  for (let x = 0; x < w; x++) {
+    for (let yy = flatTop; yy < baseY; yy++) {
+      if (!body.opaque(x, yy)) continue;
+      if (yy <= flatTop + 1) {
+        body.px(x, yy, P5.towerRimHot);
+        if (body.opaque(x, yy + 1) && (x + yy) % 3 !== 0) body.px(x, yy + 1, P5.towerRim);
+      }
+      break;
+    }
   }
-  // Rain shaft under part of the base: thin dithered streaks fading out downward.
-  const s0 = cx - baseW * r.range(0.3, 0.42);
-  const s1 = cx + baseW * r.range(0.05, 0.25);
-  for (let x = Math.floor(s0); x < s1; x++) {
-    if ((x * 7 + seed) % 3 === 0) continue;
-    for (let yy = baseY + 2; yy < H; yy++) {
+  // Rain shaft under part of the base: slanted streaks fading out downward.
+  const s0 = Math.floor(cx - baseW * r.range(0.32, 0.44));
+  const s1 = Math.floor(cx + baseW * r.range(0.04, 0.22));
+  for (let x = s0; x < s1; x++) {
+    for (let yy = baseY + 1; yy < H; yy++) {
       if (body.opaque(x, yy)) continue;
       const fade = (yy - baseY) / (H - baseY);
-      if (((x + yy * 3) & 3) === 0 && fade < bayer(x, yy) * 1.2) body.px(x, yy, P5.rainShaft);
+      const lane = (x * 2 + Math.floor(yy / 3)) % 5;
+      if (lane === 0 && fade < bayer(x, yy) * 1.15 + 0.08) body.px(x, yy, fade < 0.35 ? P5.rainShaftL : P5.rainShaft);
     }
   }
-  // Lightning-lit interior: only the changed pixels (drawn over the body with alpha).
+  // Lightning-lit interior (drawn over the body with alpha): domes glow around the flash point.
   const lit = new PixelArt(w, H);
   const fx = cx + r.range(-6, 10);
-  const fy = anvilY + (baseY - anvilY) * r.range(0.45, 0.7);
-  const R = w * 0.42;
+  const fy = anvilY + (baseY - anvilY) * r.range(0.45, 0.68);
+  const R = w * 0.44;
   const litRamp = [P5.litLow, P5.litMid, P5.litHigh, P5.litCore];
-  for (let yy = 0; yy <= baseY + 6; yy++) {
+  for (let yy = 0; yy <= baseY + 2; yy++) {
     for (let x = 0; x < w; x++) {
       if (!body.opaque(x, yy)) continue;
+      const i = yy * w + x;
+      if (field.hgt[i] < -1e8) continue;
       const d = Math.hypot((x - fx) * 0.85, yy - fy);
-      const k = 1 - d / R;
-      if (k <= 0) continue;
-      if (k * 1.15 < bayer(x, yy) * 0.6) continue;
-      lit.px(x, yy, ramp(litRamp, k * k * 1.3, x, yy));
+      const k = (1 - d / R) * (0.55 + 0.45 * field.nz[i]);
+      if (k <= 0.04) continue;
+      if (k * 1.2 < bayer(x, yy) * 0.55) continue;
+      lit.px(x, yy, ramp(litRamp, k * k * 1.45, x, yy));
     }
   }
   return { body, lit, fx, fy };
@@ -154,12 +181,12 @@ let towersCache: Tower[] | null = null;
 export function stormTowers(): Tower[] {
   if (towersCache) return towersCache;
   const specs = [
-    { x: 0, w: 190, h: 112, y: 46 },
-    { x: 210, w: 140, h: 86, y: 74 },
-    { x: 370, w: 230, h: 128, y: 32 },
-    { x: 640, w: 150, h: 94, y: 66 },
-    { x: 810, w: 200, h: 118, y: 42 },
-    { x: 1030, w: 130, h: 80, y: 80 },
+    { x: 0, w: 196, h: 118, y: 40 },
+    { x: 220, w: 136, h: 84, y: 76 },
+    { x: 372, w: 236, h: 134, y: 24 },
+    { x: 646, w: 150, h: 94, y: 66 },
+    { x: 812, w: 206, h: 122, y: 36 },
+    { x: 1036, w: 128, h: 80, y: 82 },
   ];
   towersCache = specs.map((s, i) => {
     const t = makeTower(s.w, s.h, 900 + i * 37, 34);
@@ -238,91 +265,98 @@ export function flagshipSilhouette(): PixelArt {
 
 // ------------------------------------------------------------------ cloud banks
 
-/** Tileable band of lumpy cloud banks (transparent above). */
-function cloudBank(w: number, h: number, seed: number, cols: { shade: string; body: string; light: string; rim: string }, count: number, minY: number, maxY: number): PixelArt {
-  const p = new PixelArt(w, h);
+const MID_LOOK: CloudLook = {
+  ramp: [P5.midDeep, P5.midShade, P5.midBody, P5.midLight, P5.midRim, P5.midHigh],
+  ambient: 0.14,
+  shadow: 0.25,
+  glow: [P5.midGlow1, P5.midGlow2],
+  glowDepth: 5,
+  rim: P5.midHigh,
+  wrap: true,
+  volume: 9,
+  volumeMix: 0.6,
+};
+
+/** Tileable band of flat-bottomed cumulus banks drifting at mid depth (transparent elsewhere). */
+function cloudBank(w: number, h: number, seed: number, count: number, minY: number, maxY: number): PixelArt {
   const r = new Rng(seed);
-  const puffs: Puff[] = [];
+  const blobs: Blob[] = [];
   for (let i = 0; i < count; i++) {
-    const cx = r.range(0, w);
-    const cy = r.range(minY, maxY);
-    const n = r.int(4, 8);
-    const spread = r.range(5, 8);
+    const cx = (i + r.range(0.1, 0.7)) * (w / count);
+    const base = r.range(minY, maxY);
+    const len = r.range(50, 116);
+    const n = Math.max(3, Math.round(len / 13));
+    const peak = r.range(0.3, 0.55);
     for (let j = 0; j < n; j++) {
-      const k = j - (n - 1) / 2;
-      puffs.push({ x: cx + k * spread, y: cy + Math.abs(k) * 1.2 + r.range(-1.5, 1.5), r: r.range(5, 10) - Math.abs(k) * 0.5 });
+      const t = j / (n - 1);
+      const bell = 1 - Math.pow(Math.abs(t - peak) * 2, 1.5) * 0.7;
+      const rad = r.range(7, 10) * bell + 3;
+      blobs.push({ x: cx - len / 2 + t * len + r.range(-2, 2), y: base - rad * 0.35 - bell * r.range(2, 7), r: rad * 1.2, ry: rad * 0.85, z: r.range(0, 3), cut: base });
     }
-    // Flat underside.
-    puffs.push({ x: cx, y: cy + 6, r: 0 });
-  }
-  puffs.sort((a, b) => b.y - a.y);
-  for (const pf of puffs) {
-    if (pf.r <= 0) continue;
-    for (const o of [-w, 0, w]) {
-      p.circle(pf.x + o, pf.y + 1.5, pf.r, cols.shade);
-      p.circle(pf.x + o - 0.5, pf.y - 0.5, pf.r - 1.2, cols.body);
-      p.circle(pf.x + o - pf.r * 0.3, pf.y - pf.r * 0.38, pf.r * 0.48, cols.light);
+    // A taller cauliflower head on the bigger banks.
+    if (len > 72) {
+      const hx = cx - len / 2 + len * peak + r.range(-6, 6);
+      const hr = r.range(9, 12);
+      blobs.push({ x: hx, y: base - hr - r.range(6, 10), r: hr * 1.1, ry: hr * 0.9, z: 5, cut: base });
+      blobs.push({ x: hx + hr * 0.9, y: base - hr * 0.7 - 4, r: hr * 0.75, z: 3, cut: base });
     }
   }
-  // Rim light on the very tops.
-  for (let x = 0; x < w; x++) {
-    for (let y = 0; y < h; y++) {
-      if (!p.opaque(x, y)) continue;
-      p.px(x, y, cols.rim);
-      break;
-    }
-  }
-  return p;
+  return cloudArt(w, h, blobs, MID_LOOK).art;
 }
 
 export const MID_PERIOD = 720;
 export const MID_FACTOR = 0.16;
 
 export function midClouds(): PixelArt {
-  return cloudBank(MID_PERIOD, 64, 31, { shade: P5.midShade, body: P5.midBody, light: P5.midLight, rim: P5.midRim }, 9, 22, 44);
+  return cloudBank(MID_PERIOD, 64, 31, 7, 40, 58);
 }
 
-/** The cloud sea: big lit billows on top, a dense dithered body below. */
+/**
+ * The cloud sea far below (the level's "floor"): rows of billows, each row deeper and darker, the
+ * front row's tops catching the warm horizon glow. Tileable; solid down to the bottom.
+ */
 export function cloudSea(w: number, h: number, seed: number, near: boolean): PixelArt {
-  const p = new PixelArt(w, h);
   const r = new Rng(seed);
-  const top = near ? 14 : 12;
-  // Body.
-  for (let y = top; y < h; y++) {
+  const blobs: Blob[] = [];
+  const top = near ? 16 : 13;
+  const rows = near ? 3 : 4;
+  const rowH = near ? 13 : 10;
+  for (let row = 0; row < rows; row++) {
+    const y = top + row * rowH;
+    const step = (near ? 26 : 17) - row * 2;
+    const n = Math.round(w / step);
+    for (let i = 0; i < n; i++) {
+      const big = r.chance(row === 0 ? 0.3 : 0.15);
+      const rad = (near ? r.range(11, 15) : r.range(7.5, 10.5)) * (1 - row * 0.1) + (big ? 3 : 0);
+      blobs.push({ x: (i + r.range(0.2, 0.8)) * (w / n), y: y + r.range(-2, 2) - (big ? 3 : 0) + rad * 0.3, r: rad * r.range(1.25, 1.5), ry: rad * 0.8, z: 30 - row * 8 + r.range(0, 3) });
+    }
+  }
+  const look: CloudLook = {
+    ramp: near ? [P5.seaDeeper, P5.seaDeep, P5.seaShade, P5.seaBody, P5.seaMid, P5.seaLight, P5.seaHigh] : [P5.seaDeeper, P5.seaDeep, P5.seaShade, P5.seaBody, P5.seaMid, P5.seaLight],
+    ambient: 0.2,
+    shadow: 0.3,
+    rim: P5.seaRim,
+    wrap: true,
+    depthFade: near ? 0.5 : 0.4,
+    volume: near ? 11 : 8,
+    volumeMix: 0.55,
+  };
+  const field = cloudField(w, h, blobs, true);
+  // Solid body below the billows: a dim plane facing slightly up.
+  const bodyTop = top + (rows - 1) * rowH;
+  for (let y = bodyTop; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const t = (y - top) / (h - top);
-      p.px(x, y, ramp([P5.seaBody, P5.seaShade, P5.seaDeep, P5.seaDeeper], Math.min(1, t * 1.6), x, y));
+      const i = y * w + x;
+      if (field.hgt[i] > -1e8) continue;
+      field.hgt[i] = -30;
+      field.nx[i] = 0;
+      field.ny[i] = -0.25;
+      field.nz[i] = 0.97;
     }
   }
-  // Billows along the top (tileable).
-  const puffs: Puff[] = [];
-  const n = Math.round(w / (near ? 16 : 11));
-  for (let i = 0; i < n; i++) {
-    const x = (i / n) * w + r.range(-4, 4);
-    const big = r.chance(0.3);
-    puffs.push({ x, y: top + r.range(-2, 4) + (big ? -2 : 3), r: (near ? r.range(9, 15) : r.range(6, 11)) + (big ? 3 : 0) });
-  }
-  // Secondary billows inside the body (depth).
-  for (let i = 0; i < n * 0.7; i++) puffs.push({ x: r.range(0, w), y: top + r.range(12, 26), r: r.range(5, 9) });
-  puffs.sort((a, b) => b.y - a.y);
-  for (const pf of puffs) {
-    const deep = pf.y > top + 10;
-    for (const o of [-w, 0, w]) {
-      p.circle(pf.x + o, pf.y + 1.5, pf.r, deep ? P5.seaDeep : P5.seaShade);
-      p.circle(pf.x + o - 0.5, pf.y - 0.5, pf.r - 1.2, deep ? P5.seaShade : P5.seaBody);
-      p.circle(pf.x + o - pf.r * 0.3, pf.y - pf.r * 0.38, pf.r * 0.52, deep ? P5.seaBody : P5.seaLight);
-    }
-  }
-  // Warm sunset rim on the billow tops.
-  for (let x = 0; x < w; x++) {
-    let found = 0;
-    for (let y = 0; y < h && found < 2; y++) {
-      if (!p.opaque(x, y)) continue;
-      p.px(x, y, found === 0 ? P5.seaRim : P5.seaLight);
-      found++;
-    }
-  }
-  return p;
+  const art = new PixelArt(w, h);
+  paintCloud(art, field, look);
+  return art;
 }
 
 // ------------------------------------------------------------------ lightning schedule
