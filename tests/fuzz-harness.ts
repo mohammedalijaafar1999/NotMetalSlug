@@ -219,6 +219,7 @@ export function runFuzz(c: FuzzCase): FuzzReport {
   const dyingSince = new Map<number, number>();
   const zombieSince = new Map<number, number>();
   const prevDead = new Set<number>();
+  const seenShots = new Set<number>();
   const prevVehicle = new Map<number, Vehicle | null>();
   let lockKey: unknown = null;
   let lockSince = 0;
@@ -272,6 +273,15 @@ export function runFuzz(c: FuzzCase): FuzzReport {
       report('count', `entity count ${w.entities.length} > ${MAX_ENTITIES}: ${top.map(([t, n]) => `${t}=${n}`).join(' ')}`);
     }
     const nowDead = new Set<number>();
+    // Enemy fire must come from inside the view (no shots from off-screen).
+    for (const e of w.entities) {
+      if (e.team !== 'enemy' || (e as any).damageAmount === undefined || seenShots.has(e.id)) continue;
+      seenShots.add(e.id);
+      const o = (e as any).owner as Entity | null;
+      if (o && (o as any).isBoss) continue;
+      const off = Math.max(cam.x - e.x, e.x - (cam.x + VIEW_W), cam.y - 40 - e.y);
+      if (off > 12) report('offshot:' + (o?.type ?? e.type), `enemy shot ${describeEntity(e)} fired ${fmt(off)} px outside the view by ${o ? describeEntity(o) : 'no owner'}`);
+    }
     for (const e of w.entities) {
       if (!Number.isFinite(e.x) || !Number.isFinite(e.y) || !Number.isFinite(e.vx) || !Number.isFinite(e.vy)) {
         report('nan:' + e.type, `non-finite position/velocity ${describeEntity(e)} v=(${e.vx},${e.vy})`);
