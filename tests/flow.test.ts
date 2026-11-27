@@ -9,6 +9,9 @@ import { NameEntryScene } from '../src/scenes/gameover';
 import { installUiFlow } from '../src/scenes/install';
 import { GameplayScene, CONTINUE_SECONDS } from '../src/scenes/gameplay';
 import { CharSelectScene } from '../src/scenes/charselect';
+import { BootScene } from '../src/scenes/core-scenes';
+import { preload } from '../src/scenes/preload';
+import { sprites } from '../src/engine/sprites';
 import { EndingScene, endingSquad } from '../src/scenes/ending';
 import { TallyScene } from '../src/scenes/tally';
 import { GameSession } from '../src/game/session';
@@ -776,5 +779,33 @@ describe('couch setup: player 1 on the keyboard, player 2 on a gamepad', () => {
     expect(input.twoPlayerKeyboard).toBe(false);
     expect(gp.world.players.length).toBe(2);
     input.resetPadSeats();
+  });
+});
+
+describe('boot', () => {
+  it('bakes only the title art behind the progress bar; the rest bakes in the background and is done before play', () => {
+    const boot = new BootScene();
+    const queued = sprites.all();
+    const list = (boot as any).list as { name: string }[];
+    expect(list.length).toBeGreaterThan(5);
+    expect(list.length).toBeLessThan(queued.length / 10);
+    expect(list.map((x) => x.name)).toContain('ui_logo');
+    app.scenes.set(boot, { fade: false });
+    for (let i = 0; i < 600 && scene() === 'boot'; i++) run(DT);
+    expect(scene()).toBe('title');
+    expect(preload.remaining).toBeGreaterThan(0);
+    // Time-sliced: one step stays near its budget (one sprite frame at a time).
+    const before = preload.remaining;
+    const t0 = performance.now();
+    preload.step(2);
+    expect(performance.now() - t0).toBeLessThan(200);
+    expect(preload.remaining).toBeLessThanOrEqual(before);
+    // Starting gameplay bakes whatever is left: every frame of every sprite.
+    new GameplayScene(new GameSession({ characters: ['dex', 'juno'], mission: 1 }), 'sandbox');
+    expect(preload.remaining).toBe(0);
+    const unbaked = queued.filter((sp) => !(sp as any).baked.every(Boolean)).map((sp) => sp.name);
+    expect(unbaked).toEqual([]);
+    // The HUD portraits were queued too (defined lazily elsewhere).
+    expect(queued.some((sp) => sp.name.startsWith('ui_face_'))).toBe(true);
   });
 });

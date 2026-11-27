@@ -14,6 +14,7 @@ import { MAP_H, MAP_POINTS, MAP_W, faceSprite } from '../content/ui/art';
 import { MISSION_COUNT, missionInfo } from '../content/ui/missions';
 import { getCharacter } from '../game/characters';
 import type { GameSession } from '../game/session';
+import { PRELOAD_BOOST_MS } from './preload';
 
 /** Draw the tactical map with the route and markers. `current` = mission being briefed / selected. */
 export function renderMap(g: CanvasRenderingContext2D, x: number, y: number, t: number, current: number, opts: { reached?: number; showAll?: boolean } = {}): void {
@@ -76,6 +77,8 @@ export function renderMap(g: CanvasRenderingContext2D, x: number, y: number, t: 
 
 export class BriefingScene implements Scene {
   name = 'briefing';
+  /** A static card right before play: the background sprite baking gets more time per frame. */
+  readonly preloadBudget = PRELOAD_BOOST_MS;
   time = 0;
   private chars = 0;
   private lines: string[] = [];

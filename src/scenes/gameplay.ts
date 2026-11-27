@@ -17,6 +17,7 @@ import { Hud, continueState } from '../game/hud';
 import type { GameSession, PlayerProfile } from '../game/session';
 import type { Vehicle } from '../game/vehicle';
 import { PauseScene } from './pause';
+import { preload } from './preload';
 import { Bot } from '../debug/bot';
 import { C, blink, panel, sharedKeysHint, syncTouch, twoTone, uiInput, uiSfx } from './ui';
 
@@ -87,6 +88,9 @@ export class GameplayScene implements Scene {
     this.def = def;
     this.hud.demo = this.demo;
     this.hud.allowJoin = !this.demo;
+    // Whatever the background preloader has not baked yet is baked now, so no frame of play
+    // stalls to rasterize a sprite.
+    preload.finish();
     this.world = this.buildWorld();
     // A player still out from the last mission gets the continue prompt again (countdown, then
     // PRESS START): START or FIRE brings them back with full lives, beside their partner.
