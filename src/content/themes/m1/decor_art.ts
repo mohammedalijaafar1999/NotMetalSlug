@@ -654,9 +654,26 @@ sprites.define({
   name: 'm1_sign',
   w: 38,
   h: 32,
-  frames: 4,
+  frames: 5,
   draw: (p, f) => {
-    if (f === 0) {
+    if (f === 4) {
+      // Ford warning: NO VEHICLES (tank crossed out) over a MUD plank - the BULLDOG sinks here.
+      post(p, 17, 12, 32, 3);
+      p.circle(18.5, 10.5, 10.4, '#c82a1a');
+      p.circle(18.5, 10.5, 8.2, MC.cream);
+      // Tiny tank silhouette (hull, turret, gun, treads).
+      p.rect(11, 10, 15, 4, '#3a3e48');
+      p.rect(14, 7, 7, 3, '#3a3e48');
+      p.rect(21, 8, 5, 1, '#3a3e48');
+      p.rect(12, 14, 13, 2, '#23252c');
+      for (let x = 13; x < 25; x += 3) p.px(x, 15, '#8a92a0');
+      // The slash (top-left to bottom-right).
+      p.line(12.5, 4.5, 24.5, 16.5, '#e83a2a', 2.2);
+      p.px(13, 4, '#f86a4a');
+      // MUD plank.
+      signBoard(p, 8, 22, 22, 8, PH.woodD);
+      tinyText(p, 'MUD', 13, 23, MC.cream);
+    } else if (f === 0) {
       // Legion KEEP OUT board on two posts.
       post(p, 6, 10, 32, 3);
       post(p, 29, 10, 32, 3);

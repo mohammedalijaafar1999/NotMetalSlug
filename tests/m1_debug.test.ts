@@ -31,7 +31,7 @@ it('debug m1 bot trace', () => {
         .map((e) => `${e.type}@${Math.round(e.x)},${Math.round(e.y)}${(e as any).state ? ':' + (e as any).state : ''}${e.blocksProgress ? 'B' : ''}`)
         .join(' ');
       console.log(
-        `t=${(i / 60).toFixed(1)} p=${p.x.toFixed(0)},${p.y.toFixed(0)} g=${p.onGround} st=${p.state} veh=${p.vehicle?.type ?? '-'} cam=${Math.round(w.camera.x)},${Math.round(w.camera.y)} lock=${w.level.locked} k=${w.stats.kills} | ${near}`,
+        `t=${(i / 60).toFixed(2)} p=${p.x.toFixed(0)},${p.y.toFixed(0)} g=${p.onGround} st=${p.state} veh=${p.vehicle?.type ?? '-'}${p.vehicle ? ':' + p.vehicle.hp : ''} cam=${Math.round(w.camera.x)},${Math.round(w.camera.y)} lock=${w.level.locked} k=${w.stats.kills} | ${near}`,
       );
     }
   }

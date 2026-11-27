@@ -73,9 +73,9 @@ export const PLATFORMS: PlatformDef[] = [
   { x: 2171, y: 258, w: 32, style: 'bamboo:26' },
   // Jungle road: bamboo lookout.
   { x: 3290, y: 266, w: 44, style: 'bamboo:33' },
-  // Broken river bridge (32 px gap in the middle).
-  { x: 3934, y: 300, w: 94, style: 'pier:17' },
-  { x: 4060, y: 300, w: 106, style: 'pier:17' },
+  // The blown river bridge: only the stubs on both banks remain (wade through the ford).
+  { x: 3930, y: 300, w: 42, style: 'pier:17' },
+  { x: 4132, y: 300, w: 40, style: 'pier:17' },
   // Fuel depot catwalk.
   { x: 4690, y: P - 40, w: 82, style: 'metal:35' },
   // Gauntlet: bamboo platform and a watchtower deck.
