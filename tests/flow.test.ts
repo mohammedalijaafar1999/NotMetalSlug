@@ -7,7 +7,8 @@ import { input, InputManager, DEFAULT_BINDINGS, type ActionMask } from '../src/e
 import { settings, resetHighScores, getHighScores } from '../src/engine/storage';
 import { NameEntryScene } from '../src/scenes/gameover';
 import { installUiFlow } from '../src/scenes/install';
-import { GameplayScene } from '../src/scenes/gameplay';
+import { GameplayScene, CONTINUE_SECONDS } from '../src/scenes/gameplay';
+import { CharSelectScene } from '../src/scenes/charselect';
 import { EndingScene, endingSquad } from '../src/scenes/ending';
 import { TallyScene } from '../src/scenes/tally';
 import { GameSession } from '../src/game/session';
@@ -15,12 +16,12 @@ import { characters } from '../src/game/characters';
 import { missionInfo, countHostages } from '../src/content/ui/missions';
 import { getLevel, allLevels } from '../src/game/level';
 import { RESPAWN_INVULN } from '../src/game/player';
-import { joinKey, vehicleRow, PANEL_ROW_W, Hud, BANNER_MAX_W } from '../src/game/hud';
+import { joinKey, startKeyLabel, vehicleRow, PANEL_ROW_W, Hud, BANNER_MAX_W } from '../src/game/hud';
 import { entityTypes } from '../src/game/registry';
 import { textWidth } from '../src/engine/font';
 import { makeWorld } from './helpers';
 import type { Vehicle } from '../src/game/vehicle';
-import { layoutLabel, sharedKeysHint } from '../src/scenes/ui';
+import { layoutLabel, sharedKeysHint, uiInput } from '../src/scenes/ui';
 import { KeyRemapScene, assignKey } from '../src/scenes/options';
 
 const DT = 1 / 60;
@@ -534,5 +535,246 @@ describe('announcement banners', () => {
     gp.hud.banner('WARNING!');
     gp.render(g);
     expect(order).toEqual(['entity', 'hud']);
+  });
+});
+
+const scene = () => app.scenes.current?.name;
+
+describe('out between missions', () => {
+  it('a 2P player out when the mission ended gets the continue prompt next mission; START brings them back with full lives', () => {
+    const s = new GameSession({ characters: ['dex', 'juno'], twoPlayer: true, mission: 1 });
+    // Player 1 lost the last life in the previous mission and did not continue.
+    s.players[0].out = true;
+    s.players[0].lives = 0;
+    const gp = new GameplayScene(s, 'sandbox');
+    app.scenes.set(gp, { fade: false });
+    run(0.5);
+    expect(gp.world.players.map((p) => p.index)).toEqual([1]);
+    // The normal continue prompt: a countdown, then PRESS <their START key>.
+    expect(gp.hud.continueTimers[0]).toBeGreaterThan(CONTINUE_SECONDS - 1);
+    expect(gp.continueScreen).toBe(false);
+    run(CONTINUE_SECONDS + 0.5);
+    expect(gp.hud.continueTimers[0]).toBe(-1);
+    expect(s.players[0].out).toBe(true);
+    expect(scene()).toBe('gameplay');
+    expect(startKeyLabel(0)).toBe('ENTER');
+    expect(startKeyLabel(1)).toBe('RSHIFT');
+    press({ start: true }, 0);
+    expect(app.scenes.current).toBe(gp); // no pause menu
+    expect(s.players[0].out).toBe(false);
+    expect(s.players[0].lives).toBe(s.livesPerCredit);
+    run(0.1);
+    const p1 = gp.world.players.find((p) => p.index === 0)!;
+    const p2 = gp.world.players.find((p) => p.index === 1)!;
+    // Drops in beside the partner with the respawn invulnerability.
+    expect(p1.invuln).toBeGreaterThan(RESPAWN_INVULN - 0.5);
+    expect(Math.abs(p1.x - p2.x)).toBeLessThan(80);
+  });
+
+  it('a solo player who goes out with the winning blow keeps playing (no life lost)', () => {
+    const s = new GameSession({ characters: ['dex', 'juno'], twoPlayer: false, mission: 1 });
+    const gp = new GameplayScene(s, 'sandbox');
+    app.scenes.set(gp, { fade: false });
+    run(1.5);
+    const p = gp.world.players[0];
+    p.profile.lives = 1;
+    p.kill();
+    for (let k = 0; k < 600 && !s.players[0].out; k++) run(DT);
+    expect(s.players[0].out).toBe(true);
+    // ...and the boss went down in that same moment.
+    gp.world.level.bossDefeated();
+    expect(gp.phase).toBe('complete');
+    expect(s.players[0].out).toBe(false);
+    expect(s.players[0].lives).toBe(1);
+    expect(s.players[0].continues).toBe(0);
+    run(0.2);
+    expect(gp.continueScreen).toBe(false);
+    const next = new GameplayScene(s, 'sandbox');
+    expect(next.world.players.map((q) => q.index)).toEqual([0]);
+  });
+
+  it('a mission never starts with nobody playing', () => {
+    const s = new GameSession({ characters: ['dex', 'juno'], twoPlayer: false, mission: 1 });
+    s.players[0].out = true;
+    s.players[0].lives = 0;
+    const gp = new GameplayScene(s, 'sandbox');
+    app.scenes.set(gp, { fade: false });
+    run(1.5);
+    expect(s.players[0].out).toBe(false);
+    expect(s.players[0].lives).toBe(s.livesPerCredit);
+    expect(gp.world.players.length).toBe(1);
+    expect(scene()).toBe('gameplay');
+    expect(gp.phase).toBe('play');
+  });
+});
+
+describe('character select dead ends', () => {
+  const tapCard = (cs: CharSelectScene, i: number) => {
+    const r = (cs as any).cardRect(i);
+    uiInput.injectTap(r.x + r.w / 2, r.y + r.h / 2);
+    cs.update(DT);
+  };
+
+  it('player 2 can back out of START 2 PLAYERS; player 1 then starts alone', () => {
+    const cs = new CharSelectScene({ twoPlayer: true });
+    app.scenes.set(cs, { fade: false });
+    run(0.5);
+    expect(cs.slots[1].joined).toBe(true);
+    expect(input.twoPlayerKeyboard).toBe(true);
+    press({ bomb: true }, 1);
+    expect(cs.slots[1].joined).toBe(false);
+    expect(input.twoPlayerKeyboard).toBe(false);
+    expect(app.scenes.current).toBe(cs); // still choosing
+    press({ fire: true }, 0);
+    run(1.5);
+    expect(scene()).not.toBe('charselect');
+    const gp = app.scenes.stack.find((x) => x instanceof GameplayScene) as GameplayScene | undefined;
+    const sess = gp?.session ?? (app.scenes.current as any).session;
+    expect(sess.twoPlayer).toBe(false);
+  });
+
+  it('on a touch-only screen START 2 PLAYERS leaves the player 2 slot open, so a tap confirms and starts', () => {
+    const saved = input.lastDevice;
+    input.lastDevice = 'touch';
+    try {
+      const cs = new CharSelectScene({ twoPlayer: true });
+      app.scenes.set(cs, { fade: false });
+      run(0.5);
+      expect(cs.slots[1].joined).toBe(false);
+      expect(input.twoPlayerKeyboard).toBe(false);
+      uiInput.flush();
+      tapCard(cs, cs.slots[0].index); // tap the highlighted soldier = confirm
+      expect(cs.slots[0].confirmed).toBe(true);
+      run(1.5);
+      expect(scene()).not.toBe('charselect');
+    } finally {
+      input.lastDevice = saved;
+    }
+  });
+});
+
+describe('couch setup: player 1 on the keyboard, player 2 on a gamepad', () => {
+  const mkPad = (index: number) => ({
+    index,
+    connected: true,
+    axes: [0, 0, 0, 0],
+    buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })),
+  });
+  const START = 9;
+  const A = 0;
+  const X = 2;
+  let pads: ReturnType<typeof mkPad>[] = [];
+  const gl = globalThis as any;
+  let hadNav: PropertyDescriptor | undefined;
+  beforeAll(() => {
+    hadNav = Object.getOwnPropertyDescriptor(gl, 'navigator');
+    Object.defineProperty(gl, 'navigator', { configurable: true, value: { getGamepads: () => pads.map((p) => (p.connected ? p : null)) } });
+  });
+  afterAll(() => {
+    pads = [];
+    if (hadNav) Object.defineProperty(gl, 'navigator', hadNav);
+    else delete gl.navigator;
+  });
+  const key = (im: InputManager, code: string, down: boolean) => {
+    const k = im as any;
+    if (down) {
+      k.keysDown.add(code);
+      k.keyTapLatch.add(code);
+    } else k.keysDown.delete(code);
+  };
+
+  it('a lone pad pressing START while player 1 plays on the keyboard takes the player 2 seat and keeps it', () => {
+    pads = [mkPad(0)];
+    const im = new InputManager();
+    im.poll(DT);
+    key(im, 'ArrowRight', true); // player 1 runs on the keyboard
+    im.poll(DT);
+    key(im, 'ArrowRight', false);
+    expect(im.p1Device).toBe('keyboard');
+    im.offerPadToPlayer2();
+    pads[0].buttons[START].pressed = true;
+    im.poll(DT);
+    expect(im.player(1).pressed('start')).toBe(true);
+    expect(im.player(0).pressed('start')).toBe(false); // does not pause player 1
+    expect(im.hasPadFor(1)).toBe(true);
+    expect(im.hasPadFor(0)).toBe(false);
+    pads[0].buttons[START].pressed = false;
+    pads[0].buttons[A].pressed = true; // later: the pad still drives player 2 (no offer needed)
+    im.poll(DT);
+    expect(im.player(1).held('jump')).toBe(true);
+    expect(im.player(0).held('jump')).toBe(false);
+    // A second pad plugged in drives player 1; the seated pad stays player 2's.
+    pads[0].buttons[A].pressed = false;
+    const p2 = mkPad(1);
+    pads.push(p2);
+    p2.buttons[X].pressed = true;
+    im.poll(DT);
+    expect(im.player(0).held('fire')).toBe(true);
+    expect(im.player(1).held('fire')).toBe(false);
+    pads.pop();
+    // Back at the title: the lone pad drives player 1 again.
+    im.resetPadSeats();
+    pads[0].buttons[A].pressed = true;
+    im.poll(DT);
+    expect(im.player(0).held('jump')).toBe(true);
+    expect(im.player(1).held('jump')).toBe(false);
+  });
+
+  it('keeps the other setups: a pad player 1 plays with, two pads, and no offer (player 2 in / paused)', () => {
+    // Player 1 plays on the pad: START stays player 1's.
+    pads = [mkPad(0)];
+    let im = new InputManager();
+    im.poll(DT);
+    pads[0].buttons[A].pressed = true;
+    im.poll(DT);
+    pads[0].buttons[A].pressed = false;
+    im.poll(DT);
+    expect(im.p1Device).toBe('gamepad');
+    im.offerPadToPlayer2();
+    pads[0].buttons[START].pressed = true;
+    im.poll(DT);
+    expect(im.player(0).pressed('start')).toBe(true);
+    expect(im.player(1).pressed('start')).toBe(false);
+    // Two pads: connection order, whatever player 1 used last.
+    pads = [mkPad(0), mkPad(1)];
+    im = new InputManager();
+    im.poll(DT);
+    key(im, 'KeyD', true);
+    im.poll(DT);
+    im.offerPadToPlayer2();
+    pads[0].buttons[START].pressed = true;
+    im.poll(DT);
+    expect(im.player(0).pressed('start')).toBe(true);
+    expect(im.hasPadFor(0) && im.hasPadFor(1)).toBe(true);
+    // No offer (player 2 already in, or a menu is open): the lone pad is player 1's.
+    pads = [mkPad(0)];
+    im = new InputManager();
+    im.poll(DT);
+    key(im, 'KeyD', true);
+    im.poll(DT);
+    pads[0].buttons[START].pressed = true;
+    im.poll(DT);
+    expect(im.player(0).pressed('start')).toBe(true);
+  });
+
+  it('in a mission: player 2 drops in from the pad, player 1 keeps the solo keyboard layout and is not paused', () => {
+    pads = [mkPad(0)];
+    const s = new GameSession({ characters: ['dex', 'juno'], twoPlayer: false, mission: 1 });
+    const gp = new GameplayScene(s, 'sandbox');
+    app.scenes.set(gp, { fade: false });
+    run(1);
+    key(input, 'ArrowRight', true);
+    run(0.2);
+    key(input, 'ArrowRight', false);
+    pads[0].buttons[START].pressed = true;
+    run(0.1);
+    pads[0].buttons[START].pressed = false;
+    run(0.1);
+    expect(app.scenes.current).toBe(gp);
+    expect(s.players[1].joined).toBe(true);
+    expect(input.hasPadFor(1)).toBe(true);
+    expect(input.twoPlayerKeyboard).toBe(false);
+    expect(gp.world.players.length).toBe(2);
+    input.resetPadSeats();
   });
 });

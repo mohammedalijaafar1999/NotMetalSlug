@@ -68,6 +68,8 @@ export class GameplayScene implements Scene {
   continueScreen = false;
   private wasContinueScreen = false;
   private lastDigit = [-1, -1];
+  /** World time at which each player went out (-1 = not this mission). */
+  private outAt = [-1, -1];
 
   constructor(session: GameSession, levelId?: string, opts: GameplayOptions = {}) {
     this.session = session;
@@ -75,6 +77,9 @@ export class GameplayScene implements Scene {
     this.demo = !!opts.demo;
     this.onDemoEnd = opts.onDemoEnd ?? null;
     if (this.demo) this.name = 'demo';
+    // A mission never starts with nobody playing (a solo player is never left out between
+    // missions; see onMissionComplete). Safety net: everyone joined continues.
+    if (!this.demo && session.players.every((p) => !p.joined || p.out)) for (const p of session.players) if (p.joined) session.continueGame(p.index);
     this.snapshot = session.players.map((p) => ({ joined: p.joined, character: p.character, score: p.score, lives: p.lives, continues: p.continues, kills: p.kills, rescues: p.rescues, out: p.out }));
     this.killsAtStart = session.players.map((p) => p.kills);
     const def = (levelId ? getLevel(levelId) : levelForMission(session.mission)) ?? getLevel('sandbox');
@@ -83,6 +88,9 @@ export class GameplayScene implements Scene {
     this.hud.demo = this.demo;
     this.hud.allowJoin = !this.demo;
     this.world = this.buildWorld();
+    // A player still out from the last mission gets the continue prompt again (countdown, then
+    // PRESS START): START or FIRE brings them back with full lives, beside their partner.
+    for (const p of session.players) if (p.joined && p.out && !this.demo) this.hud.continueTimers[p.index] = CONTINUE_SECONDS;
     if (app.debug.autopilot || this.demo) this.enableAutopilot(true);
     if (this.demo) for (const p of this.world.players) p.godMode = true;
   }
@@ -127,6 +135,7 @@ export class GameplayScene implements Scene {
     w.on('playerOut', (e) => {
       this.hud.continueTimers[e.player.index] = CONTINUE_SECONDS;
       this.lastDigit[e.player.index] = -1;
+      this.outAt[e.player.index] = w.time;
     });
     return w;
   }
@@ -272,12 +281,14 @@ export class GameplayScene implements Scene {
       return;
     }
 
-    // Drop-in: player 2 presses start/fire on their controls.
+    // Drop-in: player 2 presses start/fire on their controls (a lone pad while player 1 plays
+    // on the keyboard takes the player 2 seat, see InputManager.offerPadToPlayer2).
     const p2 = this.session.players[1];
     if (!this.demo && !p2.joined && this.phase === 'play') {
+      input.offerPadToPlayer2();
       const i2 = input.player(1);
       if (i2.pressed('start') || i2.pressed('fire')) {
-        const shared = input.lastDevice !== 'gamepad';
+        const shared = !input.hasPadFor(1);
         if (shared) input.twoPlayerKeyboard = true;
         this.session.join(1);
         p2.missionRescues = 0;
@@ -374,7 +385,8 @@ export class GameplayScene implements Scene {
     this.lastDigit[i] = -1;
     const pl = this.world.players.find((p) => p.index === i);
     if (pl) pl.respawn();
-    else this.spawnPlayer(this.world, this.session.players[i]);
+    // Out since an earlier mission: drop in beside the partner, with the respawn invulnerability.
+    else this.spawnPlayer(this.world, this.session.players[i], true);
     audio.play('coin');
     this.hud.banner(`${i + 1}P CONTINUE!`, { time: 1.2, scale: 1, color: i === 0 ? C.p1 : C.p2 });
     this.continueScreen = false;
@@ -384,6 +396,16 @@ export class GameplayScene implements Scene {
     if (this.phase === 'complete') return;
     this.phase = 'complete';
     this.phaseTime = 0;
+    // The last life went in the same moment the mission was won (traded the final blow): like a
+    // death that ends after the win (Player.finishDeath), it costs nothing - otherwise the next
+    // mission would start without this player (or, solo, with nobody playing).
+    const w = this.world;
+    for (const prof of this.session.players) {
+      if (!prof.joined || !prof.out || this.outAt[prof.index] < 0 || w.time - this.outAt[prof.index] > 0.25) continue;
+      prof.out = false;
+      prof.lives = Math.max(1, prof.lives);
+      w.players.find((p) => p.index === prof.index)?.respawn();
+    }
     for (const p of this.world.players) p.celebrate();
     this.hud.continueTimers = [-1, -1];
     this.hud.banner('MISSION', { time: 4.5, scale: 3, color: C.gold });

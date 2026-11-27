@@ -14,7 +14,7 @@ import { app } from '../app';
 import { flow } from './flow';
 import { Menu } from './menu';
 import { backdrop } from './backdrop';
-import { C, blink, ctl, easeOutBack, enterMenu, panel, rect, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
+import { C, blink, ctl, easeOutBack, enterMenu, panel, rect, text, touchOnly, twoTone, uiInput, uiSfx, syncTouch } from './ui';
 import { LOGO_SHINE_FRAMES, LOGO_W, RIBBON_W } from '../content/ui/art';
 import { Particles } from '../game/effects';
 import { MissionSelectScene } from './missionselect';
@@ -48,7 +48,12 @@ export class TitleScene implements Scene {
     TitleScene.introShown = true;
     this.menu = new Menu([
       { label: 'START 1 PLAYER', action: () => flow.newGame({ twoPlayer: false }), hint: 'TAKE ON THE LEGION SOLO. A FRIEND CAN JOIN ANY TIME.' },
-      { label: 'START 2 PLAYERS', action: () => flow.newGame({ twoPlayer: true }), hint: 'TWO-PLAYER CO-OP ON ONE KEYBOARD OR TWO GAMEPADS.' },
+      {
+        label: 'START 2 PLAYERS',
+        action: () => flow.newGame({ twoPlayer: true }),
+        // Touch controls drive player 1 only.
+        hint: () => (touchOnly() ? 'PLAYER 2 NEEDS A KEYBOARD OR A GAMEPAD.' : 'CO-OP ON ONE KEYBOARD, A KEYBOARD AND A PAD, OR TWO PADS.'),
+      },
       {
         label: 'MISSION SELECT',
         action: () => app.scenes.push(new MissionSelectScene()),

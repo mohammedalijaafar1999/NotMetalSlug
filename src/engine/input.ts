@@ -328,8 +328,17 @@ export class InputManager {
   private captureCb: ((code: string) => void) | null = null;
   readonly touch = new TouchControls();
   lastDevice: 'keyboard' | 'gamepad' | 'touch' = 'keyboard';
-  /** Gamepad indices assigned to players (by connection order). */
+  /**
+   * Gamepad indices assigned to player slots (by connection order). -1 marks a slot with no pad
+   * (player 1 on the keyboard after a lone pad took the player 2 seat).
+   */
   private padOrder: number[] = [];
+  /** What player 1 last played with (moves / buttons; START is not counted). */
+  p1Device: 'keyboard' | 'gamepad' | 'touch' | null = null;
+  /** Set by offerPadToPlayer2() for the next poll. */
+  private p2PadOffer = false;
+  /** Each live pad's actions at the previous poll (edge detection for the player 2 seat). */
+  private padPrev = new Map<number, boolean[]>();
   /** Called on the first user gesture (used to unlock audio). */
   onFirstGesture: (() => void) | null = null;
   /** Called after the window lost focus / the tab was hidden and held input was released. */
@@ -439,13 +448,37 @@ export class InputManager {
     return this.pads().some(Boolean);
   }
 
+  /** True if a connected gamepad drives player i. */
+  hasPadFor(i: number): boolean {
+    const idx = this.padOrder[i];
+    return idx !== undefined && idx >= 0 && this.pads().some((p) => !!p && p.connected && p.index === idx);
+  }
+
+  /**
+   * Scenes where player 2 can drop in call this on every update. While player 1 plays on the
+   * keyboard (or touch), a lone gamepad's START or FIRE then takes the player 2 seat (and keeps
+   * it) instead of driving and pausing player 1, so the press joins player 2.
+   */
+  offerPadToPlayer2(): void {
+    this.p2PadOffer = true;
+  }
+
+  /** Between games: the connected pads take the player slots in order (a lone pad is player 1). */
+  resetPadSeats(): void {
+    const live = new Set(this.pads().filter((p) => !!p && p.connected).map((p) => p!.index));
+    this.padOrder = this.padOrder.filter((i) => i >= 0 && live.has(i));
+  }
+
   /**
    * Give a newly seen pad a player slot: the first slot whose pad is gone (a reconnecting pad
    * normally gets its old index back, so it returns to its own player), else a new slot.
    */
   private assignPad(index: number, live: Set<number>): void {
     if (this.padOrder.includes(index)) return;
-    const free = this.padOrder.findIndex((i) => !live.has(i));
+    // A slot whose pad dropped out first (a pad coming back with a new index), then a slot
+    // with no pad (player 1 on the keyboard), else a new slot.
+    let free = this.padOrder.findIndex((i) => i >= 0 && !live.has(i));
+    if (free < 0) free = this.padOrder.indexOf(-1);
     if (free >= 0) this.padOrder[free] = index;
     else this.padOrder.push(index);
   }
@@ -490,11 +523,23 @@ export class InputManager {
     // Maintain stable order of pads.
     const live = new Set(pads.map((p) => p.index));
     for (const p of pads) this.assignPad(p.index, live);
+    const raw = new Map(pads.map((p) => [p.index, padActions(readPad(p))] as const));
+    // Couch setup: player 1 on the keyboard, a friend picks up the only pad and presses START
+    // or FIRE while player 2 can join -> that pad becomes player 2's.
+    const offer = this.p2PadOffer;
+    this.p2PadOffer = false;
+    if (offer && pads.length === 1 && this.padOrder[0] === pads[0].index && (this.p1Device === 'keyboard' || this.p1Device === 'touch')) {
+      const now = raw.get(pads[0].index)!;
+      const before = this.padPrev.get(pads[0].index);
+      const edge = (a: Action) => now[ACTIONS.indexOf(a)] && !before?.[ACTIONS.indexOf(a)];
+      if (edge('start') || edge('fire')) {
+        this.padOrder[0] = -1;
+        this.padOrder[1] = pads[0].index;
+      }
+    }
+    this.padPrev = raw;
     // One entry per player slot; a slot whose pad is disconnected reads as all released.
-    const padStates = this.padOrder.map((i) => {
-      const p = pads.find((q) => q.index === i);
-      return p ? padActions(readPad(p)) : ACTIONS.map(() => false);
-    });
+    const padStates = this.padOrder.map((i) => raw.get(i) ?? ACTIONS.map(() => false));
     if (padStates.some((s) => s.some(Boolean))) {
       this.lastDevice = 'gamepad';
       this.gesture();
@@ -519,6 +564,13 @@ export class InputManager {
         }
       }
       const pad = padStates[pi];
+      if (pi === 0) {
+        // What player 1 plays with (START is left out: ESC to pause is not "playing").
+        const used = (d: (i: number) => boolean) => ACTIONS.some((a, i) => a !== 'start' && d(i));
+        if (used((i) => down[i] || tap[i])) this.p1Device = 'keyboard';
+        else if (pad && used((i) => pad[i])) this.p1Device = 'gamepad';
+        else if (this.touch.enabled && used((i) => this.touch.state[ACTIONS[i]] || this.touch.taps[ACTIONS[i]])) this.p1Device = 'touch';
+      }
       if (pad) for (let i = 0; i < n; i++) down[i] = down[i] || pad[i];
       if (pi === 0 && this.touch.enabled) {
         for (let i = 0; i < n; i++) {

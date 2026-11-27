@@ -27,6 +27,8 @@ export function installUiFlow(): void {
       if (applyUrlParams()) return;
     }
     input.twoPlayerKeyboard = false;
+    // Between games a lone pad drives player 1 again (see InputManager.offerPadToPlayer2).
+    input.resetPadSeats();
     app.scenes.set(new TitleScene());
   };
   flow.newGame = ({ twoPlayer, mission }) => app.scenes.set(new CharSelectScene({ twoPlayer, mission }));

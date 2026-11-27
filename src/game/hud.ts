@@ -79,7 +79,13 @@ export function continueState(session: GameSession, timers: number[]): { allOut:
 /** The button player 2 presses to drop in: START on a gamepad, their START key on the keyboard. */
 export function joinKey(): string {
   if (input.lastDevice === 'gamepad') return 'START';
-  const ks = input.bindings.p2.start ?? [];
+  return startKeyLabel(1);
+}
+
+/** Player i's START: START on the gamepad that drives them, else their (first) START key. */
+export function startKeyLabel(i: 0 | 1): string {
+  if (input.hasPadFor(i)) return 'START';
+  const ks = (i === 0 ? input.bindings.p1 : input.bindings.p2).start ?? [];
   const k = ks.find((c) => !c.startsWith('Numpad')) ?? ks[0];
   return k ? keyLabel(k) : 'START';
 }
@@ -306,7 +312,8 @@ export class Hud {
     if (t >= 0) {
       drawText(g, `CONTINUE? ${Math.max(0, Math.floor(t))}`, cx, 14, { align: 'center', color: blink(this.time, 2) ? C.gold : C.white, outline: C.out });
     } else if (blink(this.time, 1.5, 0.7)) {
-      drawText(g, 'PRESS START', cx, 14, { align: 'center', color: C.white, outline: C.out });
+      // Name the key: player 2 on the keyboard presses RSHIFT, not "START".
+      drawText(g, `PRESS ${startKeyLabel(i as 0 | 1)}`, cx, 14, { align: 'center', color: C.white, outline: C.out });
     }
   }
 
