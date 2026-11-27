@@ -61,7 +61,7 @@ for (const x of [0, 1500, 3000, 4500, 6000]) b.add('m5_airspace', x, 0, {}, x ==
 
 // ------------------------------------------------------------------ A: first contact
 
-b.add('fighter', 1040, undefined, { facing: -1, passes: 3, alt: 92 });
+b.add('fighter', 1040, undefined, { facing: -1, passes: 3, alt: 104 });
 {
   const g1 = b.ship('gunship', 1140, S(156), -1);
   b.deco('m5_searchlight', g1.deck1 - 12, g1.deckY, { facing: -1 });
@@ -161,7 +161,7 @@ b.add('crate_prop', 3680, 150, { drop: 'H', size: 'small' });
 
 b.add('m5_supply', 4080, undefined, { item: 'fuel' }, 4140);
 b.add('fighter', 4340, undefined, { facing: -1, passes: 3, alt: 100 });
-b.add('fighter', 4400, undefined, { facing: 1, passes: 2, alt: 64 }, 4420);
+b.add('fighter', 4400, undefined, { facing: 1, passes: 2, alt: 136 }, 4420);
 b.barge(4330, 4560, S(160), 1, [4362, 4528]);
 b.platform(4452, S(160) - 30, 60, 'catwalk');
 b.add('rifleman', 4380, S(160), { behavior: 'patrol' });
@@ -169,7 +169,7 @@ b.add('bazooka', 4418, S(160), { behavior: 'guard' });
 b.add('hostage', 4448, S(160), { mode: 'caged', drop: 'fuel', look: 2 });
 b.add('rifleman', 4486, S(160), { behavior: 'idle', facing: -1 });
 b.add('sniper', 4482, S(160) - 30, { behavior: 'guard' });
-b.add('heli', 4920, undefined, { facing: -1, alt: 72, bombs: false });
+b.add('heli', 4920, undefined, { facing: -1, alt: 78, bombs: false });
 {
   const g3 = b.ship('gunship', 4760, S(110), 1);
   b.deco('m5_lamp', g3.deck0 + 8, g3.deckY, { facing: -1 });
@@ -202,7 +202,7 @@ b.barge(5050, 5200, S(176), 1, [5080, 5170]);
   b.add('rifleman', 5650, f2.deckY, { behavior: 'guard' });
   b.add('grenadier', 5680, f2.deckY, { behavior: 'guard' });
 }
-b.add('fighter', 5890, undefined, { facing: -1, passes: 2, alt: 92 });
+b.add('fighter', 5890, undefined, { facing: -1, passes: 2, alt: 108 });
 b.add('jetpack', 5780, S(66), { ...JET });
 b.add('jetpack', 5820, S(118), { ...JET }, 5830);
 b.add('m5_supply', 6040, undefined, { item: 'fuel' }, 6100);
@@ -270,8 +270,8 @@ registerLevel({
         {
           delay: 0.6,
           spawns: [
-            { type: 'fighter', x: 1300, props: { facing: 1, passes: 3, alt: 76 } },
-            { type: 'fighter', x: 1780, props: { facing: -1, passes: 3, alt: 136 } },
+            { type: 'fighter', x: 1300, props: { facing: 1, passes: 3, alt: 100 } },
+            { type: 'fighter', x: 1780, props: { facing: -1, passes: 3, alt: 142 } },
           ],
         },
         {
@@ -287,7 +287,7 @@ registerLevel({
         {
           delay: 1.0,
           spawns: [
-            { type: 'heli', x: 1800, props: { facing: -1, alt: 70, bombs: false } },
+            { type: 'heli', x: 1800, props: { facing: -1, alt: 78, bombs: false } },
             { type: 'paratrooper', x: 1566, props: { drift: 0 } },
             { type: 'paratrooper', x: 1612, props: { drift: 0 } },
             { type: 'paratrooper', x: 1660, props: { drift: 0 } },
@@ -321,7 +321,7 @@ registerLevel({
         {
           delay: 1.0,
           spawns: [
-            { type: 'heli', x: 2990, props: { facing: -1, alt: 74, bombs: false } },
+            { type: 'heli', x: 2990, props: { facing: -1, alt: 78, bombs: false } },
             { type: 'fighter', x: 2520, props: { facing: 1, passes: 2, alt: 124 } },
           ],
         },
@@ -355,7 +355,7 @@ registerLevel({
         {
           delay: 1.0,
           spawns: [
-            { type: 'heli', x: 3990, props: { facing: -1, alt: 66, bombs: false } },
+            { type: 'heli', x: 3990, props: { facing: -1, alt: 78, bombs: false } },
             { type: 'drone', x: 3530, props: { kind: 'kamikaze', alt: 50 } },
             { type: 'drone', x: 3522, props: { kind: 'kamikaze', alt: 90 } },
             { type: 'drone', x: 3514, props: { kind: 'kamikaze', alt: 126 } },
@@ -369,7 +369,7 @@ registerLevel({
         {
           delay: 0.6,
           spawns: [
-            { type: 'fighter', x: 4860, props: { facing: 1, passes: 3, alt: 70 } },
+            { type: 'fighter', x: 4860, props: { facing: 1, passes: 3, alt: 104 } },
             { type: 'fighter', x: 5320, props: { facing: -1, passes: 3, alt: 132 } },
             { type: 'drone', x: 5300, props: { kind: 'zap', alt: 60 } },
             { type: 'drone', x: 5316, props: { kind: 'zap', alt: 150 } },
@@ -378,7 +378,7 @@ registerLevel({
         {
           delay: 1.0,
           spawns: [
-            { type: 'heli', x: 5320, props: { facing: -1, alt: 64, bombs: false } },
+            { type: 'heli', x: 5320, props: { facing: -1, alt: 78, bombs: false } },
             { type: 'heli', x: 4860, props: { facing: 1, alt: 104, bombs: false } },
           ],
         },

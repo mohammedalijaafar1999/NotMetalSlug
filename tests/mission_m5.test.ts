@@ -118,6 +118,25 @@ describe('mission 5 STORMFRONT level', () => {
     }
   });
 
+  it('always leaves a wide flyable corridor for the gyro (no forced squeezes on the auto-scroll)', () => {
+    const w = makeWorld('m5');
+    const T = w.terrain;
+    for (let cx = 0; cx <= L.width - VIEW_W; cx += 16) {
+      const camY = w.camera.boundsAt(cx).minY;
+      // Gyro feet band inside the view (Vehicle.clampToView) and a 40 px wide probe anywhere in it.
+      let best = 0;
+      for (let x = cx + 30; x <= cx + VIEW_W - 30; x += 24) {
+        let run = 0;
+        for (let y = camY + 36; y <= camY + 210; y += 2) {
+          const blocked = T.solidOverlap({ x: x - 20, y: y - 22, w: 40, h: 22 }, null);
+          run = blocked ? 0 : run + 2;
+          best = Math.max(best, run);
+        }
+      }
+      expect(best, `corridor at camera x ${cx}`).toBeGreaterThanOrEqual(40);
+    }
+  });
+
   it('builds the boss arena to THUNDERHEAD\'s notes: open sky, fixed camera, kill floor far below', () => {
     const lock = L.locks!.find((l) => l.boss)!;
     expect(lock.x).toBe(L.width - VIEW_W);
