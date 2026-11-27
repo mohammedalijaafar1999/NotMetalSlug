@@ -414,6 +414,31 @@ describe('special movers', () => {
     expect(jp.dying).toBe(true);
     expect(until(w, () => jp.onGround, 300)).toBeGreaterThanOrEqual(0);
   });
+
+  it('jetpack never fires from out of view: a wind-up that drifts off-screen is dropped, grounded ones never shoot', () => {
+    const shotsBy = (w: World, e: Entity) => w.query((x) => x instanceof Projectile && x.team === 'enemy' && x.owner === e).length;
+    for (const attack of ['aim', 'drop'] as const) {
+      const w = arena();
+      const p = w.players[0];
+      const jp = w.spawn('jetpack', p.x + (attack === 'drop' ? 0 : 60), p.y - 70) as JetpackTrooper;
+      (jp as any).nextAttack = attack === 'aim' ? 'burst' : 'drop';
+      expect(until(w, () => jp.state === attack, 600), attack).toBeGreaterThanOrEqual(0);
+      // The camera "moves on" mid wind-up: he is now well outside the view.
+      jp.x = w.camera.x - 121;
+      for (let i = 0; i < 60 * 2; i++) {
+        jp.x = Math.min(jp.x, w.camera.x - 121);
+        step(w, 1);
+        expect(shotsBy(w, jp), `${attack}: nothing fired from off-screen`).toBe(0);
+      }
+    }
+    // Grounded (no y) and off-screen: stays quiet.
+    const w = arena();
+    const jp = w.spawn('jetpack', w.camera.x + VIEW_W + 140) as JetpackTrooper;
+    for (let i = 0; i < 60 * 4; i++) {
+      step(w, 1);
+      if (!jp.onScreen(-6)) expect(shotsBy(w, jp)).toBe(0);
+    }
+  });
 });
 
 describe('officer', () => {
