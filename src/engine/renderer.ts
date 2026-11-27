@@ -107,43 +107,46 @@ export class Renderer {
       g.fillRect(0, 0, VIEW_W, VIEW_H);
       g.globalAlpha = 1;
     }
+    // The letterbox bars never need repainting: resize() resets the display canvas (to opaque
+    // black, alpha: false) and nothing draws outside the game rectangle.
     const d = this.dctx;
     d.setTransform(1, 0, 0, 1, 0, 0);
-    d.fillStyle = '#000';
-    d.fillRect(0, 0, this.display.width, this.display.height);
+    d.globalAlpha = 1;
     d.imageSmoothingEnabled = false;
     const w = Math.round(VIEW_W * this.scale);
     const h = Math.round(VIEW_H * this.scale);
     d.drawImage(this.buffer, this.offX, this.offY, w, h);
     if (this.crt && this.scale >= 2.5) {
-      const pat = this.scanlinePattern();
-      if (pat) {
-        d.globalAlpha = 1;
-        d.fillStyle = d.createPattern(pat, 'repeat')!;
-        d.save();
-        d.translate(this.offX, this.offY);
-        d.fillRect(0, 0, w, h);
-        d.restore();
-        // Vignette.
-        const grd = d.createRadialGradient(this.offX + w / 2, this.offY + h / 2, h * 0.45, this.offX + w / 2, this.offY + h / 2, h * 0.95);
-        grd.addColorStop(0, 'rgba(0,0,0,0)');
-        grd.addColorStop(1, 'rgba(0,0,0,0.35)');
-        d.fillStyle = grd;
-        d.fillRect(this.offX, this.offY, w, h);
-      }
+      const ov = this.crtOverlay(w, h);
+      if (ov) d.drawImage(ov, this.offX, this.offY);
     }
   }
 
-  private scanlinePattern(): HTMLCanvasElement | null {
+  /**
+   * Scanlines + vignette baked once per display size. Each dark line sits at the bottom of a
+   * low-res pixel row, so they stay aligned even when the scale is not a whole number (a
+   * repeating pattern with a rounded period drifts across the rows and beats into moire bands).
+   */
+  private crtOverlay(w: number, h: number): HTMLCanvasElement | null {
     const s = this.scale;
-    if (this.scanlines && this.scanScale === s) return this.scanlines;
-    const ph = Math.max(2, Math.round(s));
+    if (this.scanlines && this.scanScale === s && this.scanlines.width === w && this.scanlines.height === h) return this.scanlines;
     const c = document.createElement('canvas');
-    c.width = 4;
-    c.height = ph;
-    const x = c.getContext('2d')!;
+    c.width = w;
+    c.height = h;
+    const x = c.getContext('2d');
+    if (!x) return null;
     x.fillStyle = 'rgba(0,0,0,0.28)';
-    x.fillRect(0, ph - Math.max(1, Math.floor(ph / 3)), 4, Math.max(1, Math.floor(ph / 3)));
+    for (let r = 0; r < VIEW_H; r++) {
+      const y0 = Math.round(r * s);
+      const y1 = Math.round((r + 1) * s);
+      const lh = Math.max(1, Math.floor((y1 - y0) / 3));
+      x.fillRect(0, y1 - lh, w, lh);
+    }
+    const grd = x.createRadialGradient(w / 2, h / 2, h * 0.45, w / 2, h / 2, h * 0.95);
+    grd.addColorStop(0, 'rgba(0,0,0,0)');
+    grd.addColorStop(1, 'rgba(0,0,0,0.35)');
+    x.fillStyle = grd;
+    x.fillRect(0, 0, w, h);
     this.scanlines = c;
     this.scanScale = s;
     return c;

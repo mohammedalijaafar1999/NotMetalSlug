@@ -31,3 +31,6 @@ steps ~1 ms. Present (buffer flush) 39% of main thread; HUD text 10%.
 
 ## Gotchas
 - headless canvas is GPU (SwiftShader); drawImage calls are deferred, the flush shows up in present().
+
+## Interrupted (usage limit)
+- The previous attempt was cut off; its uncommitted files were committed as 'WIP review_av: salvaged after interruption'. Review them (git show --stat HEAD), keep what is good, delete throwaway files, and continue.
