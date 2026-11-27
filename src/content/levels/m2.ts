@@ -339,7 +339,8 @@ const locks: LevelDef['locks'] = [
       {
         delay: 1,
         spawns: [
-          { type: 'truck', x: 1086, y: B, props: { troops: 2, troop: 'bazooka', stopX: 1200, facing: 1 } },
+          // Vehicles that come up behind you are announced on that edge first (m2_incoming).
+          { type: 'm2_incoming', x: 1086, props: { type: 'truck', y: B, props: { troops: 2, troop: 'bazooka', stopX: 1200, facing: 1 } } },
           { type: 'rifleman', x: 1560, props: { behavior: 'charge', facing: -1 } },
         ],
       },
@@ -361,7 +362,7 @@ const locks: LevelDef['locks'] = [
         delay: 0.6,
         spawns: [
           { type: 'truck', x: 3170, props: { troops: 3, troop: 'rifleman', stopX: 3010, facing: -1 } },
-          { type: 'jeep', x: 2664, props: { stopX: 2780, facing: 1 } },
+          { type: 'm2_incoming', x: 2664, props: { type: 'jeep', props: { stopX: 2780, facing: 1 } } },
         ],
       },
       {
@@ -413,7 +414,7 @@ const locks: LevelDef['locks'] = [
         delay: 0.6,
         spawns: [
           { type: 'truck', x: 6330, props: { troops: 2, troop: 'bazooka', stopX: 6170, facing: -1 } },
-          { type: 'truck', x: 5826, props: { troops: 3, troop: 'rifleman', stopX: 5940, facing: 1 } },
+          { type: 'm2_incoming', x: 5826, props: { type: 'truck', props: { troops: 3, troop: 'rifleman', stopX: 5940, facing: 1 } } },
         ],
       },
       {
@@ -429,7 +430,7 @@ const locks: LevelDef['locks'] = [
         delay: 1,
         spawns: [
           { type: 'light_tank', x: 6340, props: { behavior: 'advance', facing: -1 } },
-          { type: 'jeep', x: 5820, props: { stopX: 5960, facing: 1 } },
+          { type: 'm2_incoming', x: 5820, props: { type: 'jeep', props: { stopX: 5960, facing: 1 } } },
         ],
       },
       {

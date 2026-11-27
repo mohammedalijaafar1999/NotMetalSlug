@@ -11,6 +11,7 @@ import type { SpawnSpec } from '../src/game/registry';
 import { M2_BOSS_X, M2_BRIDGE } from '../src/content/levels/m2';
 import { BRIDGE_DROP, SPAN, type Bridge } from '../src/content/levels/m2/bridge';
 import type { Vehicle } from '../src/game/vehicle';
+import type { Incoming } from '../src/content/levels/m2/incoming';
 
 function level(): LevelDef {
   const L = getLevel('m2');
@@ -194,6 +195,47 @@ describe('mission 2 - rigged rail bridge', () => {
     expect(Math.round(p.y)).toBe(M2_BRIDGE.y + BRIDGE_DROP);
     // The walker parked on the deck was wrecked with the span.
     expect((mech as any).destroyed || mech.dead).toBe(true);
+  });
+});
+
+describe('mission 2 - incoming-vehicle warning', () => {
+  it('telegraphs first, spawns the vehicle after the delay and blocks until it is gone', () => {
+    const w = makeWorld('m2');
+    w.level.warp(5300);
+    w.players[0].x = 5400;
+    w.players[0].y = 380;
+    step(w, 30);
+    const x = w.camera.x - 60;
+    const inc = w.spawn('m2_incoming', x, undefined, { type: 'jeep', delay: 1.2, props: { facing: 1, stopX: w.camera.x + 120 } }) as Incoming;
+    expect(inc.blocksProgress).toBe(true);
+    step(w, 60);
+    expect(inc.child).toBe(null);
+    expect(w.entities.some((e) => e.type === 'jeep')).toBe(false);
+    step(w, 20);
+    const jeep = inc.child!;
+    expect(jeep?.type).toBe('jeep');
+    step(w, 60);
+    expect(inc.dead).toBe(false);
+    jeep.damage({ amount: 9999, kind: 'explosion', owner: w.players[0] });
+    for (let i = 0; i < 1200 && !inc.dead; i++) step(w, 1);
+    expect(inc.dead).toBe(true);
+  });
+
+  it('without a type it just goes away', () => {
+    const w = makeWorld('m2');
+    const inc = w.spawn('m2_incoming', w.camera.x + 100, undefined, {})!;
+    step(w, 2);
+    expect(inc.dead).toBe(true);
+  });
+
+  it('is used for every vehicle that enters an arena from behind the player', () => {
+    for (const lock of level().locks ?? []) {
+      for (const wave of lock.waves) {
+        for (const s of wave.spawns) {
+          if (['truck', 'jeep', 'light_tank'].includes(s.type)) expect(s.x, `${s.type} at ${s.x} enters from the left of lock ${lock.x}`).toBeGreaterThan(lock.x + VIEW_W);
+        }
+      }
+    }
   });
 });
 
