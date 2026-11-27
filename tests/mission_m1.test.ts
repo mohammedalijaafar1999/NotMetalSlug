@@ -16,6 +16,7 @@ import { M1 } from '../src/content/themes/m1/layout';
 import { ARENAS } from '../src/content/levels/m1/encounters';
 import { BOG_TIME, RiverBog } from '../src/content/levels/m1/bog';
 import { StockadeGate } from '../src/content/levels/m1/gate';
+import { Incoming } from '../src/content/levels/m2/incoming';
 import { Grinder } from '../src/content/bosses/boss_m1';
 
 const def = (): LevelDef => getLevel('m1')!;
@@ -99,15 +100,23 @@ describe('mission m1 - level data', () => {
     expect(paraLocks.length).toBe(1);
   });
 
-  it('wave enemies walk in from the right, drop from above, or (sabers) sneak in at the left edge', () => {
+  it('wave enemies walk in from the right, drop from above, or (sabers) come from behind after a warning', () => {
     for (const l of def().locks ?? []) {
       if (l.boss) continue;
       for (const wv of l.waves) {
         for (const s of wv.spawns) {
-          if (getEntityType(s.type)?.category !== 'enemy') continue;
           const where = `${s.type}@${s.x} in lock ${l.x}`;
-          if (s.type === 'saber') expect(s.x, where).toBeGreaterThanOrEqual(l.x + 8);
-          else if (s.type === 'paratrooper' || s.type === 'mortar') {
+          if (s.type === 'm2_incoming') {
+            // Telegraphed entry from behind: a swordsman, just past the left edge (runs in).
+            expect(s.props?.type, where).toBe('saber');
+            expect(s.props?.rumble, where).toBe(false);
+            expect(s.x, where).toBeLessThanOrEqual(l.x - 12);
+            expect(s.x, where).toBeGreaterThanOrEqual(l.x - 40);
+            continue;
+          }
+          if (getEntityType(s.type)?.category !== 'enemy') continue;
+          expect(s.type, `${where}: sabers come through the edge warning`).not.toBe('saber');
+          if (s.type === 'paratrooper' || s.type === 'mortar') {
             // From above / set up at the far end: inside the locked view.
             expect(s.x, where).toBeGreaterThanOrEqual(l.x + 40);
             expect(s.x, where).toBeLessThanOrEqual(l.x + VIEW_W - 24);
@@ -269,6 +278,47 @@ describe('mission m1 - mechanics', () => {
     expect(p.x).toBeGreaterThan(s.x + s.w);
     expect(p.onGround).toBe(true);
   });
+
+  for (const [name, L] of [
+    ['jungle road', ARENAS.road],
+    ['gauntlet', ARENAS.gauntlet],
+  ] as const) {
+    it(`${name} arena: the swordsman from behind is announced on the left edge, then runs in from off-screen`, () => {
+      const w = makeWorld('m1', { god: true });
+      const p = w.players[0];
+      step(w, 30);
+      w.level.warp(L);
+      p.x = L + 16; // backed up against the left edge, facing the right side
+      p.y = w.camera.y + 20;
+      const lock = () => w.level.activeLock;
+      // Clear the earlier waves by script until the saber wave starts.
+      for (let i = 0; i < 60 * 60 && !(lock() && lock()!.wave >= lock()!.def.waves.length - 1); i++) {
+        for (const e of w.entities) if (e.team === 'enemy' && e.hittable) e.damage({ amount: 999, kind: 'explosion', owner: p });
+        p.x = L + 16;
+        step(w, 1);
+      }
+      expect(lock()?.def.x).toBe(L);
+      expect(lock()!.wave).toBe(lock()!.def.waves.length - 1);
+      const inc = w.entities.find((e) => e instanceof Incoming);
+      expect(inc, 'edge warning').toBeTruthy();
+      let t = 0;
+      let seen = -1;
+      for (let i = 0; i < 60 * 3 && seen < 0; i++) {
+        p.x = L + 16;
+        step(w, 1);
+        t += 1 / 60;
+        const s = w.entities.find((e) => e.type === 'saber' && !e.dead);
+        if (s) {
+          seen = t;
+          // Spawned past the left edge, not inside the view next to the player.
+          expect(s.right).toBeLessThan(w.camera.x);
+          expect(p.x - s.x).toBeGreaterThan(24);
+        }
+      }
+      expect(seen, 'the saber shows up').toBeGreaterThan(0);
+      expect(seen, 'seconds of warning').toBeGreaterThanOrEqual(0.8);
+    });
+  }
 
   it('the GRINDER smashes through the stockade gate on its entrance', () => {
     const w = makeWorld('m1', { god: true });

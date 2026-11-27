@@ -1,12 +1,15 @@
-// Mission 2 fairness helper: m2_incoming telegraphs something entering from a screen edge (a truck
-// or jeep coming up behind you in a locked arena), then spawns it.
+// Lock-wave fairness helper (missions 1 and 2): m2_incoming telegraphs something entering from a
+// screen edge (a truck or jeep coming up behind you, a swordsman sneaking in from the left edge of a
+// locked arena), then spawns it.
 //
-//   { type: 'm2_incoming', x, props: { type: 'truck', props: { ... }, delay: 1.3, y? } }
+//   { type: 'm2_incoming', x, props: { type: 'truck', props: { ... }, delay: 1.3, y?, rumble? } }
 //
 // While waiting, a blinking "!" sign with an arrow sits on the screen edge of the entry side, dust
-// kicks up there and an engine rumble pans in from that side. After props.delay seconds the entity
-// is spawned at x (props.y, or on the floor) and the helper keeps the lock wave blocked until that
-// entity is dead or no longer blocks progress - exactly as if it had been spawned by the wave.
+// kicks up there and an engine rumble pans in from that side (props.rumble = false for soldiers: no
+// engine, no dust, just the sign and the alert). After props.delay seconds the entity is spawned at x
+// (props.y, or on the floor; put x just past the screen edge so it runs in) and the helper keeps the
+// lock wave blocked until that entity is dead or no longer blocks progress - exactly as if it had
+// been spawned by the wave.
 
 import { Entity } from '../../../game/entity';
 import { Z } from '../../../game/constants';
@@ -22,6 +25,8 @@ export class Incoming extends Entity {
   private delay: number;
   private t = 0;
   private rumble = 0;
+  /** Engine rumble + dust while waiting (vehicles); false = sign and alert only (soldiers). */
+  private engine: boolean;
   child: Entity | null = null;
 
   constructor(props: Record<string, any>) {
@@ -30,6 +35,7 @@ export class Incoming extends Entity {
     this.childProps = props.props ?? {};
     this.childY = typeof props.y === 'number' ? props.y : undefined;
     this.delay = props.delay ?? 1.3;
+    this.engine = props.rumble !== false;
     this.blocksProgress = true;
     this.persistent = true;
     this.hittable = false;
@@ -66,7 +72,7 @@ export class Incoming extends Entity {
       this.rumble -= dt;
       const ex = this.edgeX();
       const floor = this.world.terrain.topFloorAt(ex) ?? this.y;
-      if (this.rumble <= 0) {
+      if (this.rumble <= 0 && this.engine) {
         this.rumble = 0.4;
         this.world.sfx('engine', ex, { vol: 0.5, pitch: 0.8 });
         this.world.particles.dust(ex - this.side * 4, floor, 3);
@@ -120,5 +126,5 @@ registerEntity(
   'm2_incoming',
   'misc',
   (_w, s) => new Incoming(s.props ?? {}),
-  'Mission 2 lock-wave helper: telegraphs an entity entering from a screen edge (blinking "!" + arrow on that edge, dust, engine rumble), spawns props.type with props.props at x after props.delay (1.3 s) and blocks the wave until it is gone.',
+  'Lock-wave helper (missions 1-2): telegraphs an entity entering from a screen edge (blinking "!" + arrow on that edge, dust, engine rumble; props.rumble=false for soldiers), spawns props.type with props.props at x after props.delay (1.3 s) and blocks the wave until it is gone.',
 );

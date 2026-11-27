@@ -10,8 +10,9 @@
 // Wave rules learned the hard way: riflemen and grenadiers only walk toward you from beyond ~130-170
 // px and back away when you get close - spawned at (or pushed past) the LEFT edge of a locked screen
 // they never come back into view and the wave never ends. So wave infantry enters off the RIGHT edge
-// (they walk in) or from above (paratroopers); only sabers (who always charge) sneak in at the left
-// edge. Officers stand on screen.
+// (they walk in) or from above (paratroopers); only sabers (who always charge) come in from behind,
+// and only after a blinking "!" on the left edge (sneak(): m2_incoming, then they run in from just
+// past the edge - never popping into view next to you). Officers stand on screen.
 
 import type { LockDef } from '../../../game/level';
 import type { SpawnSpec } from '../../../game/registry';
@@ -30,9 +31,14 @@ const hostage = (x: number, drop: string, mode: 'tied' | 'caged' | 'wander' = 't
 /** Arena camera-left positions (the boss lock is at M1.bossL). */
 export const ARENAS = { beach: 1180, village: 2400, road: 3460, depot: 4600, gauntlet: 5600 } as const;
 
-/** Wave helpers: off the right edge of an arena (walks in), or just inside its left edge (sabers). */
+/** Wave helper: off the right edge of an arena (walks in). */
 const right = (L: number, d: number) => L + 384 + d;
-const behind = (L: number, d = 14) => L + d;
+/**
+ * A swordsman coming up behind you: a blinking "!" on the left edge of the locked screen first
+ * (m2_incoming, no engine rumble), then he runs in from just past that edge. He never pops into
+ * view next to a player who is backing away from the right side.
+ */
+const sneak = (L: number) => at('m2_incoming', L - 18, { type: 'saber', rumble: false, delay: 1.0, props: { behavior: 'charge', facing: 1 } });
 /** Paratrooper dropping in over arena x (starts above the screen). */
 const para = (x: number, props: Props = {}) => at('paratrooper', x, props);
 
@@ -140,7 +146,7 @@ export const LOCKS: LockDef[] = [
     waves: [
       { spawns: [charge('rifleman', right(A.road, 16)), charge('rifleman', right(A.road, 40)), charge('grenadier', right(A.road, 64)), charge('rifleman', right(A.road, 92))], delay: 0.8 },
       { spawns: [at('light_tank', right(A.road, 60), { facing: -1, behavior: 'advance' }), charge('rifleman', right(A.road, 20)), charge('rifleman', right(A.road, 110))], delay: 1.2 },
-      { spawns: [charge('saber', behind(A.road, 14), { facing: 1 }), charge('rifleman', right(A.road, 16)), charge('rifleman', right(A.road, 44))], delay: 1.0 },
+      { spawns: [sneak(A.road), charge('rifleman', right(A.road, 16)), charge('rifleman', right(A.road, 44))], delay: 1.0 },
     ],
   },
   // Arena 4 - fuel depot on the plateau: riflemen, then the mortar crew sets up at the far end,
@@ -160,7 +166,7 @@ export const LOCKS: LockDef[] = [
       { spawns: [charge('shield_trooper', right(A.gauntlet, 16)), charge('rifleman', right(A.gauntlet, 52)), charge('grenadier', right(A.gauntlet, 36)), charge('rifleman', right(A.gauntlet, 80))], delay: 0.8 },
       { spawns: [at('heli', right(A.gauntlet, 40), { facing: -1 }), charge('rifleman', right(A.gauntlet, 24)), charge('rifleman', right(A.gauntlet, 52))], delay: 1.2 },
       { spawns: [charge('rifleman', right(A.gauntlet, 16)), charge('rifleman', right(A.gauntlet, 40)), charge('grenadier', right(A.gauntlet, 64)), charge('rifleman', right(A.gauntlet, 92))], delay: 1.2 },
-      { spawns: [charge('saber', behind(A.gauntlet, 14), { facing: 1 }), charge('shield_trooper', right(A.gauntlet, 20)), charge('rifleman', right(A.gauntlet, 48))], delay: 1.0 },
+      { spawns: [sneak(A.gauntlet), charge('shield_trooper', right(A.gauntlet, 20)), charge('rifleman', right(A.gauntlet, 48))], delay: 1.0 },
     ],
   },
   // Boss - GRINDER (no announce: the boss shows its own WARNING banner).
