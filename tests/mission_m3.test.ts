@@ -76,6 +76,29 @@ describe('mission 3 FROSTBITE PASS', () => {
     }
     expect(L.briefing).toBe(L.briefing!.toUpperCase());
     expect(lines).toBeLessThanOrEqual(11);
+    // Terrain variety: slopes, one-way platforms of several styles, solids, water, a vertical section.
+    expect(L.solids?.length ?? 0).toBeGreaterThan(0);
+    expect(L.water?.length ?? 0).toBeGreaterThan(0);
+    const styles = new Set((L.platforms ?? []).map((p) => p.style ?? 'wood'));
+    for (const st of ['wood', 'metal', 'rock', 'ice']) expect(styles.has(st), st).toBe(true);
+    const w = makeWorld('m3');
+    const climb = w.camera.boundsAt(M3.CLIFF - 170);
+    expect(climb.maxY - climb.minY).toBeGreaterThanOrEqual(300);
+  });
+
+  it('keeps arena waves fair: walkers enter on screen or from the right, officers stand in view', () => {
+    const walkers = new Set(['rifleman', 'grenadier', 'shield_trooper', 'flametrooper', 'bazooka', 'saber', 'robot', 'officer', 'mortar', 'sniper']);
+    for (const lock of L.locks ?? []) {
+      for (const wave of lock.waves) {
+        for (const s of wave.spawns) {
+          if (!walkers.has(s.type)) continue;
+          // Infantry hold 56-170 px from you: spawned beyond the LEFT edge they would idle off-screen.
+          expect(s.x, `${s.type} in lock ${lock.x}`).toBeGreaterThanOrEqual(lock.x + 8);
+          // Officers (and stationary crews) never walk in: they must start inside the locked view.
+          if (s.type === 'officer' || s.type === 'mortar' || s.type === 'sniper') expect(s.x, `${s.type} in lock ${lock.x}`).toBeLessThanOrEqual(lock.x + VIEW_W - 8);
+        }
+      }
+    }
   });
 
   it('builds the boss arena to FROST BASTION spec', () => {
