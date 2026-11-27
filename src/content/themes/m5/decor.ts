@@ -21,6 +21,7 @@ import { cog, Pen } from '../../machines/common';
 import { P5 } from './palette';
 import { SHIPS, type ShipId } from './ships';
 import { hash1 } from './sky';
+import { staticDecor } from '../bake';
 
 // ------------------------------------------------------------------ sprites
 
@@ -417,7 +418,11 @@ const strutDecor: DecorRenderer = (g, d) => {
 };
 
 export const STORM_DECOR: Record<string, DecorRenderer> = {
-  m5_strut: strutDecor,
+  // Static: baked once per strut (~20 fillRects apiece).
+  m5_strut: staticDecor(strutDecor, (d) => {
+    const h = Math.max(4, Math.round((d.props?.h as number) ?? 30));
+    return [d.x - 16, d.y - h - 8, 32, h + 16];
+  }),
   m5_ship: shipDecor,
   m5_mast: mastDecor,
   m5_searchlight: searchlightDecor,

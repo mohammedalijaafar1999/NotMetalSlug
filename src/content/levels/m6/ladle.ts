@@ -8,6 +8,7 @@
 
 import { sprites } from '../../../engine/sprites';
 import { fxRng } from '../../../engine/rng';
+import { VIEW_W } from '../../../engine/renderer';
 import { rectsOverlap } from '../../../engine/math';
 import { registerEntity } from '../../../game/registry';
 import { Actor, Entity } from '../../../game/entity';
@@ -101,6 +102,8 @@ export class MoltenGlob extends Projectile {
 }
 
 type LadleState = 'idle' | 'tilt' | 'pour' | 'right';
+/** Splash landing spots stay this far inside the view. */
+export const SPLASH_EDGE = 8;
 const TILT_T = 0.9;
 const POUR_T = 1.3;
 const RIGHT_T = 0.7;
@@ -176,7 +179,7 @@ export class Ladle extends Entity {
         }
         if (k >= 1) {
           this.set('pour');
-          this.launchSplashes(vis);
+          this.launchSplashes();
           if (vis) this.world.sfx('fire_burst', this.x, { vol: 0.7, pitch: 0.7 });
         }
         break;
@@ -202,12 +205,20 @@ export class Ladle extends Entity {
     }
   }
 
-  private launchSplashes(vis: boolean): void {
-    if (!vis) return;
+  /**
+   * Splash globs arc out to both sides. Only while the stream itself is in view (a ladle hanging
+   * just off screen must not lob globs in from outside), and each landing spot is kept inside the
+   * view so its marker is always readable.
+   */
+  private launchSplashes(): void {
+    const cam = this.world.camera;
+    const left = cam.x + SPLASH_EDGE;
+    const right = cam.x + VIEW_W - SPLASH_EDGE;
+    if (this.x < cam.x || this.x > cam.x + VIEW_W) return;
     for (let i = 0; i < this.splash; i++) {
       const dir = i % 2 === 0 ? -1 : 1;
       const dist = 26 + this.world.rng.range(0, 34);
-      const tx = this.x + dir * dist;
+      const tx = Math.max(left, Math.min(right, this.x + dir * dist));
       const ty = this.world.terrain.groundBelow(tx, this.y - 40) ?? this.y;
       const T = 0.85 + this.world.rng.range(0, 0.25);
       const x0 = this.x;

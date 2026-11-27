@@ -116,6 +116,13 @@ export function glow(g: CanvasRenderingContext2D, cx: number, cy: number, r: num
   const disc = (rr: number, aa: number) => {
     if (rr < 1 || aa <= 0) return;
     g.globalAlpha = aa;
+    // One blit of a baked opaque disc at alpha aa composites exactly like its rows filled at aa
+    // (a lamp's two glows were ~95 fillRects a frame).
+    const img = discImage(rr, color);
+    if (img) {
+      g.drawImage(img, Math.round(cx) - rr, Math.round(cy) - rr);
+      return;
+    }
     g.fillStyle = color;
     for (let dy = -rr; dy <= rr; dy++) {
       const hw = Math.floor(Math.sqrt(rr * rr - dy * dy));
@@ -126,6 +133,32 @@ export function glow(g: CanvasRenderingContext2D, cx: number, cy: number, r: num
   disc(Math.round(r * 0.66), a * 0.3);
   disc(Math.round(r * 0.36), a * 0.45);
   g.globalAlpha = 1;
+}
+
+const discs = new Map<string, HTMLCanvasElement | null>();
+
+/** An opaque pixel disc of radius rr (the glow's row maths), baked once per size and color. */
+function discImage(rr: number, color: string): HTMLCanvasElement | null {
+  const key = rr + color;
+  let c = discs.get(key);
+  if (c === undefined) {
+    c = null;
+    if (typeof document !== 'undefined') {
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = rr * 2 + 1;
+      const x = cv.getContext('2d');
+      if (x) {
+        x.fillStyle = color;
+        for (let dy = -rr; dy <= rr; dy++) {
+          const hw = Math.floor(Math.sqrt(rr * rr - dy * dy));
+          x.fillRect(rr - hw, rr + dy, hw * 2 + 1, 1);
+        }
+        c = cv;
+      }
+    }
+    discs.set(key, c);
+  }
+  return c;
 }
 
 /** Flat pool of light on the ground (pixel ellipse). */

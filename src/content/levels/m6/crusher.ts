@@ -242,6 +242,20 @@ export class Crusher extends Entity {
     w.particles.sparks(this.x + this.headW / 2, this.y - 2, 4, '#ffe080', 120);
   }
 
+  /** Move an actor clear of the head, to the nearer side unless a wall is there. */
+  private pushOut(e: Actor): void {
+    const half = this.headW / 2 + e.w / 2 + 1;
+    const near = e.x < this.x ? -1 : 1;
+    for (const side of [near, -near]) {
+      const x = this.x + side * half;
+      const r: Rect = { x: x - e.w / 2, y: e.y - e.h, w: e.w, h: e.h };
+      if (this.world.terrain.solidOverlap(r, this)) continue;
+      e.x = x;
+      if (Math.sign(e.vx) === -side) e.vx = 0;
+      return;
+    }
+  }
+
   /** Damage everything under the descending head. */
   private crush(): void {
     const r: Rect = { x: this.x - this.headW / 2 + 1, y: this.headTop, w: this.headW - 2, h: HEAD_H };
@@ -254,6 +268,9 @@ export class Crusher extends Entity {
         if (anyE.state !== 'play' && anyE.state !== 'respawn') continue;
         this.hitIds.add(e.id);
         e.damage({ amount: 99, kind: 'crush', x: e.x, y: this.headBottom, dir: e.x < this.x ? -1 : 1 });
+        // An invulnerable player (respawn blink, god mode) survives the hit: squeeze them out to
+        // the nearer side instead of leaving them inside the resting head.
+        if (anyE.state === 'play' || anyE.state === 'respawn') this.pushOut(e);
       } else if (anyE.isVehicle) {
         this.hitIds.add(e.id);
         if (this.scrap) {

@@ -627,6 +627,15 @@ function drawSun(g: CanvasRenderingContext2D, t: Tod, sx: number, sy: number): v
   }
   g.globalAlpha = 1;
   // Disc, with retro gaps across the lower half at sunset.
+  forSunRows(t, (dy, half, color) => {
+    g.fillStyle = color;
+    g.fillRect(Math.round(sx - half), Math.round(sy + dy), half * 2 + 1, 1);
+  });
+}
+
+/** The sun disc's rows: (dy from the center, half width, color). */
+function forSunRows(t: Tod, row: (dy: number, half: number, color: string) => void): void {
+  const r = t.sun.r;
   const rows = Math.ceil(r);
   for (let dy = -rows; dy <= rows; dy++) {
     const half = Math.floor(Math.sqrt(Math.max(0, r * r - dy * dy)));
@@ -635,8 +644,7 @@ function drawSun(g: CanvasRenderingContext2D, t: Tod, sx: number, sy: number): v
       const gap = Math.floor((dy - 1) / 3);
       if ((dy - 1) % 4 < Math.min(3, gap * 0.5 + 0.5)) continue;
     }
-    g.fillStyle = dy < -r * 0.35 ? t.sun.core : mixColor(t.sun.core, t.sun.rim, Math.min(1, (dy + r * 0.35) / (r * 1.35)));
-    g.fillRect(Math.round(sx - half), Math.round(sy + dy), half * 2 + 1, 1);
+    row(dy, half, dy < -r * 0.35 ? t.sun.core : mixColor(t.sun.core, t.sun.rim, Math.min(1, (dy + r * 0.35) / (r * 1.35))));
   }
 }
 
@@ -645,6 +653,106 @@ function circle(g: CanvasRenderingContext2D, cx: number, cy: number, r: number):
     const half = Math.floor(Math.sqrt(r * r - dy * dy));
     g.fillRect(Math.round(cx - half), Math.round(cy + dy), half * 2 + 1, 1);
   }
+}
+
+// The sky bands and the sun used to cost ~150-300 fillRects a frame. Both are now baked: the
+// bands into a 1 px wide strip (stretched over the screen), the sun (three 16% glow rings and the
+// disc) into a small image from the same row maths, rebuilt only when the colors or size change.
+// Math.round(c - n) === Math.round(c) - n for integer n, so a blit at the rounded center lands
+// every row exactly where the live fillRects did.
+
+let skyBake: { key: string; c: HTMLCanvasElement } | null = null;
+
+function paintSky(g: CanvasRenderingContext2D, t: Tod, w: number): void {
+  const bands = 27;
+  for (let i = 0; i < bands; i++) {
+    const s = i / (bands - 1);
+    const seg = s * (t.sky.length - 1);
+    const k = Math.min(t.sky.length - 2, Math.floor(seg));
+    g.fillStyle = mixColor(t.sky[k], t.sky[k + 1], seg - k);
+    const y0 = Math.floor((i / bands) * VIEW_H);
+    const y1 = Math.floor(((i + 1) / bands) * VIEW_H);
+    g.fillRect(0, y0, w, y1 - y0);
+  }
+}
+
+function drawSky(g: CanvasRenderingContext2D, t: Tod): void {
+  const key = t.sky.join();
+  if (skyBake?.key !== key) {
+    skyBake = null;
+    const c = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+    const cg = c?.getContext('2d');
+    if (c && cg) {
+      c.width = 1;
+      c.height = VIEW_H;
+      paintSky(cg, t, 1);
+      skyBake = { key, c };
+    }
+  }
+  if (skyBake) g.drawImage(skyBake.c, 0, 0, 1, VIEW_H, 0, 0, VIEW_W, VIEW_H);
+  else paintSky(g, t, VIEW_W);
+}
+
+let sunBake: { key: string; c: HTMLCanvasElement; R: number } | null = null;
+
+/** The sun (glow + disc) as an image centered at (R, R); null without a DOM. */
+function sunImage(t: Tod): { c: HTMLCanvasElement; R: number } | null {
+  const sun = t.sun;
+  const key = `${sun.r}|${sun.core}|${sun.rim}|${sun.glow}|${sun.stripes}`;
+  if (sunBake?.key === key) return sunBake;
+  if (typeof document === 'undefined') return null;
+  const c = sunBake?.c ?? document.createElement('canvas');
+  const r = sun.r;
+  const R = Math.floor(r + 18);
+  const S = R * 2 + 1;
+  c.width = S;
+  c.height = S;
+  const cg = c.getContext('2d');
+  const img = cg?.createImageData(S, S);
+  if (!cg || !img?.data) return null;
+  // Glow: each ring adds a 16% layer of the glow color (alpha 1 - 0.84^n under n rings).
+  const n = new Uint8Array(S * S);
+  for (const rr of [r + 18, r + 11, r + 6]) {
+    for (let dy = -Math.floor(rr); dy <= Math.floor(rr); dy++) {
+      const half = Math.floor(Math.sqrt(rr * rr - dy * dy));
+      const row = (R + dy) * S + R;
+      for (let dx = -half; dx <= half; dx++) n[row + dx]++;
+    }
+  }
+  const d = img.data;
+  const glow = hexRgb(sun.glow);
+  const alpha = [0, 1, 2, 3].map((k) => Math.round(255 * (1 - 0.84 ** k)));
+  for (let i = 0; i < S * S; i++) {
+    if (!n[i]) continue;
+    d[i * 4] = glow[0];
+    d[i * 4 + 1] = glow[1];
+    d[i * 4 + 2] = glow[2];
+    d[i * 4 + 3] = alpha[Math.min(3, n[i])];
+  }
+  forSunRows(t, (dy, half, color) => {
+    const [cr, cgr, cb] = hexRgb(color);
+    for (let dx = -half; dx <= half; dx++) {
+      const i = ((R + dy) * S + R + dx) * 4;
+      d[i] = cr;
+      d[i + 1] = cgr;
+      d[i + 2] = cb;
+      d[i + 3] = 255;
+    }
+  });
+  cg.putImageData(img, 0, 0);
+  sunBake = { key, c, R };
+  return sunBake;
+}
+
+function hexRgb(c: string): [number, number, number] {
+  const v = parseInt(c.slice(1, 7), 16);
+  return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+}
+
+function renderSun(g: CanvasRenderingContext2D, t: Tod, sx: number, sy: number): void {
+  const img = sunImage(t);
+  if (img) g.drawImage(img.c, Math.round(sx) - img.R, Math.round(sy) - img.R);
+  else drawSun(g, t, sx, sy);
 }
 
 // Background pumpjacks in the MID layer's oil region: strip u positions are derived at bake time.
@@ -682,7 +790,16 @@ function drawBgPump(g: CanvasRenderingContext2D, x: number, y: number, time: num
   g.fillRect(x + 2, y - 4, 1, 3);
   g.fillRect(x - 1, y - 6, 3, 2);
   // Walking beam rocking around (x, y - 7).
-  for (let k = -6; k <= 6; k++) g.fillRect(x + k, Math.round(y - 7 - k * a * 0.25), 1, 1);
+  // (one fillRect per run of pixels on the same row)
+  let k0 = -6;
+  let y0 = Math.round(y - 7 - k0 * a * 0.25);
+  for (let k = -5; k <= 7; k++) {
+    const yy = k <= 6 ? Math.round(y - 7 - k * a * 0.25) : NaN;
+    if (yy === y0) continue;
+    g.fillRect(x + k0, y0, k - k0, 1);
+    k0 = k;
+    y0 = yy;
+  }
   // Horse head and the rod.
   const hy = Math.round(y - 7 + 6 * a * 0.25);
   g.fillRect(x - 8, hy - 1, 2, 3);
@@ -714,25 +831,16 @@ function drawFlare(g: CanvasRenderingContext2D, x: number, y: number, time: numb
 /** Full background render (screen space). */
 export function renderBackdrop(g: CanvasRenderingContext2D, camX: number, camY: number, time: number, level: LevelDef): void {
   renderCtx.level = level;
+  renderCtx.camX = camX;
   const prog = progressAt(level, camX);
   const t = todAt(prog);
   const kf = prog * (TODS.length - 1);
   const k0 = Math.min(TODS.length - 2, Math.floor(kf));
   const fr = kf - k0;
-  // Sky bands.
-  const bands = 27;
-  for (let i = 0; i < bands; i++) {
-    const s = i / (bands - 1);
-    const seg = s * (t.sky.length - 1);
-    const k = Math.min(t.sky.length - 2, Math.floor(seg));
-    g.fillStyle = mixColor(t.sky[k], t.sky[k + 1], seg - k);
-    const y0 = Math.floor((i / bands) * VIEW_H);
-    const y1 = Math.floor(((i + 1) / bands) * VIEW_H);
-    g.fillRect(0, y0, VIEW_W, y1 - y0);
-  }
+  drawSky(g, t);
   const base = Math.max(0, level.height - VIEW_H);
   const lift = base - camY; // > 0 when the camera is above the level bottom
-  drawSun(g, t, t.sun.x - camX * 0.004, t.sun.y + lift * 0.12);
+  renderSun(g, t, t.sun.x - camX * 0.004, t.sun.y + lift * 0.12);
   // Layers (crossfaded keyframes).
   const pass = (draw: (k: number) => void) => {
     draw(k0);

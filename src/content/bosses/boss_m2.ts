@@ -37,10 +37,13 @@ import { CarpetBomb, LockMark, TopMissile, TornRotor } from './m2/parts';
 
 export const HORNET_HP = 380;
 
-/** Pivot height above the ground for each flight band. */
+/**
+ * Pivot height above the ground for each flight band. The top of the band keeps the rotor discs
+ * (~57 px above the pivot) just under the boss HP bar (screen y 22-43) with the arena floor at y 184.
+ */
 const ALT_INTRO = 128;
-const ALT_HIGH = 94;
-const ALT_MID = 86;
+const ALT_HIGH = 84;
+const ALT_MID = 82;
 const ALT_LOW = 70;
 /** Local y of the wheels' bottom (lowest point of the hull). */
 const WHEELS = 24;
@@ -475,7 +478,7 @@ export class HornetKing extends BigBoss {
       // ---------------------------------------------------------- missile salvo
       case 'salvoOpen': {
         this.tx = this.clampX(px - this.facing * 40);
-        this.ty = this.alt(ALT_MID + 6);
+        this.ty = this.alt(ALT_MID + 2);
         this.podState = this.stateTime < 0.2 ? 1 : 2;
         if (this.stateTime > this.delay(0.55)) {
           this.setState('salvoFire');
@@ -486,7 +489,7 @@ export class HornetKing extends BigBoss {
       }
       case 'salvoFire': {
         this.tx = this.x;
-        this.ty = this.alt(ALT_MID + 6);
+        this.ty = this.alt(ALT_MID + 2);
         this.fireT -= dt;
         if (this.fireT <= 0 && this.shotsLeft > 0) {
           this.fireT = this.delay(T.salvoGap);
@@ -554,7 +557,7 @@ export class HornetKing extends BigBoss {
       // ---------------------------------------------------------- missile rain (phase 2+)
       case 'rainOpen': {
         this.tx = this.clampX((this.arenaL + this.arenaR) / 2 + this.facing * 10);
-        this.ty = this.alt(ALT_MID + 8);
+        this.ty = this.alt(ALT_MID + 2);
         this.podState = this.stateTime < 0.2 ? 1 : 2;
         if (this.stateTime > this.delay(0.6)) {
           this.setState('rainFire');
@@ -565,7 +568,7 @@ export class HornetKing extends BigBoss {
       }
       case 'rainFire': {
         this.tx = this.x;
-        this.ty = this.alt(ALT_MID + 8);
+        this.ty = this.alt(ALT_MID + 2);
         this.fireT -= dt;
         if (this.fireT <= 0 && this.rainSlots.length) {
           this.fireT = 0.13;
@@ -625,7 +628,9 @@ export class HornetKing extends BigBoss {
       }
     }
     const gx = this.state === 'intro' ? this.tx : clamp(this.tx + ex, this.arenaL + 26, this.arenaR - 26);
-    this.flyTo(dt, gx, this.ty + ey, maxV, maxVy);
+    // The erratic bobbing never lifts it above the top of the band (rotors under the HP bar).
+    const gy = this.state === 'intro' ? this.ty + ey : Math.max(this.ty + ey, this.alt(ALT_HIGH + 2));
+    this.flyTo(dt, gx, gy, maxV, maxVy);
     if (this.y > this.groundY - MIN_ALT) {
       this.y = this.groundY - MIN_ALT;
       this.vy = Math.min(0, this.vy);

@@ -12,6 +12,7 @@
 import { PixelArt } from '../../../engine/pixelart';
 import { Rng } from '../../../engine/rng';
 import { VIEW_H, VIEW_W } from '../../../engine/renderer';
+import { settings } from '../../../engine/storage';
 import { bandedGradient } from '../../../art/textures';
 import type { LevelDef } from '../../../game/level';
 import type { ParallaxLayer } from '../../../game/theme';
@@ -375,8 +376,15 @@ export interface Flash {
 
 const SLOT = 0.85;
 
-/** Lightning inside the far clouds: deterministic in time; `rate` 0..1 scales how often. */
-export function flashAt(time: number, rate: number): Flash | null {
+/** Peak strength of a cloud flash when the SCREEN FLASHES option is off. */
+export const SOFT_FLASH = 0.3;
+
+/**
+ * Lightning inside the far clouds: deterministic in time; `rate` 0..1 scales how often.
+ * `bright` (the SCREEN FLASHES option): a double flicker to full strength. Off: one soft swell
+ * to SOFT_FLASH with no flicker, and the bolt stays lit instead of blinking.
+ */
+export function flashAt(time: number, rate: number, bright = true): Flash | null {
   if (rate <= 0) return null;
   const slot = Math.floor(time / SLOT);
   const h = hash1(slot * 13 + 7);
@@ -386,11 +394,12 @@ export function flashAt(time: number, rate: number): Flash | null {
   if (t < 0 || t > 0.5) return null;
   // Double flicker, then a soft decay.
   let k = 0;
-  if (t < 0.05) k = 1;
+  if (!bright) k = SOFT_FLASH * (t < 0.16 ? Math.min(1, t / 0.08) : Math.max(0, 1 - (t - 0.16) / 0.34));
+  else if (t < 0.05) k = 1;
   else if (t < 0.09) k = 0.25;
   else if (t < 0.16) k = 0.85;
   else k = Math.max(0, 0.6 * (1 - (t - 0.16) / 0.34));
-  const bolt = hash1(slot * 17 + 1) < 0.45 && t < 0.15 && (t < 0.05 || t > 0.09);
+  const bolt = hash1(slot * 17 + 1) < 0.45 && t < 0.15 && (!bright || t < 0.05 || t > 0.09);
   return { pick: Math.floor(hash1(slot * 5 + 11) * 1000), k, bolt, seed: slot };
 }
 
@@ -511,7 +520,7 @@ export function renderStormBackground(g: CanvasRenderingContext2D, camX: number,
       visible.push({ i, sx, sy });
     }
   }
-  const fl = flashAt(time, storm);
+  const fl = flashAt(time, storm, settings.flashes);
   if (fl && visible.length) {
     const v = visible[fl.pick % visible.length];
     const t = towers[v.i];

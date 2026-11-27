@@ -97,7 +97,23 @@ export class FloorMark extends GroundMarker {
     }
     super.update(dt);
   }
+
+  /** Shadows on bright snow need about twice the usual darkness to read (the common one is grey here). */
+  override render(g: CanvasRenderingContext2D): void {
+    if (this.style !== 'shadow') {
+      super.render(g);
+      return;
+    }
+    const t = this.progress;
+    const r = this.radius * (0.35 + 0.65 * t);
+    pixelEllipse(g, this.x, this.y - 1, r, Math.max(1, r * 0.32), SHADOW, SHADOW_ALPHA + 0.35 * t);
+    if (t > 0.45) pixelEllipse(g, this.x, this.y - 1, r * 0.55, Math.max(1, r * 0.2), SHADOW, 0.45);
+  }
 }
+
+/** Floor shadow color and starting opacity on snow (reaches SHADOW_ALPHA + 0.35 at impact). */
+export const SHADOW = '#0a0c18';
+export const SHADOW_ALPHA = 0.4;
 
 /** Ice splinters flying out of an impact. */
 export function iceBurst(w: World, x: number, y: number, n = 8, speed = 80, front = true): void {

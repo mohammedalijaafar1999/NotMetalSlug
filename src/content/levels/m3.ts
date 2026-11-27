@@ -215,7 +215,7 @@ const decor: DecorDef[] = [
   dec('pylon', PYLON, {}, 'back', Math.round(cableY(PYLON)) - 3),
   // Arrival station.
   dec('warnlight', 4566, { color: 'amber' }),
-  dec('terminal', 4630),
+  dec('terminal', 4630, { f: 1 }), // sign on the facade: a roof sign would sit under the HUD up here
   dec('lamp', 4764),
   dec('sign', 4842, { f: 5 }),
   dec('pine', 4862, { f: 2 }),

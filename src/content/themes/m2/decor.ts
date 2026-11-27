@@ -8,12 +8,14 @@
 //   m2_bg (region marker for the backdrop, draws nothing)
 // Common props: v (variant), flip (mirror), dy (vertical nudge).
 
+import { VIEW_W } from '../../../engine/renderer';
 import { sprites } from '../../../engine/sprites';
 import type { DecorDef, LevelDef } from '../../../game/level';
 import type { DecorRenderer } from '../../../game/theme';
 import { C } from './palette';
 import { levelGroundY, renderCtx, SAND_LINE } from './terrain';
 import { gustAt } from './weather';
+import { staticDecor } from '../bake';
 
 function spr(name: string, frameOf?: (d: DecorDef, time: number) => number, sink = 1): DecorRenderer {
   return (g, d, time) => {
@@ -124,11 +126,13 @@ function px(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: num
 const cliffs: DecorRenderer = (g) => {
   const L = renderCtx.level;
   if (!L) return;
+  const cx = renderCtx.camX;
   for (const line of L.ground) {
     for (let i = 0; i < line.length - 1; i++) {
       const [x1, y1] = line[i];
       const [x2, y2] = line[i + 1];
       if (x1 !== x2 || Math.abs(y2 - y1) < 6) continue;
+      if (x1 < cx - 8 || x1 > cx + VIEW_W + 8) continue; // off screen
       const x = Math.round(x1);
       const top = Math.round(Math.min(y1, y2));
       const bot = Math.round(Math.max(y1, y2));
@@ -328,14 +332,23 @@ const barrier: DecorRenderer = (g, d) => {
   px(g, x + len + 1, y - 12, 1, 12, C.steelD);
 };
 
+// The procedural pieces are static: each one is baked once per decor entry (they paint 50-130
+// fillRects apiece). Boxes are generous world bounds; the bake crops them.
+const num = (d: DecorDef, k: string, def: number) => Math.round((d.props?.[k] as number) ?? def);
+
 export const M2_DECOR: Record<string, DecorRenderer> = {
-  pillar,
-  watchtower,
-  barrier,
+  pillar: staticDecor(pillar, (d) => [d.x - 16, d.y - num(d, 'h', 40) - 16, 32, num(d, 'h', 40) + 32]),
+  watchtower: staticDecor(watchtower, (d) => [d.x - 28, d.y - num(d, 'h', 46) - 48, 56, num(d, 'h', 46) + 64]),
+  barrier: staticDecor(barrier, (d) => [d.x - 8, d.y - 24, num(d, 'w', 46) + 16, 32]),
   m2_bg: () => {},
   cliffs,
   surface,
-  pipeline,
+  pipeline: staticDecor(pipeline, (d) => {
+    const w = num(d, 'w', 200);
+    const v = num(d, 'valve', 0);
+    const x = Math.min(d.x, d.x + v) - 24;
+    return [x, d.y - num(d, 'h', 12) - 24, Math.max(d.x + w, d.x + v) + 24 - x, num(d, 'h', 12) + 24 + 160];
+  }),
   tumbleweed,
   windpump,
   pumpjack,
