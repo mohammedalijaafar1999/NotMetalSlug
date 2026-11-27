@@ -389,7 +389,8 @@ const locks: LevelDef['locks'] = [
         delay: 0.6,
         spawns: [
           { type: 'jetpack', x: BX2 + 70, y: DECK - 70, props: { facing: -1 } },
-          { type: 'bazooka', x: BX2 + 80, props: { behavior: 'charge', facing: -1, range: 80 } },
+          // Ground troops enter on the far abutment (the mesa step beyond it is a different floor).
+          { type: 'bazooka', x: BX2 + 62, props: { behavior: 'charge', facing: -1, range: 80 } },
         ],
       },
       {
@@ -398,7 +399,7 @@ const locks: LevelDef['locks'] = [
           { type: 'paratrooper', x: M2_BRIDGE.x1 + 110 },
           { type: 'paratrooper', x: M2_BRIDGE.x1 + 250 },
           { type: 'jetpack', x: M2_BRIDGE.x1 - 60, y: DECK - 80, props: { facing: 1 } },
-          { type: 'rifleman', x: BX2 + 70, props: { behavior: 'charge', facing: -1 } },
+          { type: 'rifleman', x: BX2 + 62, props: { behavior: 'charge', facing: -1 } },
         ],
       },
       { delay: 1.2, spawns: [{ type: 'm2_detonator', x: M2_BRIDGE.x1 + (M2_BRIDGE.spans * SPAN) / 2, y: DECK }] },
