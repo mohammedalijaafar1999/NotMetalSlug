@@ -7,27 +7,31 @@
 // section where camera keys lift the view 112 px into the upper fleet layer (the carrier battle)
 // and then dive back down. Auto-scroll everywhere (36-46 px/s); camera locks pause it.
 //
-//   0      takeoff: open sky, a Legion picket skiff with chatting deck hands and the first cage
+//   0      take-off: open sky, a Legion picket skiff with chatting deck hands and a prisoner tied
+//          to its mast
 //   600    first contact: the signature jet fighter, a gunship with deck turrets, zap drones,
 //          jetpack escorts                                                    [checkpoint 1100]
 //   1360   LOCK 1 "INTERCEPT": fighters from both sides, a mixed drone swarm, a HORNET +
-//          paratroopers onto a sky barge
+//          paratroopers onto a sky barge (gantry catwalk)
 //   1750   the cargo convoy: two blimps (crates, barrels, sleeping crew + officer, bottom turret),
 //          jetpack escorts, a fighter from behind                             [checkpoint 2200]
 //   2560   LOCK 2 "FUEL ZEPPELIN": blow up the tanker (its fireball clears the escorts), revenge
 //          drones, then a HORNET + fighter
 //   2900   THE CLIMB: camera rises past a frigate into the upper fleet layer  [checkpoint 3300]
-//   3560   LOCK 3 "CARRIER": battle over a 620 px cruiser deck (turrets, troops, paratroopers,
-//          jetpacks, HORNET, kamikaze drones); then the dive back down
-//   4300   storm front: barge with a sniper, gunship with a bottom turret, fighter pair, HORNET
-//                                                                             [checkpoint 4400]
-//   4900   LOCK 4 "GAUNTLET": four waves of everything                       [checkpoint 5500]
-//   5300   last escort frigate, then the calm approach: an abandoned skiff with the last prisoner,
-//          supplies, the flagship's silhouette on the horizon                 [checkpoint 6300]
+//   3560   LOCK 3 "CARRIER DECK": battle over a 620 px cruiser deck (turrets, troops, a launch
+//          ramp, a weapon case, paratroopers, jetpacks, HORNET, kamikaze drones); then the dive
+//   4300   storm front: barge with a sniper on its gantry, gunship with a bottom turret, a fighter
+//          pair, HORNET                                                        [checkpoint 4400]
+//   4900   LOCK 4 "AMBUSH" (gauntlet): four waves of everything               [checkpoint 5500]
+//   5300   last escort frigate (officer on a gantry, weapon case), then the calm approach: an
+//          abandoned skiff with the last prisoner wandering its deck (touch him), supplies, the
+//          flagship's silhouette on the horizon                               [checkpoint 6300]
 //   6616   BOSS: THUNDERHEAD, open sky, camera y fixed.
 //
-// Hostages (8, all caged on decks: shoot the cage) drop fuel / bombs / 1UPs - weapon cases would
+// Hostages (8: tied / caged / wandering on decks) drop bombs / fuel / 1UPs - weapon cases would
 // only turn into points inside the gyro. Allied supply crates (m5_supply) float down at intervals.
+// m5_airspace keeps gyros out of hulls, glides the starting gyros out from under the HUD and flies
+// a spare gyro down to a pilot shot down over a deck.
 
 import { registerLevel } from '../../game/level';
 import { LevelBuilder } from './m5/build';
@@ -266,6 +270,7 @@ registerLevel({
   locks: [
     {
       x: 1360,
+      announce: 'INTERCEPT!',
       waves: [
         {
           delay: 0.6,
@@ -329,6 +334,7 @@ registerLevel({
     },
     {
       x: 3560,
+      announce: 'CARRIER DECK!',
       waves: [
         {
           delay: 0.5,
@@ -365,6 +371,7 @@ registerLevel({
     },
     {
       x: 4900,
+      announce: 'AMBUSH!',
       waves: [
         {
           delay: 0.6,
