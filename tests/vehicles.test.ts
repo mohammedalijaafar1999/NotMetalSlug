@@ -468,6 +468,16 @@ describe('hostages', () => {
     expect(w.stats.rescues).toBe(2);
   });
 
+  it('the autopilot shoots open a caged hostage when nothing hostile is in view (even one behind it)', () => {
+    const flat: LevelDef = { id: 'test_bot_cage', mission: 0, name: 'CAGE', theme: 'default', music: 'm1', width: 1600, height: 216, start: { x: 300 }, ground: [[[0, 180], [1600, 180]]] };
+    const w = makeWorld(flat, { god: true });
+    hold(w, null, 40);
+    const h = spawn<Hostage>(w, 'hostage', w.players[0].x - 120, undefined, { mode: 'caged' });
+    const bot = new Bot(0);
+    for (let i = 0; i < 60 * 6 && h.caged; i++) step(w, 1, [bot]);
+    expect(h.caged).toBe(false);
+  });
+
   /** A rescued hostage's run-off on a test strip; returns the modes seen and whether it got wet. */
   function runOff(lvl: LevelDef, hx: number, frames = 60 * 8): { h: Hostage; modes: Set<string>; wet: boolean; fell: boolean } {
     const w = makeWorld(lvl, { god: true });
