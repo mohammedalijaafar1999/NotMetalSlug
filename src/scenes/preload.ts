@@ -19,6 +19,8 @@ const EARLY_PREFIXES = ['ui_', 'char_', 'muzzle_flash'];
 export const PRELOAD_BUDGET_MS = 5;
 /** A static screen right before play (the briefing card) can give it more. */
 export const PRELOAD_BOOST_MS = 12;
+/** Per simulation step while a loading bar shows (deploying before the baking is done). */
+export const PRELOAD_LOADING_MS = 13;
 
 const has = (prefixes: string[], s: Sprite) => prefixes.some((p) => s.name.startsWith(p));
 
@@ -33,6 +35,9 @@ class Preloader {
   /** Total background baking time so far (ms), and frames baked by finish() (diagnostics). */
   bakedMs = 0;
   forcedFrames = 0;
+  /** Sprite frames queued at start() and baked since (progress bars). */
+  private totalFrames = 0;
+  private doneFrames = 0;
 
   /**
    * Split the sprite registry: returns the boot set (baked by the boot screen) and queues the
@@ -55,6 +60,8 @@ class Preloader {
     this.queue = rest.map((s, i) => ({ s, i, r: rank(s) })).sort((a, b) => a.r - b.r || a.i - b.i).map((x) => x.s);
     this.qi = 0;
     this.fi = 0;
+    this.totalFrames = this.queue.reduce((a, q) => a + q.frameCount, 0);
+    this.doneFrames = 0;
     this.started = true;
     this.running = false;
     return boot;
@@ -67,6 +74,11 @@ class Preloader {
 
   get done(): boolean {
     return this.qi >= this.queue.length;
+  }
+
+  /** Fraction of the queued sprite frames baked (1 when nothing is queued). */
+  get progress(): number {
+    return this.totalFrames ? Math.min(1, this.doneFrames / this.totalFrames) : 1;
   }
 
   /** Bake queued frames for up to `budgetMs` (one frame of one sprite at a time). */
@@ -94,6 +106,7 @@ class Preloader {
       console.error('[preload] failed to bake sprite', s.name, e);
       this.fi = s.frameCount;
     }
+    this.doneFrames++;
     if (++this.fi >= s.frameCount) {
       this.qi++;
       this.fi = 0;

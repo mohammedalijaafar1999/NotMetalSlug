@@ -88,9 +88,6 @@ export class GameplayScene implements Scene {
     this.def = def;
     this.hud.demo = this.demo;
     this.hud.allowJoin = !this.demo;
-    // Whatever the background preloader has not baked yet is baked now, so no frame of play
-    // stalls to rasterize a sprite.
-    preload.finish();
     this.world = this.buildWorld();
     // A player still out from the last mission gets the continue prompt again (countdown, then
     // PRESS START): START or FIRE brings them back with full lives, beside their partner.
@@ -191,6 +188,9 @@ export class GameplayScene implements Scene {
   }
 
   enter(): void {
+    // Whatever the background preloader has not baked yet is baked now (behind the black of the
+    // scene transition), so no frame of play stalls to rasterize a sprite.
+    preload.finish();
     input.flush();
     uiInput.attach();
     uiInput.flush();

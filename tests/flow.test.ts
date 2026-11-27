@@ -10,6 +10,7 @@ import { installUiFlow } from '../src/scenes/install';
 import { GameplayScene, CONTINUE_SECONDS } from '../src/scenes/gameplay';
 import { CharSelectScene } from '../src/scenes/charselect';
 import { BootScene } from '../src/scenes/core-scenes';
+import { BriefingScene } from '../src/scenes/briefing';
 import { preload } from '../src/scenes/preload';
 import { sprites } from '../src/engine/sprites';
 import { EndingScene, endingSquad } from '../src/scenes/ending';
@@ -800,11 +801,27 @@ describe('boot', () => {
     preload.step(2);
     expect(performance.now() - t0).toBeLessThan(200);
     expect(preload.remaining).toBeLessThanOrEqual(before);
-    // Starting gameplay bakes whatever is left: every frame of every sprite.
-    new GameplayScene(new GameSession({ characters: ['dex', 'juno'], mission: 1 }), 'sandbox');
+    // A player who deploys from the briefing before the baking is done sees a DEPLOYING bar
+    // until it is: gameplay then has nothing left to force.
+    const br = new BriefingScene(new GameSession({ characters: ['dex', 'juno'], mission: 1 }), { levelId: 'sandbox' });
+    app.scenes.set(br, { fade: false });
+    run(0.5);
+    press({ fire: true }); // finish typing
+    press({ fire: true }); // deploy
+    expect((br as any).loading).toBe(true);
+    expect(scene()).toBe('briefing');
+    const forced = preload.forcedFrames;
+    for (let i = 0; i < 2000 && scene() !== 'gameplay'; i++) run(DT);
+    expect(scene()).toBe('gameplay');
     expect(preload.remaining).toBe(0);
+    expect(preload.forcedFrames).toBe(forced);
     const unbaked = queued.filter((sp) => !(sp as any).baked.every(Boolean)).map((sp) => sp.name);
     expect(unbaked).toEqual([]);
+    // Any other way into gameplay (debug URL, attract demo) bakes the remainder on entering.
+    preload.start();
+    expect(preload.remaining).toBeGreaterThan(0);
+    app.scenes.set(new GameplayScene(new GameSession({ characters: ['dex', 'juno'], mission: 1 }), 'sandbox'), { fade: false });
+    expect(preload.remaining).toBe(0);
     // The HUD portraits were queued too (defined lazily elsewhere).
     expect(queued.some((sp) => sp.name.startsWith('ui_face_'))).toBe(true);
   });
