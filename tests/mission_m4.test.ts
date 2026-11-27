@@ -288,6 +288,24 @@ describe('mission 4 mechanics', () => {
     expect(w.terrain.floorAt(5930, 100, 300)?.y).toBe(180);
   }, 60_000);
 
+  it('lock-wave paratroopers land on the ground, never stranded on a catwalk or ledge', () => {
+    // Infantry never step down more than 24 px, so a wave trooper that lands on a high one-way
+    // platform stays there (unreachable for straight fire) and can stall the lock.
+    for (const lock of def.locks ?? []) {
+      for (const wave of lock.waves) {
+        for (const s of wave.spawns) {
+          if (s.type !== 'paratrooper') continue;
+          // Default drift is up to 8 px/s toward the player over a ~4 s descent.
+          const reach = s.props?.drift === 0 ? 8 : 40;
+          for (const pl of def.platforms ?? []) {
+            const over = s.x > pl.x - reach && s.x < pl.x + pl.w + reach;
+            expect(over, `paratrooper at ${s.x} (lock ${lock.x}) can land on the platform at ${pl.x}..${pl.x + pl.w}, y ${pl.y}`).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
   it('a lock-wave truck from behind parks at the left edge instead of running down the screen', () => {
     // Trucks ram while driving: one entering behind the player must stop as soon as it is in
     // (its nose at most ~70 px into the view), where it is seen before it can reach you.
