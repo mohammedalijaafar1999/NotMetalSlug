@@ -3,7 +3,7 @@
 // game over transitions. Also runs the attract-mode demo (opts.demo).
 
 import type { Scene } from '../engine/scene';
-import { input } from '../engine/input';
+import { input, type Action } from '../engine/input';
 import { audio } from '../engine/audio';
 import { settings } from '../engine/storage';
 import { VIEW_H, VIEW_W } from '../engine/renderer';
@@ -21,6 +21,9 @@ import { Bot } from '../debug/bot';
 import { C, blink, panel, sharedKeysHint, syncTouch, twoTone, uiInput, uiSfx } from './ui';
 
 export const CONTINUE_SECONDS = 10;
+/** Keys that always pause (menu START), unless a player remapped one of them to a game action. */
+const PAUSE_KEYS = ['Enter', 'Escape', 'NumpadEnter', 'KeyP'];
+const GAME_ACTIONS: readonly Action[] = ['left', 'right', 'up', 'down', 'fire', 'jump', 'bomb'];
 /** Attract demo length (seconds). */
 export const DEMO_SECONDS = 45;
 
@@ -225,6 +228,11 @@ export class GameplayScene implements Scene {
     for (let i = 0; i < 2; i++) {
       const prof = this.session.players[i];
       if ((!prof.joined || prof.out) && (input.player(i).pressed('start') || input.player(i).pressed('fire'))) return false;
+      // A pause key the player remapped to a game action (e.g. JUMP on Enter) is that action.
+      if (prof.joined && !prof.out) {
+        const b = i === 0 ? input.bindings.p1 : input.bindings.p2;
+        for (const a of GAME_ACTIONS) if (input.player(i).pressed(a) && b[a]?.some((k) => PAUSE_KEYS.includes(k))) return false;
+      }
     }
     return true;
   }

@@ -229,6 +229,34 @@ describe('pause menu with real key presses', () => {
     // A fire button held through the pause does not count as a new press afterwards.
     expect(input.player(0).pressed('start')).toBe(false);
   });
+
+  it('a pause key remapped to a game action (JUMP on ENTER, FIRE on P) does not pause', () => {
+    // Through the remap screen's own logic (ENTER moves from START to JUMP, START gets K).
+    const saved = JSON.parse(JSON.stringify(settings.bindings));
+    settings.bindings = JSON.parse(JSON.stringify(DEFAULT_BINDINGS));
+    assignKey(0, 'jump', 'Enter');
+    assignKey(0, 'fire', 'KeyP');
+    expect(input.bindings.p1.start).toEqual(['KeyK']);
+    const s = new GameSession({ characters: ['dex', 'juno'], mission: 1 });
+    const gp = new GameplayScene(s);
+    app.scenes.set(gp, { fade: false });
+    run(1.5);
+    const p1 = gp.world.players[0];
+    const y0 = p1.y;
+    const shots0 = gp.world.stats.shotsFired;
+    holdKey('Enter', 4);
+    expect(app.scenes.current?.name).toBe('gameplay');
+    expect(p1.y).toBeLessThan(y0);
+    run(1);
+    holdKey('KeyP', 2);
+    expect(app.scenes.current?.name).toBe('gameplay');
+    expect(gp.world.stats.shotsFired).toBeGreaterThan(shots0);
+    // ESC still pauses.
+    holdKey('Escape');
+    expect(app.scenes.current?.name).toBe('pause');
+    settings.bindings = saved;
+    input.bindings = settings.bindings;
+  });
 });
 
 describe('drop-in co-op', () => {
