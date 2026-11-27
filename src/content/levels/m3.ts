@@ -30,7 +30,10 @@ const CABLE: [number, number][] = [
   [PYLON, 352],
   [DOCK_B, D - 44],
 ];
-const JAM_LOCK = PYLON - 192;
+// The jam lock frames the stalled cabin at 40% of the view (where the autopilot holds position);
+// it engages a little before the cabin stops so the camera is already settled.
+const JAM_LOCK = PYLON - 154;
+const JAM_TRIGGER = PYLON - 214;
 
 // Climb: rock ledges stacked on the cliff face at CLIFF.
 const CLIFF = 6200;
@@ -190,13 +193,12 @@ const decor: DecorDef[] = [
   dec('sign', 3058, { f: 1 }),
   dec('sign', 3076, { f: 2 }),
   dec('icefall', 3093, {}, 'back', S + 1),
-  dec('pine_far', 3150, { f: 1 }, 'back', S),
   dec('sign', 3268, { f: 3 }),
   dec('terminal', 3400),
   dec('lamp', 3346),
   dec('warnlight', 3466, { color: 'amber' }),
   // Gorge.
-  dec('gorge', 3472, { w: 1088, behindTerrain: true }, 'back', 446),
+  dec('gorge', 3472, { w: 1088, behindTerrain: true }, 'back', 432),
   dec('pylon', PYLON, {}, 'back', Math.round(cableY(PYLON)) - 3),
   // Arrival station.
   dec('warnlight', 4566, { color: 'amber' }),
@@ -218,6 +220,7 @@ const decor: DecorDef[] = [
   dec('rock', 5840, { f: 0 }),
   dec('pine', 5870, { f: 3 }),
   // Climb.
+  dec('cliff', CLIFF, { w: 420, h: H - P - 12 }, 'back', P + 12),
   dec('pine_far', 5960, { f: 2 }),
   dec('rock', 6020, { f: 2 }),
   dec('icefall', CLIFF - 40, {}, 'back', TIERS[1] + 6),
@@ -281,8 +284,8 @@ const entities: SpawnSpec[] = [
   at('mortar', 3040, { facing: -1 }),
   at('sniper', 2900, { facing: -1 }, { y: S - 64 }),
   // The bridge and the cable car (spawned off-screen so they are there when you arrive).
-  at('m3_weak_bridge', 3090, { w: 160, floor: 512 }, { y: S, trigger: 2640 }),
-  at('m3_cablecar', DOCK_A, { cable: CABLE, to: DOCK_B, stops: [{ x: PYLON, lock: JAM_LOCK }], speed: 48, ends: [3475, 4557] }, { y: D, trigger: 3000 }),
+  at('m3_weak_bridge', 3090, { w: 160, floor: 512 }, { y: S, trigger: 3000 }),
+  at('m3_cablecar', DOCK_A, { cable: CABLE, to: DOCK_B, stops: [{ x: PYLON, lock: JAM_LOCK }], speed: 48, ends: [3475, 4557] }, { y: D, trigger: 3040 }),
   at('bazooka', 3300, { behavior: 'guard', facing: -1 }),
   at('rifleman', 3390, { behavior: 'guard', facing: -1 }),
   at('rifleman', 3420, { behavior: 'idle', facing: -1 }),
@@ -297,7 +300,6 @@ const entities: SpawnSpec[] = [
   at('drone', 4370, { kind: 'kamikaze' }, { trigger: 4270 }),
   at('jetpack', 4470, { facing: -1 }, { y: 330, trigger: 4400 }),
   // Arrival deck.
-  at('sniper', 4636, { facing: -1 }, { y: D - 88 }),
   at('rifleman', 4600, { behavior: 'guard', facing: -1 }),
   at('shield_trooper', 4650, { behavior: 'guard', facing: -1 }),
   at('hostage', 4686, { mode: 'caged', drop: 'H', look: 2 }),
@@ -318,7 +320,7 @@ const entities: SpawnSpec[] = [
   at('grenadier', CLIFF - 60, { behavior: 'guard', facing: -1 }, { y: TIERS[3] }),
   at('hostage', CLIFF - 50, { drop: 'L', look: 2 }, { y: TIERS[4] }),
   at('sniper', CLIFF - 100, { facing: -1 }, { y: TIERS[6] }),
-  at('mortar', 6330, { facing: -1 }),
+  at('mortar', 6470, { facing: -1 }),
   // Plateau.
   at('rifleman', 6420, { behavior: 'patrol' }),
   at('rifleman', 6470, { behavior: 'guard', facing: -1 }),
@@ -355,7 +357,6 @@ registerLevel({
     { x: 1862, y: S - 64, w: 36, style: 'wood' },
     { x: 2420, y: 416, w: 96, style: 'metal' },
     { x: 2882, y: S - 64, w: 36, style: 'wood' },
-    { x: 4566, y: D - 88, w: 130, style: 'metal' },
     ...climbLedges,
   ],
   water: [{ x: 3090, y: 498, w: 104, h: 22 }],
@@ -409,9 +410,10 @@ registerLevel({
     {
       // Mid-gorge: the cabin jams at the pylon.
       x: JAM_LOCK,
+      trigger: JAM_TRIGGER,
       announce: 'CABLE JAMMED!',
       waves: [
-        { spawns: [at('jetpack', JAM_LOCK + 410, { facing: -1 }, { y: 320 }), at('jetpack', JAM_LOCK - 24, { facing: 1 }, { y: 330 }), at('drone', JAM_LOCK + 404, { kind: 'zap' })] },
+        { spawns: [at('jetpack', JAM_LOCK + 404, { facing: -1 }, { y: 320 }), at('jetpack', JAM_LOCK - 24, { facing: 1 }, { y: 330 }), at('drone', JAM_LOCK + 400, { kind: 'zap' })] },
         {
           delay: 1,
           spawns: [
@@ -419,10 +421,10 @@ registerLevel({
             at('paratrooper', PYLON + 6, { drift: 0 }),
             at('paratrooper', PYLON + 28, { drift: 0 }),
             at('drone', JAM_LOCK - 20, { kind: 'kamikaze' }),
-            at('drone', JAM_LOCK + 404, { kind: 'kamikaze' }),
+            at('drone', JAM_LOCK + 400, { kind: 'kamikaze' }),
           ],
         },
-        { delay: 1.2, spawns: [at('heli', JAM_LOCK + 430, { facing: -1 })] },
+        { delay: 1.2, spawns: [at('heli', JAM_LOCK + 424, { facing: -1 })] },
       ],
     },
     {

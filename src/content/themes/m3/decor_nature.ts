@@ -245,48 +245,57 @@ sprites.define({
 
 // ------------------------------------------------------------------ backdrop tiles (no outline)
 
-/** The gorge seen across: far rock wall with snow ledges sinking into the misty depths. */
+/** The gorge seen across: the far rim (hazy pines) and a cliff face that fades into the misty abyss.
+ *  Tiles horizontally (128 px period); 120 px tall, origin at the top-left (the rim line). */
+export const GORGE_H = 120;
+
 sprites.define({
   name: 'm3_gorge',
   w: 128,
-  h: 96,
+  h: GORGE_H,
   ox: 0,
   oy: 0,
   outline: null,
   draw: (p) => {
-    const r = new Rng(91);
     const W = 128;
-    const H = 96;
+    const H = GORGE_H;
+    const mist = '#b4c6dc';
+    const deep = '#26304a';
+    // Far rim line (gently uneven) - everything below is the far cliff face.
+    const rimAt = (x: number) => 10 + Math.round(Math.sin((x / W) * Math.PI * 4 + 1) * 2 + Math.sin((x / W) * Math.PI * 10) * 1);
+    // Smooth periodic relief noise (lit bulges / shadowed gullies).
+    const relief = (x: number, y: number) =>
+      Math.sin((x / W) * Math.PI * 6 + y * 0.09) * 0.5 + Math.sin((x / W) * Math.PI * 14 - y * 0.05 + 2) * 0.3 + (hash01(x * 31 + y * 17) - 0.5) * 0.25;
     for (let x = 0; x < W; x++) {
-      const rim = 4 + Math.round(Math.sin((x / W) * Math.PI * 4 + 1) * 2 + Math.sin((x / W) * Math.PI * 10) * 1);
-      for (let y = 0; y < H; y++) {
-        if (y < rim) continue;
-        const d = (y - rim) / (H - rim);
-        let c = mixColor('#6e7f99', '#2c3650', Math.min(1, d * 1.1));
-        // Vertical fissures + strata.
-        if ((x * 7 + Math.floor(y / 5) * 3) % 23 === 0) c = mixColor(c, '#1e2638', 0.5);
-        if (hash01(x * 13 + y * 3) > 0.94) c = mixColor(c, '#9aa8c0', 0.4);
-        if (y - rim < 2) c = y - rim === 0 ? '#dfe8f2' : '#b6c6da';
+      const rim = rimAt(x);
+      for (let y = rim; y < H; y++) {
+        const k = y - rim;
+        const v = relief(x, y);
+        let c = v > 0.35 ? '#8aa0bc' : v > -0.1 ? '#7088a8' : v > -0.45 ? '#5e7496' : '#506686';
+        // Strata.
+        if ((y + Math.floor(x / 16) * 2) % 13 === 0 && v > -0.3) c = '#667c9e';
+        // Distance haze on the upper face, then the abyss swallows it.
+        if (k < 16) c = mixColor(c, mist, 0.2 + (k / 16) * 0.3);
+        else c = mixColor(mixColor(c, mist, 0.5), deep, Math.min(1, (k - 16) / 40));
+        if (k < 2) c = k === 0 ? '#e2ebf5' : '#b8c8dc';
         p.px(x, y, c);
       }
-    }
-    // Snow ledges.
-    for (let k = 0; k < 6; k++) {
-      const lx = r.int(0, W - 20);
-      const ly = r.int(18, 70);
-      const lw = r.int(8, 22);
-      for (let i = 0; i < lw; i++) {
-        const x = (lx + i) % W;
-        p.px(x, ly, mixColor('#d6e2ee', '#5a6a86', ly / H));
-        p.px(x, ly + 1, mixColor('#9eb0c8', '#3a4660', ly / H));
+      // Snow ledges catching on the face.
+      if (hash01(Math.floor(x / 16) * 7 + 3) > 0.6 && x % 16 < 12) {
+        const ly = rim + 6 + Math.floor(hash01(Math.floor(x / 16) * 5) * 16);
+        p.px(x, ly, mixColor('#dce6f0', mist, 0.35));
       }
     }
-    // Frozen streaks.
-    for (let k = 0; k < 3; k++) {
-      const fx = r.int(4, W - 4);
-      const fy = r.int(12, 30);
-      const fl = r.int(14, 34);
-      for (let y = fy; y < fy + fl; y++) p.px(fx + (y % 7 === 0 ? 1 : 0), y, mixColor('#b4def2', '#4a6a8c', y / H));
+    // Hazy pines on the far rim.
+    const r = new Rng(97);
+    for (let k = 0; k < 9; k++) {
+      const tx = r.int(0, W - 1);
+      const th = r.int(5, 11);
+      const base = rimAt(tx) + 1;
+      for (let j = 0; j < th; j++) {
+        const half = Math.floor((j / th) * 2.4);
+        for (const wrap of [0, -W, W]) p.rect(tx - half + wrap, base - th + j, half * 2 + 1, 1, j === 0 ? '#c8d6e6' : '#7088a8');
+      }
     }
   },
 });

@@ -14,7 +14,8 @@
 //            truck (frozen truck), sign (f: 0 PASS, 1 DANGER, 2 weight limit, 3 cable car, 4 HALT, 5 FORT),
 //            warnlight (props.color 'red'|'amber' blinks; props.off), skirack, banner (waving),
 //            drums, crates, lamp (flickers), gate (boom gate), mast (radio mast, blinking light)
-//   spans  : gorge (x = left edge, props.w; the far gorge wall sinking into the abyss - give it
+//   spans  : cliff (x = left edge, y = top, props.w/h: sheer rock face painted over the ground mass),
+//            gorge (x = left edge, props.w; the far gorge wall sinking into the abyss - give it
 //            props.behindTerrain so the cliff edges overlap it), lake (x = left edge, props.w;
 //            glossy ice crust + dark frozen water from y down, drawn over the ground fill)
 
@@ -23,7 +24,7 @@ import { mixColor } from '../../engine/pixelart';
 import { registerTheme, type DecorRenderer } from '../../game/theme';
 import type { DecorDef } from '../../game/level';
 import { P3 } from './m3/palette';
-import { forestLayer, groundTile, mistLayer, peaksLayer, ridgeLayer, snowEdge, stoneTile, hash01 } from './m3/layers';
+import { cliffTile, forestLayer, groundTile, mistLayer, peaksLayer, ridgeLayer, snowEdge, stoneTile, hash01 } from './m3/layers';
 import { drawPlatform } from './m3/platforms';
 import { renderSnow } from './m3/weather';
 import './m3/decor_nature';
@@ -41,6 +42,7 @@ function spr(name: string, anim?: (d: DecorDef, time: number) => number): DecorR
 const phase = (d: DecorDef): number => hash01(Math.round(d.x) * 13 + Math.round(d.y));
 
 const cssCache = new Map<string, HTMLCanvasElement>();
+let cliffCanvas: HTMLCanvasElement | null = null;
 function tileCanvas(name: string): HTMLCanvasElement {
   let c = cssCache.get(name);
   if (!c) {
@@ -50,18 +52,21 @@ function tileCanvas(name: string): HTMLCanvasElement {
   return c;
 }
 
-/** Tile a backdrop sprite horizontally over [x, x + w) with its top at y; fill below with `deep`. */
+/** Tile a backdrop sprite horizontally over [x, x + w) with its top at y; fill below with `deep`.
+ *  (Sprite pixel buffers carry a 1 px padding border, skipped here so the tiles butt seamlessly.) */
 function band(g: CanvasRenderingContext2D, name: string, x: number, y: number, w: number, deep: string, depth: number): void {
   const c = tileCanvas(name);
+  const tw = c.width - 2;
+  const th = c.height - 2;
   const x0 = Math.round(x);
   const x1 = Math.round(x + w);
   const y0 = Math.round(y);
-  for (let tx = x0; tx < x1; tx += c.width) {
-    const cw = Math.min(c.width, x1 - tx);
-    g.drawImage(c, 0, 0, cw, c.height, tx, y0, cw, c.height);
+  for (let tx = x0; tx < x1; tx += tw) {
+    const cw = Math.min(tw, x1 - tx);
+    g.drawImage(c, 1, 1, cw, th, tx, y0, cw, th);
   }
   g.fillStyle = deep;
-  g.fillRect(x0, y0 + c.height, x1 - x0, depth);
+  g.fillRect(x0, y0 + th, x1 - x0, depth);
 }
 
 const DECOR: Record<string, DecorRenderer> = {
@@ -123,21 +128,43 @@ const DECOR: Record<string, DecorRenderer> = {
   // ---------------------------------------------------------------- spans
   gorge: (g, d, time) => {
     const w = (d.props?.w as number) ?? 256;
-    band(g, 'm3_gorge', d.x, d.y, w, '#232b40', 400);
-    // Mist drifting low in the abyss.
+    band(g, 'm3_gorge', d.x, d.y, w, '#26304a', 400);
+    // Mist wisps drifting across the abyss.
     const x0 = Math.round(d.x);
     for (let k = 0; k < 3; k++) {
-      const yy = Math.round(d.y + 58 + k * 16);
-      g.globalAlpha = 0.16 + k * 0.05;
-      g.fillStyle = mixColor('#9eb4d0', '#4a5a78', k / 3);
-      for (let i = 0; i < 5; i++) {
-        const len = 70 + ((i * 37 + k * 11) % 50);
+      const yy = Math.round(d.y + 28 + k * 11);
+      g.globalAlpha = 0.2 - k * 0.05;
+      g.fillStyle = '#e4edf6';
+      for (let i = 0; i < 6; i++) {
+        const len = 60 + ((i * 37 + k * 11) % 60);
         const span = w + len;
-        const px = ((((i * 97 + k * 53 + time * (5 + k * 2)) % span) + span) % span) - len;
-        g.fillRect(x0 + Math.round(px), yy + (i % 2) * 3, Math.min(len, Math.max(0, w - px)), 2 + (k % 2));
+        const px = ((((i * 97 + k * 53 + time * (4 + k * 3)) % span) + span) % span) - len;
+        const a = Math.max(0, px);
+        const b = Math.min(w, px + len);
+        if (b > a) g.fillRect(x0 + Math.round(a), yy + (i % 2) * 3, Math.round(b - a), 2 + (k % 2));
       }
     }
     g.globalAlpha = 1;
+  },
+  cliff: (g, d) => {
+    // Sheer rock face painted over the ground mass: x = left edge, y = top, props.w / props.h.
+    if (!cliffCanvas) cliffCanvas = cliffTile().toCanvas();
+    const c = cliffCanvas;
+    const w = (d.props?.w as number) ?? 256;
+    const h = (d.props?.h as number) ?? 256;
+    const x0 = Math.round(d.x);
+    const y0 = Math.round(d.y);
+    for (let ty = 0; ty < h; ty += c.height)
+      for (let tx = 0; tx < w; tx += c.width) {
+        const cw = Math.min(c.width, w - tx);
+        const ch = Math.min(c.height, h - ty);
+        g.drawImage(c, 0, 0, cw, ch, x0 + tx, y0 + ty, cw, ch);
+      }
+    // Lit outer edge + dark outline where the face meets the air.
+    g.fillStyle = P3.outline;
+    g.fillRect(x0 - 1, y0, 1, h);
+    g.fillStyle = '#a8b8cc';
+    g.fillRect(x0, y0, 1, h);
   },
   lake: (g, d) => {
     const w = (d.props?.w as number) ?? 256;
