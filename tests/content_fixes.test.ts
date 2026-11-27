@@ -4,6 +4,12 @@ import { describe, expect, it } from 'vitest';
 import '../src/content/index';
 import { flashAt, SOFT_FLASH } from '../src/content/themes/m5/sky';
 import { lightning, strikeAmount } from '../src/content/themes/m4/weather';
+import { Ladle, MoltenGlob, SPLASH_EDGE } from '../src/content/levels/m6/ladle';
+import { GroundMarker } from '../src/content/bosses/common/fx';
+import { VIEW_W } from '../src/engine/renderer';
+import type { LevelDef } from '../src/game/level';
+import type { World } from '../src/game/world';
+import { makeWorld, step } from './helpers';
 
 /** Brightness samples of every flash event in [0, seconds) at 1/240 s. */
 function events(sample: (t: number) => number, seconds: number): number[][] {
@@ -57,5 +63,71 @@ describe('lightning honors the SCREEN FLASHES option', () => {
     expect(on.some((e) => !singleSwell(e))).toBe(true);
     for (const e of off) expect(singleSwell(e)).toBe(true);
     expect(Math.max(...off.flat())).toBeLessThanOrEqual(0.6 + 1e-9);
+  });
+});
+
+// ------------------------------------------------------------------ m6 mechanics
+
+function bench(extra: Partial<LevelDef> = {}): LevelDef {
+  return {
+    id: 'fix_bench',
+    mission: 0,
+    name: 'BENCH',
+    theme: 'm6',
+    music: 'm6',
+    width: 1600,
+    height: 216,
+    start: { x: 60 },
+    ground: [
+      [
+        [0, 180],
+        [1600, 180],
+      ],
+    ],
+    ...extra,
+  };
+}
+
+/** Run until the ladle starts pouring; returns the markers and globs it made. */
+function pour(w: World, la: Ladle): { markers: GroundMarker[]; globs: MoltenGlob[] } {
+  const before = new Set(w.entities);
+  for (let i = 0; i < 60 * 8 && la.state !== 'pour'; i++) step(w, 1);
+  expect(la.state).toBe('pour');
+  step(w, 1);
+  const fresh = w.entities.filter((e) => !before.has(e));
+  return {
+    markers: fresh.filter((e): e is GroundMarker => e instanceof GroundMarker),
+    globs: fresh.filter((e): e is MoltenGlob => e instanceof MoltenGlob),
+  };
+}
+
+describe('m6 ladle splashes stay in view', () => {
+  it('a ladle hanging just off screen pours without lobbing globs in', () => {
+    const w = makeWorld(bench(), { god: true });
+    step(w, 60);
+    const cam = w.camera.x;
+    const la = w.spawn('m6_ladle', cam + VIEW_W + 20, 180, { cycle: 3.2, splash: 4 }) as Ladle;
+    const { globs } = pour(w, la);
+    expect(w.camera.x).toBe(cam);
+    expect(globs.length).toBe(0);
+  });
+
+  it('a ladle at the edge of the view lands every glob (and its marker) inside the view', () => {
+    for (const side of [-1, 1]) {
+      const w = makeWorld(bench(), { god: true });
+      step(w, 60);
+      const cam = w.camera.x;
+      const x = side < 0 ? cam + 6 : cam + VIEW_W - 6;
+      const la = w.spawn('m6_ladle', x, 180, { cycle: 3.2, splash: 4 }) as Ladle;
+      const { markers, globs } = pour(w, la);
+      expect(w.camera.x).toBe(cam);
+      expect(globs.length).toBe(4);
+      const splashMarks = markers.filter((m) => m.radius === 6);
+      expect(splashMarks.length).toBe(4);
+      for (const m of splashMarks) {
+        expect(m.x).toBeGreaterThanOrEqual(cam + SPLASH_EDGE);
+        expect(m.x).toBeLessThanOrEqual(cam + VIEW_W - SPLASH_EDGE);
+      }
+    }
   });
 });
