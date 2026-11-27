@@ -122,7 +122,8 @@ export class Bot {
     if (moving && Math.abs(ctrl.x - this.lastX) < 0.3) this.stuck += dt;
     else this.stuck = 0;
     this.lastX = ctrl.x;
-    const gapAhead = ctrl.onGround && moving && !ctrl.floorAhead(dir, 14, 60);
+    // Take off close to the edge: a running jump only just clears a 40 px pit.
+    const gapAhead = ctrl.onGround && moving && !ctrl.floorAhead(dir, 6, 60);
     if (!flying && this.jumpHold <= 0 && (ctrl.hitWall !== 0 || this.stuck > 0.25 || gapAhead || (ctrl.onGround && this.frame % 97 === 0))) {
       this.jumpHold = 0.35;
     }
