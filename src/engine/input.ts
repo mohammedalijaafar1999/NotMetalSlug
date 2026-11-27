@@ -191,6 +191,9 @@ function padActions(p: PadState): boolean[] {
   });
 }
 
+/** Letterbox bar width (CSS px) from which the touch buttons move into it as one column. */
+export const TOUCH_COLUMN_MIN_BAR = 70;
+
 /** On-screen touch controls (created lazily on first touch). Drives player 1. */
 class TouchControls {
   root: HTMLDivElement | null = null;
@@ -246,13 +249,14 @@ class TouchControls {
       return b;
     };
     // Hug the screen edges (clear of notches) so the controls sit in the letterbox bars as much
-    // as possible instead of over the action.
+    // as possible instead of over the action (see layout()).
     const R = (px: number) => `right:calc(${px}px + env(safe-area-inset-right, 0px));`;
-    const B = (px: number) => `bottom:calc(${px}px + env(safe-area-inset-bottom, 0px));`;
-    mkBtn('FIRE', 'fire', R(12) + B(84) + 'width:78px;height:78px;');
-    mkBtn('JUMP', 'jump', R(98) + B(20) + 'width:66px;height:66px;');
-    mkBtn('BOMB', 'bomb', R(12) + B(8) + 'width:58px;height:58px;font-size:11px;');
+    this.fireBtn = mkBtn('FIRE', 'fire', '');
+    this.jumpBtn = mkBtn('JUMP', 'jump', '');
+    this.bombBtn = mkBtn('BOMB', 'bomb', 'font-size:11px;');
     mkBtn('II', 'start', R(10) + 'top:calc(10px + env(safe-area-inset-top, 0px));width:40px;height:40px;border-radius:8px;');
+    this.layout();
+    window.addEventListener('resize', () => this.layout());
 
     const base = document.createElement('div');
     base.style.cssText =
@@ -305,6 +309,40 @@ class TouchControls {
     base.addEventListener('pointercancel', end);
     document.body.appendChild(root);
     this.root = root;
+  }
+
+  private fireBtn: HTMLDivElement | null = null;
+  private jumpBtn: HTMLDivElement | null = null;
+  private bombBtn: HTMLDivElement | null = null;
+
+  /**
+   * Place FIRE / JUMP / BOMB. Normally FIRE and BOMB hug the right edge with JUMP beside them;
+   * on very wide screens (19.5:9 phones in landscape) the letterbox bar beside the 16:9 game is
+   * wide enough for a button, so all three stack in one column inside it, off the play area.
+   */
+  layout(): void {
+    const [fire, jump, bomb] = [this.fireBtn, this.jumpBtn, this.bombBtn];
+    if (!fire || !jump || !bomb || typeof window === 'undefined') return;
+    const place = (b: HTMLDivElement, right: string, bottom: number, size: number) => {
+      b.style.right = right;
+      b.style.bottom = `calc(${bottom}px + env(safe-area-inset-bottom, 0px))`;
+      b.style.width = b.style.height = `${size}px`;
+    };
+    const R = (px: number) => `calc(${px}px + env(safe-area-inset-right, 0px))`;
+    const bar = (window.innerWidth - (window.innerHeight * 384) / 216) / 2;
+    if (bar >= TOUCH_COLUMN_MIN_BAR) {
+      // Sizes exclude the 2 px border on each side.
+      const fit = (s: number) => Math.min(s, Math.floor(bar) - 10);
+      const [fs, js, bs] = [fit(78), fit(66), fit(58)];
+      const mid = (s: number) => `${Math.max(2, Math.floor((bar - s - 4) / 2))}px`;
+      place(bomb, mid(bs), 8, bs);
+      place(jump, mid(js), 8 + bs + 8, js);
+      place(fire, mid(fs), 8 + bs + 8 + js + 10, fs);
+    } else {
+      place(fire, R(12), 84, 78);
+      place(jump, R(98), 20, 66);
+      place(bomb, R(12), 8, 58);
+    }
   }
 
   setVisible(v: boolean): void {
