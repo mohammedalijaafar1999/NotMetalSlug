@@ -51,3 +51,35 @@ read the action.
 - `node scripts/smoke.mjs --missions=N` (dev server running) plays it in Chromium with screenshots.
 - Look at screenshots of every section; make sure enemies are visible against backgrounds,
   platforms read clearly, and nothing important hides behind the HUD.
+
+## Lessons from building the six missions
+
+- **Arena waves enter from the right or from above.** Riflemen and grenadiers only advance while
+  more than ~170 px from the player, and they back off when the player is close. An infantryman
+  spawned at or past the left edge of a locked screen therefore tends to hang back. The engine now
+  has two safety nets:
+  - lock-wave infantry are leashed back into view;
+  - a wave enemy out of view for 15 s stops blocking the lock (`LOCK_AWAY_GIVEUP`).
+
+  Still, design waves so these never trigger: spawn left-side infantry inside the view
+  (lockX + 10) and officers on screen. Only sabers, who always charge, belong at the left edge.
+- **Wide entities need an earlier `trigger`** (tanks, bunkers, fuel tanks, gates), so they spawn
+  fully off-screen instead of popping in.
+- **Slopes:**
+  - Players walk up slopes of up to about 39°, vehicles up to about 29°.
+  - Exactly 45° acts as a wall for a 12 px actor, so keep walkable banks at 35° or less.
+  - Never spawn wave enemies on slopes steeper than about 0.5: infantry `floorAhead` uses an
+    8 px window.
+  - Enemies never step down ledges taller than 24 px.
+- **Deadly water does not kill on its own.** Put a pit under deep water (canals, molten channels)
+  so a fall sinks below the kill line, and add splash or burn feedback with a mission entity.
+- **Frogmen in water** can only be hurt by the knife, grenades or jump-shots. Place them as ambient
+  level entities rather than as required lock-wave enemies.
+- **Vehicle beats need an ending.** Each mission takes its vehicle away with a set piece (bog,
+  bridge, magnet, presses) so the boss is fought on foot, and the pilot is always thrown clear
+  safely.
+- **Debug warp** skips pending spawns whose trigger is inside the new view. When testing a set
+  piece, warp about 400 px before it.
+- **Simulations depend on global state** (`Entity.nextId`, `fxRng`), so the same seed can play
+  differently in another test order. Before trusting an autopilot result, stress the level with
+  several seeds and perturbed state.
