@@ -136,6 +136,61 @@ describe('mission 2 - HORNET KING arena', () => {
     // No regular enemies are still pending inside the arena.
     for (const s of L.entities ?? []) if (s.x > x0 - 40 && s.x < x0 + VIEW_W + 160) expect(['hostage', 'pickup'], `${s.type} at ${s.x}`).toContain(s.type);
   });
+
+  it('leaves time to spare on Hard: a pistol + 10 grenades fight ends with >= 25 % of the timer left', () => {
+    // A tidy scripted player (under the hull, out of marked spots, aiming up, grenades in the
+    // re-arm hover) needed 70-76 s on Hard; a human is slower, and TIME UP costs a life.
+    const w = makeWorld('m2', { seed: 2, difficulty: 2 });
+    const p = w.players[0];
+    w.level.warp(M2_BOSS_X - 300);
+    p.x = M2_BOSS_X - 200;
+    step(w, 30);
+    for (const e of w.entities) if (e.team === 'enemy') e.remove();
+    p.bombs = 10;
+    let timeUps = 0;
+    w.level.timerEnabled = true;
+    w.level.onTimeUp = () => timeUps++;
+    let leftAtKill = -1;
+    for (let i = 0; i < 60 * 200 && w.state !== 'complete'; i++) {
+      const b = w.boss as any;
+      const mask: Record<string, boolean> = {};
+      if (!w.level.locked) mask.right = true;
+      if (b && b.dying && leftAtKill < 0) leftAtKill = w.level.timeLeft;
+      if (b && b.introDone && !b.dying) {
+        const threats: { x: number; r: number }[] = [];
+        for (const e of w.query((x) => x.constructor.name === 'LockMark')) threats.push({ x: e.x, r: 30 });
+        for (const e of w.query((x) => x.constructor.name === 'CarpetBomb')) threats.push({ x: (e as any).tx, r: 25 });
+        const safe = (x: number) => threats.every((th) => Math.abs(th.x - x) > th.r);
+        const crosses = (a: number, c: number) => threats.some((th) => th.x + th.r > Math.min(a, c) && th.x - th.r < Math.max(a, c));
+        let target = Math.max(b.arenaL + 10, Math.min(b.arenaR - 10, b.x - b.facing * 12));
+        if (!safe(p.x)) {
+          let best = Infinity;
+          for (let dx = 0; dx < 400; dx += 2)
+            for (const sg of [-1, 1]) {
+              const x = p.x + sg * dx;
+              if (x > b.arenaL + 8 && x < b.arenaR - 8 && safe(x) && dx < best) {
+                best = dx;
+                target = x;
+              }
+            }
+        } else if (crosses(p.x, target)) target = p.x;
+        if (target > p.x + 3) mask.right = true;
+        else if (target < p.x - 3) mask.left = true;
+        mask.up = true;
+        mask.fire = i % 8 < 4;
+        if (p.bombs > 0 && b.state === 'reload' && i % 30 === 0) {
+          mask.bomb = true;
+          mask.up = false;
+        }
+      }
+      input.setVirtual(0, mask);
+      step(w, 1);
+    }
+    input.setVirtual(0, null);
+    expect(w.state).toBe('complete');
+    expect(timeUps).toBe(0);
+    expect(leftAtKill).toBeGreaterThanOrEqual(0.25 * level().timeLimit!);
+  }, 60_000);
 });
 
 describe('mission 2 - rigged rail bridge', () => {

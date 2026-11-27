@@ -490,7 +490,9 @@ export const M2_LEVEL: LevelDef = {
   entities,
   locks,
   decor,
-  timeLimit: 80,
+  // 99 (like m1): the HORNET KING on Hard takes a tidy pistol player 70-76 s; at 80 (96 s) a human
+  // timed out at the boss.
+  timeLimit: 99,
 };
 
 registerLevel(M2_LEVEL);
