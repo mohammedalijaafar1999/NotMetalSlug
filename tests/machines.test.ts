@@ -390,6 +390,54 @@ describe('fair attacks', () => {
     expect(kinds).toContain('crush');
   });
 
+  it('machine wrecks never hurt players or their vehicles; tread contact on a vehicle is one crush unit', () => {
+    for (const type of ['light_tank', 'jeep', 'truck', 'snowmobile', 'turret', 'bunker', 'heli', 'drone', 'fighter']) {
+      const w = arena({ god: false });
+      const p = w.players[0];
+      const tank = w.spawn('tank', p.x + 4) as Entity;
+      step(w, 20);
+      input.setVirtual(0, { down: true });
+      step(w, 3);
+      input.setVirtual(0, null);
+      expect(p.vehicle, type).toBe(tank);
+      // Point-blank (hulls overlapping), then destroyed by the player.
+      const m = w.spawn(type, tank.x + 30, FLYERS.includes(type) ? tank.y - 30 : undefined, { facing: -1 }) as Machine;
+      step(w, 2);
+      tank.invuln = 0;
+      const hp0 = tank.hp;
+      kill(m, w);
+      for (let i = 0; i < 60 * 3; i++) {
+        tank.invuln = 0;
+        step(w, 1);
+      }
+      expect(tank.hp, `${type} wreck`).toBe(hp0);
+    }
+    // On foot next to a wreck: the blast only hurts enemies.
+    const w = arena({ god: false });
+    const p = w.players[0];
+    p.invuln = 0;
+    const t = w.spawn('light_tank', p.x + 24, undefined, { facing: -1 }) as LightTank;
+    step(w, 1);
+    kill(t, w);
+    step(w, 60 * 3);
+    expect(p.state, 'a player beside an exploding tank survives').toBe('play');
+    // A light tank grinding into a driven BULLDOG: one crush unit (22 HP) per contact, not a capped 45.
+    const w2 = arena({ god: false });
+    const p2 = w2.players[0];
+    const bulldog = w2.spawn('tank', p2.x + 4) as Entity;
+    step(w2, 20);
+    input.setVirtual(0, { down: true });
+    step(w2, 3);
+    input.setVirtual(0, null);
+    const lt = w2.spawn('light_tank', bulldog.x + 36, undefined, { facing: -1 }) as LightTank;
+    step(w2, 1);
+    bulldog.invuln = 0;
+    const hpb = bulldog.hp;
+    lt.vx = -26;
+    step(w2, 2);
+    expect(hpb - bulldog.hp).toBe(22);
+  });
+
   it('show damage smoke below half health', () => {
     const w = arena();
     const t = w.spawn('light_tank', w.camera.x + 260) as LightTank;

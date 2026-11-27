@@ -1170,7 +1170,10 @@ export abstract class Machine extends Enemy {
       const until = this.touchCd.get(t.id) ?? -1;
       if (this.age < until) continue;
       this.touchCd.set(t.id, this.age + cd);
-      if (t.damage({ amount, kind, owner: this, x: t.cx, y: t.cy, dir: Math.sign(t.cx - this.x) || this.facing })) hit = true;
+      // Treads and rams flatten soldiers; on a player vehicle's armour a contact is one crush unit
+      // (22 HP), not a capped 45 HP hit (a point-blank brawl with a light tank cost half a BULLDOG).
+      const amt = kind === 'crush' && (t as any).isVehicle === true ? Math.min(amount, 1) : amount;
+      if (t.damage({ amount: amt, kind, owner: this, x: t.cx, y: t.cy, dir: Math.sign(t.cx - this.x) || this.facing })) hit = true;
     }
     return hit;
   }
