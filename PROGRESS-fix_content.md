@@ -12,7 +12,7 @@ Branch fix/content (from claude/metal-slug-game-sogjdj). Dev server: port 5603.
 | 6 | m3 CABLE CAR sign under HUD | done (terminal frame 1: sign on the facade; arrival uses f:1; screenshot artifacts/m3arr1.png) |
 | 7 | FROST BASTION flak shadows darker | done (FloorMark shadow override 0.4->0.75 alpha; screenshot artifacts/flak1_zoom.png; test) |
 | 8 | HORNET KING band lower | done (ALT_HIGH 94->84, ALT_MID 86->82, salvo/rain +2, phase-2 wobble capped at ALT_HIGH+2; bar-overlap samples 27%->4%; tilted carpet run still touches bar bottom ~y30-34; test) |
-| 9 | m6 lift jetpack below HUD band | todo |
+| 9 | m6 lift jetpack below HUD band | done (root cause: it hovered over the hangar floor right of the shaft and "never scrape the floor" held it at GU-34 = top of screen; now drops in over the shaft, height 54; attacks with top >= 58; test) |
 | 10 | HUD screenshot pass per mission | todo |
 
 Next: item 1 measurement.

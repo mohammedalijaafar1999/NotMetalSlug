@@ -7,6 +7,7 @@ import { lightning, strikeAmount } from '../src/content/themes/m4/weather';
 import { Ladle, MoltenGlob, SPLASH_EDGE } from '../src/content/levels/m6/ladle';
 import { GroundMarker } from '../src/content/bosses/common/fx';
 import { Crusher } from '../src/content/levels/m6/crusher';
+import { LIFT_X } from '../src/content/levels/m6';
 import { FloorMark, SHADOW_ALPHA } from '../src/content/bosses/m3/parts';
 import { VIEW_W } from '../src/engine/renderer';
 import type { LevelDef } from '../src/game/level';
@@ -190,6 +191,35 @@ describe('m6 crusher', () => {
       expect(Math.sign(p.x - cr.x)).toBe(Math.sign(dx));
     });
   }
+});
+
+describe('m6 lift ambush', () => {
+  it('the jetpack that drops in during the climb attacks from below the HUD band (y >= 34)', () => {
+    const w = makeWorld('m6', { god: true, seed: 2 });
+    step(w, 30);
+    w.level.warp(4715); // keeps the lift's spawn pending
+    step(w, 5);
+    const p = w.players[0];
+    for (let i = 0; i < 400 && Math.abs(p.x - LIFT_X) > 2; i++) {
+      p.x = Math.min(LIFT_X, p.x + 2.5);
+      step(w, 1);
+    }
+    let minTop = Infinity;
+    let attacking = 0;
+    const cam0 = w.camera.y;
+    for (let i = 0; i < 60 * 12; i++) {
+      step(w, 1);
+      for (const e of w.entities) {
+        const st = (e as Entity & { state?: string }).state;
+        if (e.type !== 'jetpack' || e.dead || (st !== 'aim' && st !== 'burst' && st !== 'drop')) continue;
+        attacking++;
+        minTop = Math.min(minTop, e.y - e.h - w.camera.y);
+      }
+    }
+    expect(cam0 - w.camera.y).toBeGreaterThan(100); // it rode the lift up
+    expect(attacking).toBeGreaterThan(30);
+    expect(minTop).toBeGreaterThanOrEqual(34);
+  });
 });
 
 describe('m6 ladle splashes stay in view', () => {

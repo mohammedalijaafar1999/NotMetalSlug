@@ -429,7 +429,9 @@ add(
       events: [
         { at: 0.1, type: 'drone', dx: 420, props: { kind: 'zap' } },
         { at: 0.14, type: 'drone', dx: 440, props: { kind: 'zap' } },
-        { at: 0.38, type: 'jetpack', dx: 250, dy: -14, props: { facing: -1 } },
+        // flies in from the right at hover height (dropping in from above, it began aiming inside
+        // the HUD band while the camera climbed), hovering a little lower than usual for headroom
+        { at: 0.38, type: 'jetpack', dx: 160, dy: -14, props: { facing: -1, height: 54 } },
         { at: 0.6, type: 'drone', dx: -24, props: { kind: 'kamikaze' } },
         { at: 0.64, type: 'drone', dx: -36, props: { kind: 'kamikaze' } },
       ],
