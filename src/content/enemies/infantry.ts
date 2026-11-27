@@ -392,8 +392,39 @@ export abstract class Infantry extends Enemy {
 
   think(dt: number): void {
     if (!this.calmThink(dt)) this.combat(dt);
+    this.arenaLeash(dt);
     this.moveAndCollide(dt);
     this.advanceWalk(dt);
+  }
+
+  private leashT = 0;
+
+  /**
+   * Arena leash. A soldier whose wave a camera lock is waiting on must never stay out of view - no
+   * holding his preferred range just past the screen edge, no backing off out of it, no dozing
+   * off-screen - or the arena could never be cleared. Out of view for a moment: wake up and walk
+   * (hopping walls) back in.
+   */
+  protected arenaLeash(dt: number): void {
+    if (this.waveId < 0 || this.dying || !this.world.level.locked || this.state === 'panic' || this.state === 'flee') {
+      this.leashT = 0;
+      return;
+    }
+    const cam = this.world.camera;
+    const left = cam.x + 14;
+    const right = cam.x + VIEW_W - 14;
+    if (this.x >= left && this.x <= right) {
+      this.leashT = 0;
+      if ((this.vx < 0 && this.x + this.vx * dt < left) || (this.vx > 0 && this.x + this.vx * dt > right)) this.vx = 0;
+      return;
+    }
+    this.leashT += dt;
+    if (this.leashT < 0.75) return; // let normal entrances play out
+    if (this.calm) this.alert(null);
+    if (!this.onGround) return;
+    const dir = this.x < left ? 1 : -1;
+    if (Math.sign(this.vx) !== dir) this.vx = dir * 40;
+    if (this.hitWall === dir) this.jump(240);
   }
 
   protected advanceWalk(dt: number): void {

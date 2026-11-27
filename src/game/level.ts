@@ -110,6 +110,9 @@ export interface DecorDef {
   props?: Record<string, any>;
 }
 
+/** Seconds a lock-wave enemy may stay out of view before it stops blocking the arena. */
+export const LOCK_AWAY_GIVEUP = 15;
+
 const levels = new Map<string, LevelDef>();
 
 export function registerLevel(def: LevelDef): void {
@@ -160,6 +163,8 @@ export class LevelRuntime {
   timerEnabled = true;
   /** Called when the timer hits zero (scene kills players). */
   onTimeUp: (() => void) | null = null;
+  /** Seconds each tracked wave enemy has been continuously out of view (lock failsafe). */
+  private awayT = new WeakMap<Entity, number>();
 
   constructor(world: World, def: LevelDef) {
     this.world = world;
@@ -218,6 +223,16 @@ export class LevelRuntime {
     }
     const a = this.activeLock;
     if (a) {
+      // Failsafe: a wave enemy that stays out of view for a long time (stuck behind scenery,
+      // holding range past the screen edge, wandered off) stops blocking the arena.
+      if (!a.def.boss) {
+        for (const e of a.tracked) {
+          if (e.dead || !e.blocksProgress) continue;
+          const away = e.onScreen(0) ? 0 : (this.awayT.get(e) ?? 0) + dt;
+          this.awayT.set(e, away);
+          if (away > LOCK_AWAY_GIVEUP) e.blocksProgress = false;
+        }
+      }
       const waveCleared = a.tracked.every((e) => e.dead || !e.blocksProgress);
       if (waveCleared) {
         if (a.wave + 1 < a.def.waves.length) {
