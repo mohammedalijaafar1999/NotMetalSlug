@@ -83,22 +83,22 @@ export class Incoming extends Entity {
   override render(g: CanvasRenderingContext2D): void {
     // Shown until the entity has actually rolled into view.
     if (!this.childType || (this.child && (this.child.dead || this.child.onScreen(-12)))) return;
-    if (Math.floor(this.age * 6) % 2) return;
+    const hot = Math.floor(this.age * 6) % 2 === 1;
     const s = this.side;
     const ex = Math.round(this.edgeX());
     const floor = this.world.terrain.topFloorAt(ex) ?? this.y;
     const y = Math.round(floor - 40);
-    // Sign: 11x13 yellow plate with a "!".
+    // Sign: 11x13 plate with a "!", flashing yellow / red.
     const bx = s < 0 ? ex + 2 : ex - 13;
     g.fillStyle = INK;
     g.fillRect(bx - 1, y - 1, 13, 15);
-    g.fillStyle = '#ffd040';
+    g.fillStyle = hot ? '#e8402c' : '#ffd040';
     g.fillRect(bx, y, 11, 13);
-    g.fillStyle = '#fff4b0';
+    g.fillStyle = hot ? '#ff8a6a' : '#fff4b0';
     g.fillRect(bx, y, 11, 1);
-    g.fillStyle = '#c87818';
+    g.fillStyle = hot ? '#9c2018' : '#c87818';
     g.fillRect(bx, y + 12, 11, 1);
-    g.fillStyle = INK;
+    g.fillStyle = hot ? '#ffffff' : INK;
     g.fillRect(bx + 4, y + 2, 3, 6);
     g.fillRect(bx + 4, y + 9, 3, 2);
     // Arrow pointing at the edge the threat comes from.
@@ -109,7 +109,7 @@ export class Incoming extends Entity {
       g.fillStyle = INK;
       g.fillRect(xx, ay - i - 1, 1, i * 2 + 3);
       if (i > 0) {
-        g.fillStyle = '#ff5a3a';
+        g.fillStyle = hot ? '#ffd040' : '#ff5a3a';
         g.fillRect(xx, ay - i + 1, 1, Math.max(1, i * 2 - 1));
       }
     }
