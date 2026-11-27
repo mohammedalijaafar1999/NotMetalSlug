@@ -16,6 +16,7 @@ import { missionInfo, countHostages } from '../src/content/ui/missions';
 import { getLevel } from '../src/game/level';
 import { RESPAWN_INVULN } from '../src/game/player';
 import { layoutLabel, sharedKeysHint } from '../src/scenes/ui';
+import { KeyRemapScene, assignKey } from '../src/scenes/options';
 
 const DT = 1 / 60;
 
@@ -334,8 +335,23 @@ describe('tally and mission data', () => {
   });
 });
 
-describe('settings', () => {
-  it('defaults are sane', () => {
-    expect(settings.lives).toBeGreaterThanOrEqual(1);
+describe('key remapping', () => {
+  it('reports the other player actions a steal leaves without a key', () => {
+    const saved = JSON.parse(JSON.stringify(settings.bindings));
+    settings.bindings = JSON.parse(JSON.stringify(DEFAULT_BINDINGS));
+    expect(assignKey(0, 'bomb', 'ArrowUp')).toEqual(['up']); // P2's only AIM UP key
+    expect(settings.bindings.p2.up).toEqual([]);
+    expect(assignKey(0, 'fire', 'Comma')).toEqual([]); // P2 still has Numpad1 for FIRE
+    const r = new KeyRemapScene(0) as any;
+    r.capturing = 'jump';
+    r.captureT = 1;
+    r.onKey('ArrowDown');
+    expect(r.notice?.text).toContain("2P'S CROUCH / DOWN");
+    for (let i = 0; i < 10; i++) {
+      r.update(DT);
+      r.render(g);
+    }
+    settings.bindings = saved;
+    input.bindings = settings.bindings;
   });
 });

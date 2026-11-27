@@ -18,6 +18,9 @@ import { installDebugApi, applyUrlParams } from './debug/api';
 import { applySettings } from './settings-apply';
 import { startupHooks } from './hooks';
 
+/** Scenes that show the FPS counter in the bottom-right corner (elsewhere: top-right). */
+const FPS_LOW_SCENES = new Set(['gameplay', 'demo', 'pause', 'briefing']);
+
 function installDefaultFlow(): void {
   let first = true;
   flow.title = () => {
@@ -68,8 +71,10 @@ function main(): void {
       r.beginFrame();
       app.scenes.render(r.g);
       if (settings.showFps) {
+        // Bottom-right is free in gameplay; menu screens keep footers / hint panels there.
         r.g.setTransform(1, 0, 0, 1, 0, 0);
-        drawText(r.g, `${app.loop.fps} FPS`, VIEW_W - 3, 205, { align: 'right', color: '#80ff80' });
+        const low = FPS_LOW_SCENES.has(app.scenes.current?.name ?? '');
+        drawText(r.g, `${app.loop.fps} FPS`, VIEW_W - 3, low ? 205 : 2, { align: 'right', color: '#80ff80', outline: '#140c1c' });
       }
       r.present();
     },
