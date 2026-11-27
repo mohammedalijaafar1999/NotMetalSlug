@@ -12,6 +12,7 @@ import { getLevel, type LevelDef } from '../src/game/level';
 import { getTheme } from '../src/game/theme';
 import { getEntityType, type SpawnSpec } from '../src/game/registry';
 import { Hostage } from '../src/game/hostage';
+import { dropPickup } from '../src/game/pickup';
 import type { Vehicle } from '../src/game/vehicle';
 import type { World } from '../src/game/world';
 import { M5_BUILD, BOSS_X } from '../src/content/levels/m5';
@@ -283,6 +284,32 @@ describe('mission 5 mechanics', () => {
     step(w, 2);
     expect(s.dead).toBe(true);
     expect(v.hp).toBeGreaterThan(20);
+  });
+
+  it('a pickup tossed off a deck into the open sky pops a parachute and can still be caught', () => {
+    const w = worldAt(6340);
+    const v = gyroOf(w);
+    v.hp = 30;
+    const x = w.camera.x + 250;
+    expect(w.terrain.floorAt(x, w.camera.y, w.terrain.killY)).toBeNull();
+    const pk = dropPickup(w, x, w.camera.y + 80, 'fuel', -45)!;
+    let chute: SkySupply | null = null;
+    for (let i = 0; i < 90 && !chute; i++) {
+      step(w, 1);
+      chute = (w.query((e) => e instanceof SkySupply)[0] as SkySupply) ?? null;
+    }
+    expect(chute).not.toBeNull();
+    expect(pk.dead).toBe(true);
+    expect(chute!.item?.kind).toBe('fuel');
+    // It drifts down slowly: the gyro flies over and grabs it.
+    const y0 = chute!.y;
+    step(w, 60);
+    expect(chute!.y - y0).toBeLessThan(25);
+    v.x = chute!.x;
+    v.y = chute!.y + 4;
+    step(w, 2);
+    expect(chute!.dead).toBe(true);
+    expect(v.hp).toBeGreaterThan(30);
   });
 
   it('the fuel zeppelin blocks its wave until it blows up, and its fireball clears the escorts', () => {

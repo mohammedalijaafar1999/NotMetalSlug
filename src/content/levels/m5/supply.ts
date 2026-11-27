@@ -12,7 +12,7 @@ import { fxRng } from '../../../engine/rng';
 import { rectsOverlap } from '../../../engine/math';
 import { Actor } from '../../../game/entity';
 import { Z } from '../../../game/constants';
-import { makePickup, type Pickup } from '../../../game/pickup';
+import { makePickup, Pickup } from '../../../game/pickup';
 import { registerEntity } from '../../../game/registry';
 import type { Player } from '../../../game/player';
 
@@ -60,14 +60,14 @@ export class SkySupply extends Actor {
   private landedT = -1;
   private sway = 0;
 
-  constructor(world: import('../../../game/world').World, props: Record<string, any> = {}, yGiven = false) {
+  constructor(world: import('../../../game/world').World, props: Record<string, any> = {}, yGiven = false, item?: Pickup) {
     super();
     this.team = 'neutral';
     this.hittable = false;
     this.z = Z.PICKUP;
     this.w = 16;
     this.h = 14;
-    this.item = makePickup(world, String(props.item ?? 'fuel'));
+    this.item = item ?? makePickup(world, String(props.item ?? 'fuel'));
     this.startAbove = !yGiven;
     this.drift = typeof props.drift === 'number' ? props.drift : -6;
     this.fall = typeof props.fall === 'number' ? props.fall : 15;
@@ -167,6 +167,20 @@ export class SkySupply extends Actor {
       g.globalAlpha = 1;
     }
   }
+}
+
+/**
+ * A loose pickup tumbling off a deck into the open sky (a hostage's gift, an enemy's drop) pops a
+ * parachute instead of being lost: it is swapped for a supply drop with the same contents.
+ */
+export function parachutePickup(world: import('../../../game/world').World, pk: Pickup): SkySupply {
+  const item = new Pickup(pk.kind, { weapon: pk.weaponId ?? undefined, points: pk.points, sprite: pk.spriteName });
+  const s = new SkySupply(world, { drift: Math.max(-20, Math.min(20, pk.vx * 0.3)) }, true, item);
+  s.x = pk.x;
+  s.y = pk.y;
+  world.add(s);
+  pk.remove();
+  return s;
 }
 
 registerEntity(

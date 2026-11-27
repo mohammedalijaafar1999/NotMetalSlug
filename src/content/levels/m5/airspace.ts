@@ -11,7 +11,10 @@
 //    (over open sky he falls into the clouds and respawns in a new gyro as usual). Rather than leave
 //    him stranded with a pistol on a deck that is scrolling away, a spare gyro (few bombs) drops in
 //    from the top of the screen after a moment, settles over him and he climbs in.
-// 3. Take-off. Players start in a gyro just under the top edge of the view (where the HUD is), so
+// 3. Parachutes. A pickup that tumbles off a deck into the open sky (a hostage's gift tossed
+//    toward a gyro beside the ship, an enemy's drop) is swapped for a slowly drifting supply drop
+//    with the same contents, so it can still be caught.
+// 4. Take-off. Players start in a gyro just under the top edge of the view (where the HUD is), so
 //    the first helper eases each starting gyro down into open sky during the mission banner.
 // Place a few along the level (x = trigger point); extras remove themselves.
 
@@ -21,6 +24,8 @@ import { Entity } from '../../../game/entity';
 import { registerEntity } from '../../../game/registry';
 import type { Player } from '../../../game/player';
 import { isVehicle, type Vehicle } from '../../../game/vehicle';
+import { Pickup } from '../../../game/pickup';
+import { parachutePickup } from './supply';
 
 /** Max push per frame (px) - fast enough to beat the camera, slow enough to read as a nudge. */
 const PUSH = 3;
@@ -91,6 +96,7 @@ export class Airspace extends Entity {
 
   override update(dt: number): void {
     if (this.takeoff.length) this.glide(dt);
+    this.chutes();
     for (const p of this.world.players) {
       this.unstick(p);
       this.spare(p, dt);
@@ -106,6 +112,17 @@ export class Airspace extends Entity {
     v.y += Math.max(-PUSH, Math.min(PUSH, d));
     if (d < 0 && v.vy > 0) v.vy = 0;
     if (d > 0 && v.vy < 0) v.vy = 0;
+  }
+
+  /** Loose pickups falling with nothing below them get a parachute (see header). */
+  private chutes(): void {
+    const w = this.world;
+    const T = w.terrain;
+    for (const e of w.entities) {
+      if (!(e instanceof Pickup) || e.dead || e.onGround || e.vy < 30 || e.collectedBy) continue;
+      if (T.floorAt(e.x, e.y, T.killY)) continue;
+      parachutePickup(w, e);
+    }
   }
 
   /** Ease the starting gyros down to open sky (until the pilot steers vertically). */
