@@ -4,7 +4,7 @@
 // prompts, including the full-screen CONTINUE? countdown when every joined player is out.
 
 import { drawText, textWidth } from '../engine/font';
-import { input, keyLabel } from '../engine/input';
+import { input, keyLabel, type Action } from '../engine/input';
 import { VIEW_H, VIEW_W } from '../engine/renderer';
 import { pad } from '../engine/math';
 import { sprites } from '../engine/sprites';
@@ -12,7 +12,7 @@ import type { World } from './world';
 import type { Player } from './player';
 import type { GameSession } from './session';
 import { getCharacter } from './characters';
-import { C, PLAYER_COLORS, blink, ctl, easeOut, easeOutBack, panel, rect, stripes, text, twoTone, uiSfx } from '../scenes/ui';
+import { C, PLAYER_COLORS, blink, ctl, easeOut, easeOutBack, keycap, panel, rect, stripes, text, twoTone, uiSfx } from '../scenes/ui';
 import { faceSprite } from '../content/ui/art';
 
 export type BannerStyle = 'drop' | 'slide' | 'small' | 'warning';
@@ -94,6 +94,8 @@ export function startKeyLabel(i: 0 | 1): string {
 
 /** Widest banner line (the screen less a margin). */
 export const BANNER_MAX_W = VIEW_W - 16;
+/** How long mission 1 shows the controls strip (seconds). */
+export const CONTROLS_HINT_SECONDS = 9;
 
 export class Hud {
   banners: Banner[] = [];
@@ -103,6 +105,13 @@ export class Hud {
   allowJoin = true;
   /** Attract-mode demo: hide join/continue prompts. */
   demo = false;
+  /**
+   * Seconds left of the controls strip at the bottom of the screen (which key fires, jumps and
+   * throws a bomb). Mission 1 shows it at the start: menus only ever say "FIRE" and "BOMB".
+   */
+  controlsHint = 0;
+  /** An overlay (the pause menu) is drawn over the gameplay: hide the controls strip. */
+  covered = false;
   time = 0;
   private panels: PanelState[] = [0, 1].map(() => ({ shown: 0, weapon: '', weaponPop: 0, bombs: -1, bombPop: 0, lives: -1, livesPop: 0 }));
   private rescueShown = 0;
@@ -140,6 +149,7 @@ export class Hud {
 
   update(dt: number, world?: World): void {
     this.time += dt;
+    if (this.controlsHint > 0) this.controlsHint = Math.max(0, this.controlsHint - dt);
     for (const b of this.banners) b.time -= dt;
     this.banners = this.banners.filter((b) => b.time > 0);
     if (!world) return;
@@ -212,6 +222,7 @@ export class Hud {
     }
     if (world.boss && !world.boss.dead && this.boss) this.bossBar(g, world);
     this.hostages(g);
+    if (this.controlsHint > 0 && !this.demo && !cs.allOut && !this.covered) this.controlsStrip(g);
     // GO arrow.
     if (lvl && lvl.goTimer > 0) {
       const k = Math.floor(this.time * 3) % 2 === 0;
@@ -323,6 +334,58 @@ export class Hud {
     // Touch players can't drop in a second player (and the pause button lives there).
     if (input.lastDevice === 'touch' || !blink(this.time, 1, 0.7)) return;
     text(g, `2P PRESS ${joinKey()}`, VIEW_W - 5, 4, { align: 'right', color: C.grey });
+  }
+
+  /**
+   * What the controls strip shows for player 1's device: keycap labels and the action. Keyboard
+   * reads the live bindings (the solo extras - arrows, Z X C - while nobody shares the keyboard);
+   * touch shows nothing (the on-screen buttons are labelled).
+   */
+  static controlsItems(): Array<{ keys: string[]; label: string }> {
+    const dev = input.p1Device ?? input.lastDevice;
+    if (dev === 'touch') return [];
+    if (dev === 'gamepad') {
+      return [
+        { keys: ['X'], label: 'FIRE' },
+        { keys: ['A'], label: 'JUMP' },
+        { keys: ['B'], label: 'BOMB' },
+      ];
+    }
+    const own = input.bindings.p1;
+    const extras = input.twoPlayerKeyboard ? null : input.soloLayout().extras;
+    const key = (a: Action) => keyLabel(extras?.[a]?.[0] ?? own[a]?.[0] ?? '?');
+    return [
+      { keys: [key('left'), key('right')], label: 'MOVE' },
+      { keys: [key('up')], label: 'AIM' },
+      { keys: [key('fire')], label: 'FIRE' },
+      { keys: [key('jump')], label: 'JUMP' },
+      { keys: [key('bomb')], label: 'BOMB' },
+    ];
+  }
+
+  /** Width of the controls strip's contents (keycaps + labels). */
+  static controlsWidth(items: Array<{ keys: string[]; label: string }>): number {
+    let w = 0;
+    for (const it of items) {
+      for (const k of it.keys) w += Math.max(11, textWidth(k) + 6) + 2;
+      w += textWidth(it.label) + 2 + 10;
+    }
+    return Math.max(0, w - 10);
+  }
+
+  private controlsStrip(g: CanvasRenderingContext2D): void {
+    const items = Hud.controlsItems();
+    if (!items.length) return;
+    const w = Hud.controlsWidth(items);
+    // Slides in, then out over its last half second.
+    const k = Math.min(1, Math.min(this.controlsHint, Math.max(0, CONTROLS_HINT_SECONDS - this.controlsHint)) / 0.5);
+    const y = VIEW_H - 18 + Math.round((1 - easeOut(k)) * 24);
+    let x = Math.round((VIEW_W - w) / 2);
+    panel(g, x - 6, y - 3, w + 12, 17, 'dark', 0.8);
+    for (const it of items) {
+      for (const key of it.keys) x += keycap(g, key, x, y) + 2;
+      x += drawText(g, it.label, x, y + 2, { color: C.white, outline: C.out }) + 2 + 10;
+    }
   }
 
   // ------------------------------------------------------------------ boss bar
