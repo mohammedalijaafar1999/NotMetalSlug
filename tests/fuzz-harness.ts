@@ -278,9 +278,10 @@ export function runFuzz(c: FuzzCase): FuzzReport {
       if (e.team !== 'enemy' || (e as any).damageAmount === undefined || seenShots.has(e.id)) continue;
       seenShots.add(e.id);
       const o = (e as any).owner as Entity | null;
-      if (o && (o as any).isBoss) continue;
+      // Ownerless shots are level hazards (m6 ladle globs) with their own landing telegraphs.
+      if (!o || (o as any).isBoss) continue;
       const off = Math.max(cam.x - e.x, e.x - (cam.x + VIEW_W), cam.y - 40 - e.y);
-      if (off > 12) report('offshot:' + (o?.type ?? e.type), `enemy shot ${describeEntity(e)} fired ${fmt(off)} px outside the view by ${o ? describeEntity(o) : 'no owner'}`);
+      if (off > 12) report('offshot:' + (o?.type ?? e.type), `enemy shot ${describeEntity(e)} fired ${fmt(off)} px outside the view by ${describeEntity(o)}`);
     }
     for (const e of w.entities) {
       if (!Number.isFinite(e.x) || !Number.isFinite(e.y) || !Number.isFinite(e.vx) || !Number.isFinite(e.vy)) {

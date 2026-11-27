@@ -89,11 +89,32 @@ export class Projectile extends Entity {
       this.remove();
       return;
     }
-    if (this.hitsTerrain && this.world.terrain.isSolidPoint(this.x, this.y)) {
+    if (this.hitsTerrain && this.sweepTerrain()) {
       this.onHitTerrain();
       if (this.dead) return;
     }
     this.checkHits();
+  }
+
+  /**
+   * Did this frame's path enter solid terrain? Sampled every 3 px (a fast bullet moves 8 px a
+   * frame and would skip through a thin deck plate); stops the shot at the first solid point.
+   */
+  private sweepTerrain(): boolean {
+    const T = this.world.terrain;
+    const dx = this.x - this.px;
+    const dy = this.y - this.py;
+    const n = Math.min(32, Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 3)));
+    for (let i = 1; i <= n; i++) {
+      const x = this.px + (dx * i) / n;
+      const y = this.py + (dy * i) / n;
+      if (T.isSolidPoint(x, y)) {
+        this.x = x;
+        this.y = y;
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Integrate position (override for homing/sine motion). */

@@ -303,6 +303,40 @@ describe('low ceilings', () => {
   });
 });
 
+describe('projectiles', () => {
+  it('fast bullets never skip through a thin deck plate', () => {
+    // Every bullet of a burst samples the same heights, so try the plate at every phase.
+    let fired = 0;
+    let through = 0;
+    for (let py = 96; py < 104; py++) {
+      const w = makeWorld(level('core_thin_plate', { start: { x: 60 }, solids: [{ x: 120, y: py, w: 200, h: 5 }] }), { god: true });
+      settle(w);
+      const p = w.players[0];
+      // Under the plate, on the floor.
+      p.x = 220;
+      p.y = 180;
+      step(w, 2);
+      expect(p.onGround).toBe(true);
+      p.giveWeapon('hmg');
+      const seen = new Set<number>();
+      for (let i = 0; i < 60; i++) {
+        input.setVirtual(0, { up: true, fire: i % 2 === 0 });
+        step(w, 1);
+        for (const b of w.query((e) => e.team === 'player' && (e as any).damageAmount !== undefined)) {
+          if (!seen.has(b.id)) {
+            seen.add(b.id);
+            fired++;
+          }
+          if (b.y < py && b.x > 120 && b.x < 320) through++;
+        }
+      }
+      input.setVirtual(0, null);
+    }
+    expect(fired).toBeGreaterThan(40);
+    expect(through).toBe(0);
+  });
+});
+
 describe('TIME UP', () => {
   it('kills a player who is driving a vehicle (the vehicle is wrecked, the pilot dies)', () => {
     const w = makeWorld(level('core_timeup_vehicle', { entities: [{ type: 'tank', x: 260, trigger: 0 }] }), { god: false });
