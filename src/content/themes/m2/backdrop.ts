@@ -59,7 +59,7 @@ export function regionWeights(marks: Mark[], x: number): Map<Region, number> {
 // ------------------------------------------------------------------ layer geometry
 
 /** Screen-space placement when the camera sits at the level bottom. */
-const FAR = { top: 88, h: 128, f: 0.08, yf: 0.2, period: 512 };
+const FAR = { top: 88, h: 128, f: 0.08, yf: 0.03, period: 512 };
 const MID = { top: 44, h: 172, f: 0.2, yf: 0.45 };
 const NEAR = { top: 126, h: 90, f: 0.4, yf: 0.7 };
 const HAZE = { top: 14, h: 78, f: 0.03, yf: 0.05, period: 640, speed: 4 };

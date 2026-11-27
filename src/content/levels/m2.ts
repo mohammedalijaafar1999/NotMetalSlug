@@ -39,9 +39,10 @@ const STEPS: Array<[number, number]> = [
   [3730, B - 78],
   [3796, B - 112],
   [3862, B - 146],
-  [3928, B - 180],
-  [3994, MESA],
+  [3928, MESA],
 ];
+/** Rock ledge jutting out of the last (62 px) cliff: the only way up onto the mesa. */
+const LEDGE_Y = B - 177;
 
 const ground: Array<[number, number]> = [
   // 0. canyon mouth: low dunes
@@ -121,7 +122,7 @@ const platforms: PlatformDef[] = [
   { x: 2588, y: B - 40, w: 60 },
   // Mesa climb: a scaffold over the first step and a rock ledge higher up.
   { x: 3736, y: B - 112, w: 46 },
-  { x: 3880, y: B - 196, w: 30, style: 'ledge' },
+  { x: 3897, y: LEDGE_Y, w: 31, style: 'ledge' },
   // Mesa top watchtower deck.
   { x: 4383, y: MESA - 46, w: 34, style: 'plank' },
   // Oil field catwalks (two in the gauntlet arena).
@@ -160,6 +161,8 @@ const decor: DecorDef[] = [
       ['salt', 6280],
     ] as const
   ).map(([region, x]) => D('m2_bg', x, { region })),
+  // Crisp rims on every cliff face / step.
+  D('cliffs', 0, { w: 2 * W }),
   // Ground paint: the canyon road and the salt flat.
   D('surface', 1700, { type: 'road', w: 1600 }),
   D('surface', 6230, { type: 'salt', w: W - 6230 }),
@@ -294,8 +297,8 @@ const entities: SpawnSpec[] = [
   // 5. mesa climb
   { type: 'rifleman', x: 3768, y: STEPS[0][1], props: { behavior: 'guard', facing: -1 } },
   { type: 'hostage', x: 3830, y: STEPS[1][1], props: { drop: 'L', look: 1 } },
-  { type: 'grenadier', x: 3906, y: STEPS[2][1], props: { behavior: 'guard', facing: -1 } },
-  { type: 'saber', x: 3966, y: STEPS[3][1], props: { behavior: 'guard', facing: -1 } },
+  { type: 'grenadier', x: 3878, y: STEPS[2][1], props: { behavior: 'guard', facing: -1 } },
+  { type: 'saber', x: 3984, y: MESA, props: { behavior: 'guard', facing: -1 } },
   { type: 'sniper', x: 4056, y: MESA, props: { facing: -1 } },
   // 6. mesa top lookout
   { type: 'sandbags', x: 4110, y: MESA },

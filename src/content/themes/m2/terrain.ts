@@ -36,8 +36,126 @@ function bandColor(bands: Array<[number, string]>, y: number): string {
   return bands[0][1];
 }
 
-/** Ground fill: wavy sediment bands, flecks, pebbles and hairline cracks (tiles 64x64). */
+/**
+ * World row where the red sandstone gives way to drifted sand. The ground texture is GT_H rows tall,
+ * so (in levels up to GT_H px tall) its rows map 1:1 to world y: every cliff, mesa and step that
+ * rises above the canyon floor (the m2 level's floor is at y 408) shows layered red rock under its
+ * sand crust, and the floor itself stays sand.
+ */
+export const SAND_LINE = 386;
+const GT_W = 128;
+const GT_H = 512;
+
+/** Per-row base colors of the sandstone beds (lit lip on top of each bed, undercut below). */
+function rockRows(): string[] {
+  const r = new Rng(717);
+  const rows: string[] = [];
+  const beds = [C.rockL, C.rock, C.rockL, C.rockM, '#c47a50', C.rock, '#d89868'];
+  let prev = '';
+  while (rows.length < GT_H) {
+    let base = r.pick(beds);
+    if (base === prev) base = r.pick(beds);
+    prev = base;
+    const t = r.int(4, 12);
+    for (let i = 0; i < t; i++) {
+      if (i === 0) rows.push(shade(base, -0.1));
+      else if (i === t - 1 && t > 4) rows.push(shade(base, 0.16));
+      else rows.push(base);
+    }
+    // Thin dark parting between some beds.
+    if (r.chance(0.45)) rows.push(r.chance(0.5) ? C.rockD : C.rockDD);
+  }
+  return rows.slice(0, GT_H);
+}
+
+/** Sand drift line at texture column x (periodic over GT_W). */
+function sandLineAt(x: number): number {
+  const u = (x / GT_W) * TAU;
+  return SAND_LINE + Math.round(Math.sin(u * 2 + 0.4) * 2.5 + Math.sin(u * 5 + 1.3) * 1.2);
+}
+
+/**
+ * Ground fill: layered red sandstone (beds, partings, joints, varnish streaks, weathering pockets)
+ * above SAND_LINE, wavy sediment sand below it. 128 x 512, rows = world y.
+ */
 export function groundTile(): PixelArt {
+  const sand = sandTile();
+  const rows = rockRows();
+  const p = new PixelArt(GT_W, GT_H);
+  const r = new Rng(818);
+  const wave: number[] = [];
+  for (let x = 0; x < GT_W; x++) {
+    const u = (x / GT_W) * TAU;
+    wave.push(Math.round(Math.sin(u + 0.9) * 1.6 + Math.sin(u * 3 + 2.2) * 0.8));
+  }
+  // Beds.
+  for (let x = 0; x < GT_W; x++) {
+    for (let y = 0; y < GT_H; y++) {
+      const yy = Math.max(0, Math.min(GT_H - 1, y + wave[x]));
+      p.px(x, y, rows[yy]);
+    }
+  }
+  // Grain flecks.
+  for (let i = 0; i < 900; i++) {
+    const x = r.int(0, GT_W - 1);
+    const y = r.int(0, SAND_LINE);
+    p.px(x, y, r.chance(0.5) ? C.rockD : C.rockL);
+  }
+  // Desert-varnish streaks hanging down the face.
+  for (let i = 0; i < 26; i++) {
+    const x = r.int(0, GT_W - 1);
+    const y0 = r.int(0, SAND_LINE - 30);
+    const len = r.int(6, 24);
+    for (let k = 0; k < len; k++) {
+      if (k > len * 0.6 && r.chance(0.4)) continue;
+      const v = p.getRaw(x, y0 + k);
+      p.setRaw(x, y0 + k, (darkenRaw(v, 0.12) >>> 0));
+    }
+  }
+  // Vertical joints (dark crack with a lit right lip), wrapped horizontally.
+  for (let i = 0; i < 14; i++) {
+    let x = r.int(0, GT_W - 1);
+    const y0 = r.int(0, SAND_LINE - 24);
+    const len = r.int(7, 22);
+    for (let k = 0; k < len; k++) {
+      const xx = ((x % GT_W) + GT_W) % GT_W;
+      p.px(xx, y0 + k, C.rockDD);
+      p.px((xx + 1) % GT_W, y0 + k, C.rockL);
+      if (r.chance(0.18)) x += r.pick([-1, 1]);
+    }
+  }
+  // Weathering pockets (dark hollow, lit lower rim).
+  for (let i = 0; i < 16; i++) {
+    const cx = r.int(4, GT_W - 5);
+    const cy = r.int(4, SAND_LINE - 8);
+    const rx = r.int(2, 3);
+    p.rect(cx - rx, cy, rx * 2 + 1, 2, C.rockD);
+    p.rect(cx - rx + 1, cy - 1, rx * 2 - 1, 1, C.rockDD);
+    p.rect(cx - rx + 1, cy, rx * 2 - 1, 1, C.rockDD);
+    p.rect(cx - rx + 1, cy + 2, rx * 2 - 1, 1, C.rockHi);
+  }
+  // Sand drift below the sand line (with a lit lip and grains dusted on the rock above it).
+  for (let x = 0; x < GT_W; x++) {
+    const yb = sandLineAt(x);
+    for (let y = yb; y < GT_H; y++) p.setRaw(x, y, sand.getRaw(x % sand.w, y % sand.h));
+    p.px(x, yb, C.sandHi);
+    p.px(x, yb + 1, C.sandL);
+    p.px(x, yb - 1, C.rockD);
+    if (r.chance(0.45)) p.px(x, yb - 2 - r.int(0, 3), C.sandM);
+  }
+  return p;
+}
+
+function darkenRaw(v: number, amt: number): number {
+  const k = 1 - amt;
+  const r = Math.round((v & 255) * k);
+  const g = Math.round(((v >>> 8) & 255) * k);
+  const b = Math.round(((v >>> 16) & 255) * k);
+  return ((v >>> 24) << 24) | (b << 16) | (g << 8) | r;
+}
+
+/** Sand fill: wavy sediment bands, flecks, pebbles and hairline cracks (tiles 64x64). */
+function sandTile(): PixelArt {
   const W = 64;
   const H = 64;
   const p = new PixelArt(W, H);

@@ -4,6 +4,7 @@
 //   tumbleweed(props.w span, rolls right->left) vulture(perched) pipeline(props.w, h, valve)
 //   surface(props.type 'salt'|'road', props.w: paints the ground top along the level's ground line)
 //   pillar(props.h) watchtower(props.h, pair with a 'plank' platform) barrier(props.w)
+//   cliffs (one entry, props.w >= level width: lit/shadowed rims on every vertical ground step)
 //   m2_bg (region marker for the backdrop, draws nothing)
 // Common props: v (variant), flip (mirror), dy (vertical nudge).
 
@@ -11,7 +12,7 @@ import { sprites } from '../../../engine/sprites';
 import type { DecorDef, LevelDef } from '../../../game/level';
 import type { DecorRenderer } from '../../../game/theme';
 import { C } from './palette';
-import { levelGroundY, renderCtx } from './terrain';
+import { levelGroundY, renderCtx, SAND_LINE } from './terrain';
 import { gustAt } from './weather';
 
 function spr(name: string, frameOf?: (d: DecorDef, time: number) => number, sink = 1): DecorRenderer {
@@ -112,6 +113,58 @@ const surface: DecorRenderer = (g, d) => {
 function px(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, c: string): void {
   g.fillStyle = c;
   g.fillRect(x, y, w, h);
+}
+
+/**
+ * Cliff faces: every vertical step of the level's ground lines gets a crisp edge - a lit rim on
+ * faces that look left (toward the light), a shadowed rim on faces that look right - so ledges and
+ * steps read clearly. One decor entry renders them all (give it props.w >= the level width so it is
+ * never culled).
+ */
+const cliffs: DecorRenderer = (g) => {
+  const L = renderCtx.level;
+  if (!L) return;
+  for (const line of L.ground) {
+    for (let i = 0; i < line.length - 1; i++) {
+      const [x1, y1] = line[i];
+      const [x2, y2] = line[i + 1];
+      if (x1 !== x2 || Math.abs(y2 - y1) < 6) continue;
+      const x = Math.round(x1);
+      const top = Math.round(Math.min(y1, y2));
+      const bot = Math.round(Math.max(y1, y2));
+      // Leave a gap where a ledge or scaffold is attached to the face (it is drawn underneath).
+      const att = (L.platforms ?? []).find((p) => p.x <= x + 2 && p.x + p.w >= x - 2 && p.y > top && p.y < bot);
+      if (att) {
+        g.save();
+        g.beginPath();
+        g.rect(x - 4, top - 4, 8, att.y - 1 - (top - 4));
+        g.rect(x - 4, att.y + 11, 8, Math.max(0, bot + 4 - (att.y + 11)));
+        g.clip();
+      }
+      drawRim(g, x, top, bot, y2 < y1);
+      if (att) g.restore();
+    }
+  }
+};
+
+function drawRim(g: CanvasRenderingContext2D, x: number, top: number, bot: number, lit: boolean): void {
+  const rockEnd = Math.min(bot, SAND_LINE);
+  // Dark outline in the air beside the face, rim inside the rock.
+  if (lit) {
+    px(g, x - 1, top + 1, 1, bot - top - 1, C.rockDD);
+    if (rockEnd > top + 3) {
+      px(g, x, top + 3, 1, rockEnd - top - 3, C.rockHi);
+      px(g, x + 1, top + 4, 1, Math.max(0, rockEnd - top - 6), C.rockL);
+    }
+    if (bot > rockEnd) px(g, x, rockEnd, 1, bot - rockEnd, C.sandHi);
+  } else {
+    px(g, x, top + 1, 1, bot - top - 1, C.rockDD);
+    if (rockEnd > top + 2) {
+      px(g, x - 1, top + 2, 1, rockEnd - top - 2, C.rockD);
+      px(g, x - 2, top + 3, 1, Math.max(0, rockEnd - top - 5), C.rockM);
+    }
+    if (bot > rockEnd) px(g, x - 1, rockEnd, 1, bot - rockEnd, C.sandD);
+  }
 }
 
 /** Pipeline on H supports: props.w length, props.h pipe-center height above the ground, props.valve offset. */
@@ -280,6 +333,7 @@ export const M2_DECOR: Record<string, DecorRenderer> = {
   watchtower,
   barrier,
   m2_bg: () => {},
+  cliffs,
   surface,
   pipeline,
   tumbleweed,
