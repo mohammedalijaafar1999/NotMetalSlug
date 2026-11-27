@@ -15,7 +15,7 @@ import { characters, type CharacterDef } from '../game/characters';
 import { GameSession } from '../game/session';
 import { LEG, LEG_FRAMES } from '../art/humanoid';
 import { backdrop } from './backdrop';
-import { C, PLAYER_COLORS, backButton, blink, easeOutBack, enterMenu, fitText, footer, panel, rect, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
+import { C, PLAYER_COLORS, backButton, blink, easeOutBack, enterMenu, fitText, footer, panel, rect, sharedKeysHint, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
 
 interface Slot {
   joined: boolean;
@@ -332,7 +332,7 @@ export class CharSelectScene implements Scene {
       if (blink(this.time, 1.2, 0.7)) drawText(g, msg, VIEW_W - 8, VIEW_H - 19, { align: 'right', color: C.p2, outline: C.out });
     }
     if (input.twoPlayerKeyboard && this.slots[1].joined) {
-      drawText(g, '1P: WASD + J K L    2P: ARROWS + , . /', cx, VIEW_H - 19, { align: 'center', color: C.blue, outline: C.out });
+      drawText(g, sharedKeysHint(), cx, VIEW_H - 19, { align: 'center', color: C.blue, outline: C.out });
     }
     backButton(g, this.time);
     if (this.startTimer >= 0) {

@@ -30,6 +30,22 @@ const T_CREDITS = 23;
 const EPILOGUE =
   'THE RUSTCOAT LEGION IS FINISHED. MARSHAL GRISTLE WAS LAST SEEN PADDLING A RUBBER DINGHY TOWARD THE HORIZON, SHAKING HIS FIST. THE MECHANICS OF PUERTO POLVORA ARE FREE AND ALREADY FIXING EVERYTHING. THE RUCKUS SQUAD HAS EARNED A VACATION.';
 
+/**
+ * Who celebrates on the hill: the whole squad in roster order. A soldier only player 2 played
+ * wears player 2's colors; if both players picked the same soldier, player 2's twin joins too.
+ */
+export function endingSquad(session: GameSession): { id: string; p2: boolean }[] {
+  const pick = (i: number) => (session.players[i]?.joined ? session.players[i].character : null);
+  const p1 = pick(0);
+  const p2 = pick(1);
+  const out: { id: string; p2: boolean }[] = [];
+  for (const c of characters()) {
+    out.push({ id: c.id, p2: c.id === p2 && c.id !== p1 });
+    if (c.id === p2 && c.id === p1) out.push({ id: c.id, p2: true });
+  }
+  return out;
+}
+
 export class EndingScene implements Scene {
   name = 'ending';
   time = 0;
@@ -47,10 +63,7 @@ export class EndingScene implements Scene {
 
   constructor(readonly session: GameSession) {
     this.creditsH = creditsHeight(this.credits);
-    const joined = session.players.filter((p) => p.joined);
-    for (const p of joined) this.squad.push({ id: p.character, p2: p.index === 1 });
-    for (const c of characters()) if (!this.squad.some((s) => s.id === c.id && !s.p2)) this.squad.push({ id: c.id, p2: false });
-    this.squad = this.squad.slice(0, 5);
+    this.squad = endingSquad(session);
     this.epi = wrapText(EPILOGUE, 300);
   }
 

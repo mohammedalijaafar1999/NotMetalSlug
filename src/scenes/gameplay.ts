@@ -18,7 +18,7 @@ import type { GameSession, PlayerProfile } from '../game/session';
 import type { Vehicle } from '../game/vehicle';
 import { PauseScene } from './pause';
 import { Bot } from '../debug/bot';
-import { C, blink, panel, syncTouch, twoTone, uiInput, uiSfx } from './ui';
+import { C, blink, panel, sharedKeysHint, syncTouch, twoTone, uiInput, uiSfx } from './ui';
 
 export const CONTINUE_SECONDS = 10;
 /** Attract demo length (seconds). */
@@ -128,7 +128,12 @@ export class GameplayScene implements Scene {
     return w;
   }
 
-  spawnPlayer(w: World, prof: PlayerProfile): Player {
+  /**
+   * Add a player to the world. At the mission start they drop in at the level start (or sit in
+   * the level's start vehicle). A mid-mission drop-in (`dropIn`) uses the regular respawn: next
+   * to the partner, over solid ground, with the respawn invulnerability (also for the vehicle).
+   */
+  spawnPlayer(w: World, prof: PlayerProfile, dropIn = false): Player {
     const p = new Player(prof);
     const x = this.def.start.x + prof.index * 22;
     p.x = Math.max(x, w.camera.x + 40);
@@ -136,6 +141,10 @@ export class GameplayScene implements Scene {
     if (app.debug.invincible || this.demo) p.godMode = true;
     w.add(p);
     w.players.push(p);
+    if (dropIn) {
+      p.respawn();
+      return p;
+    }
     if (this.def.startVehicle) {
       const v = w.spawn(this.def.startVehicle, p.x, p.y + 40) as Vehicle | null;
       if (v && (v as any).isVehicle) {
@@ -188,6 +197,17 @@ export class GameplayScene implements Scene {
     uiInput.flush();
     // Options may have changed while paused.
     if (!this.demo) this.world.level.timerEnabled = settings.timer;
+  }
+
+  /**
+   * The window lost focus or the tab was hidden: open the pause menu so nobody dies while away
+   * (also freezes a running continue countdown). Not in the demo or while the mission is ending.
+   */
+  autoPause(): boolean {
+    if (this.demo || this.phase !== 'play' || app.loop?.manual || app.debug.autopilot) return false;
+    if (!app.scenes || app.scenes.current !== this || app.scenes.transitioning) return false;
+    app.scenes.push(new PauseScene(this));
+    return true;
   }
 
   private startPressed(): boolean {
@@ -245,13 +265,15 @@ export class GameplayScene implements Scene {
     if (!this.demo && !p2.joined && this.phase === 'play') {
       const i2 = input.player(1);
       if (i2.pressed('start') || i2.pressed('fire')) {
-        if (input.lastDevice !== 'gamepad') input.twoPlayerKeyboard = true;
+        const shared = input.lastDevice !== 'gamepad';
+        if (shared) input.twoPlayerKeyboard = true;
         this.session.join(1);
         p2.missionRescues = 0;
         this.killsAtStart[1] = p2.kills;
-        this.spawnPlayer(w, p2);
+        this.spawnPlayer(w, p2, true);
         audio.play('coin');
-        this.hud.banner('PLAYER 2 JOINED', { time: 1.5, scale: 1, color: C.blue });
+        // Sharing the keyboard moves player 1 off the arrows: say so.
+        this.hud.banner('PLAYER 2 JOINED', { time: shared ? 3.5 : 1.5, scale: 1, color: C.blue, sub: shared ? sharedKeysHint() : undefined });
       }
     }
 

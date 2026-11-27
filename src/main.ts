@@ -47,6 +47,11 @@ function main(): void {
   app.scenes.onChange = () => input.flush();
   input.start();
   input.onFirstGesture = () => audio.unlock();
+  // Window blurred / tab hidden: held keys were released; gameplay opens its pause menu.
+  input.onFocusLost = () => {
+    const s = app.scenes.current as { autoPause?: () => boolean } | undefined;
+    s?.autoPause?.();
+  };
   installDebugApi();
   installDefaultFlow();
   // Content modules may override flow hooks / install UI; give them a chance.
@@ -71,10 +76,8 @@ function main(): void {
   );
   app.scenes.set(new BootScene(), { fade: false });
   app.loop.start();
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) audio.duck(true);
-    else audio.duck(false);
-  });
+  // (No ducking here: the audio engine suspends itself while the tab is hidden, and un-ducking
+  // on return would fight the pause menu's own duck.)
 }
 
 main();

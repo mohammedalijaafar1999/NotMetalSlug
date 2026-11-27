@@ -195,7 +195,16 @@ class TouchControls {
   private stickCenter = { x: 0, y: 0 };
   private knob: HTMLDivElement | null = null;
   private base: HTMLDivElement | null = null;
+  private buttons: HTMLDivElement[] = [];
   enabled = false;
+
+  /** Let go of every button and centre the stick (focus loss, overlay hidden). */
+  releaseAll(): void {
+    for (const a of ACTIONS) this.state[a] = false;
+    this.stickId = null;
+    if (this.knob) this.knob.style.transform = '';
+    for (const b of this.buttons) b.style.background = 'rgba(255,255,255,0.14)';
+  }
 
   ensure(): void {
     if (this.root || typeof document === 'undefined') return;
@@ -226,6 +235,7 @@ class TouchControls {
       b.addEventListener('pointercancel', off);
       b.addEventListener('lostpointercapture', off);
       root.appendChild(b);
+      this.buttons.push(b);
       return b;
     };
     mkBtn('FIRE', 'fire', 'right:24px;bottom:90px;width:78px;height:78px;');
@@ -286,7 +296,10 @@ class TouchControls {
   }
 
   setVisible(v: boolean): void {
-    if (this.root) this.root.style.display = v ? '' : 'none';
+    if (!this.root) return;
+    this.root.style.display = v ? '' : 'none';
+    // A hidden control can't receive its pointerup: don't leave it stuck down.
+    if (!v) this.releaseAll();
   }
 }
 
@@ -307,6 +320,8 @@ export class InputManager {
   private padOrder: number[] = [];
   /** Called on the first user gesture (used to unlock audio). */
   onFirstGesture: (() => void) | null = null;
+  /** Called after the window lost focus / the tab was hidden and held input was released. */
+  onFocusLost: (() => void) | null = null;
   private gestured = false;
   /** Raw "any input" this step (for attract-mode / press start screens). */
   anyPressedThisStep = false;
@@ -342,8 +357,10 @@ export class InputManager {
     window.addEventListener('keyup', (e) => {
       this.keysDown.delete(e.code);
     });
-    window.addEventListener('blur', () => {
-      this.keysDown.clear();
+    // Focus loss: keyups that happen elsewhere never arrive, so release everything held.
+    window.addEventListener('blur', () => this.focusLost());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.focusLost();
     });
     window.addEventListener('pointerdown', (e) => {
       this.gesture();
@@ -360,6 +377,19 @@ export class InputManager {
       const ge = e as GamepadEvent;
       this.padOrder = this.padOrder.filter((i) => i !== ge.gamepad.index);
     });
+  }
+
+  /** Forget every held key and touch control (e.g. the window lost focus). */
+  releaseAll(): void {
+    this.keysDown.clear();
+    this.keyTapLatch.clear();
+    this.touch.releaseAll();
+  }
+
+  /** Window blurred or tab hidden: release held input, then tell the game (it pauses). */
+  focusLost(): void {
+    this.releaseAll();
+    this.onFocusLost?.();
   }
 
   private gesture(): void {
@@ -407,9 +437,29 @@ export class InputManager {
     }
   }
 
-  private keyActions(b: Bindings, tapped: boolean): boolean[] {
+  private keyActions(b: Bindings, tapped: boolean, skip?: Set<string>): boolean[] {
     const set = tapped ? this.keyTapLatch : this.keysDown;
-    return ACTIONS.map((a) => b[a].some((k) => set.has(k)));
+    return ACTIONS.map((a) => b[a].some((k) => set.has(k) && !(skip && skip.has(k))));
+  }
+
+  /** Every key code bound to any action in `b`. */
+  private static codesOf(b: Bindings): Set<string> {
+    const s = new Set<string>();
+    for (const a of ACTIONS) for (const k of b[a] ?? []) s.add(k);
+    return s;
+  }
+
+  /**
+   * Keys player 1 uses while the keyboard is not shared: their own bindings plus the solo extras
+   * (arrows, Z/X/C...). A key the player remapped explicitly always wins over a solo extra, so
+   * binding FIRE to X does not also make X jump.
+   */
+  soloLayout(): { extras: Bindings; codes: Set<string> } {
+    const mine = InputManager.codesOf(this.bindings.p1);
+    const extras = {} as Bindings;
+    for (const a of ACTIONS) extras[a] = SOLO_EXTRA[a].filter((k) => !mine.has(k));
+    const codes = new Set([...mine, ...InputManager.codesOf(extras)]);
+    return { extras, codes };
   }
 
   /** Sample all devices. Call exactly once per fixed simulation step. */
@@ -426,13 +476,17 @@ export class InputManager {
 
     const n = ACTIONS.length;
     let anyRaw = false;
+    // Solo layout: player 1 also gets the extras, and player 2's keyboard ignores every key
+    // player 1 is using (so P1's arrows / Z can't move or drop in player 2 by accident).
+    const solo = this.twoPlayerKeyboard ? null : this.soloLayout();
     for (let pi = 0; pi < 2; pi++) {
       const b = pi === 0 ? this.bindings.p1 : this.bindings.p2;
-      const down = this.keyActions(b, false);
-      const tap = this.keyActions(b, true);
-      if (pi === 0 && !this.twoPlayerKeyboard) {
-        const d2 = this.keyActions(SOLO_EXTRA, false);
-        const t2 = this.keyActions(SOLO_EXTRA, true);
+      const skip = pi === 1 && solo ? solo.codes : undefined;
+      const down = this.keyActions(b, false, skip);
+      const tap = this.keyActions(b, true, skip);
+      if (pi === 0 && solo) {
+        const d2 = this.keyActions(solo.extras, false);
+        const t2 = this.keyActions(solo.extras, true);
         for (let i = 0; i < n; i++) {
           down[i] = down[i] || d2[i];
           tap[i] = tap[i] || t2[i];

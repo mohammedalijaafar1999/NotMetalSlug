@@ -60,7 +60,7 @@ export const MISSIONS: MissionInfo[] = [
   {
     mission: 4,
     name: 'RUSTWATER DOCKS',
-    subtitle: 'OPERATION LOW TIDE',
+    subtitle: 'OPERATION HIGH WATER',
     briefing:
       'RUSTWATER HARBOR IS CRAWLING WITH FROGMEN AND GUNBOATS. FIGHT THROUGH THE FLOODED STREETS AT DUSK AND SINK THE LEVIATHAN SUBMARINE BEFORE IT SLIPS OUT OF PORT.',
     boss: 'LEVIATHAN',
@@ -110,7 +110,9 @@ export function missionInfo(n: number): MissionInfo & { level?: LevelDef } {
   if (lvl) {
     info.level = lvl;
     if (lvl.name) info.name = lvl.name.toUpperCase();
-    if (lvl.subtitle) info.subtitle = lvl.subtitle.toUpperCase();
+    // The subtitle slot is the operation codename ("OPERATION BEACHHEAD"); a level subtitle that
+    // is a plain description keeps the codename from the table above.
+    if (lvl.subtitle && /^OPERATION\b/i.test(lvl.subtitle.trim())) info.subtitle = lvl.subtitle.trim().toUpperCase();
     if (lvl.briefing) info.briefing = lvl.briefing.toUpperCase();
     if (lvl.bossName) info.boss = lvl.bossName.toUpperCase();
   }

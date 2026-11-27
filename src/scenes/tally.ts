@@ -49,6 +49,8 @@ export class TallyScene implements Scene {
   private readonly tRank: number;
   private readonly tDone: number;
   readonly rank: string | null;
+  /** Hostages placed in the level (0 = unknown). */
+  readonly hostageTotal: number;
   private rankSfx = false;
   private bonusSfx = false;
   private poppedIcons = 0;
@@ -63,7 +65,8 @@ export class TallyScene implements Scene {
     this.tRank = this.tBonus + 1.0;
     this.tDone = this.tRank + 0.5;
     const def = (stats.levelId ? getLevel(stats.levelId) : undefined) ?? levelForMission(this.missionNo);
-    this.rank = missionRank(stats.rescues, countHostages(def));
+    this.hostageTotal = countHostages(def);
+    this.rank = missionRank(stats.rescues, this.hostageTotal);
   }
 
   get missionNo(): number {
@@ -160,7 +163,7 @@ export class TallyScene implements Scene {
       Math.round(st.time * this.k(T_ROWS[0])),
       Math.round(st.kills * this.k(T_ROWS[1])),
       Math.round(st.shotsFired * this.k(T_ROWS[2])),
-      Math.round(accuracy(st.kills, st.shotsFired) * this.k(T_ROWS[3])),
+      Math.round(st.rescues * this.k(T_ROWS[3])),
       Math.round(this.k(this.tBonus, 0.8) * 100),
     ].join(',');
   }
@@ -204,12 +207,13 @@ export class TallyScene implements Scene {
     const px = 70;
     const pw = 244;
     panel(g, px, 38, pw, 62, 'steel', 0.9);
-    const acc = accuracy(st.kills, st.shotsFired);
+    // Hostages freed (out of how many) is what the rank is graded on, so it gets the last row.
+    const freed = Math.round(st.rescues * this.k(T_ROWS[3]));
     const rows: [string, string][] = [
       ['CLEAR TIME', formatTime(st.time * this.k(T_ROWS[0]))],
       ['ENEMIES DOWN', String(Math.round(st.kills * this.k(T_ROWS[1])))],
       ['SHOTS FIRED', String(Math.round(st.shotsFired * this.k(T_ROWS[2])))],
-      ['ACCURACY', `${Math.round(acc * this.k(T_ROWS[3]))}%`],
+      ['HOSTAGES FREED', this.hostageTotal > 0 ? `${freed}/${this.hostageTotal}` : String(freed)],
     ];
     rows.forEach(([label, value], r) => {
       if (this.time < T_ROWS[r] - 0.1) return;
