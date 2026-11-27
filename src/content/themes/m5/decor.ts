@@ -10,6 +10,7 @@
 //   m5_cap         bow / stern of a sky-barge hull (props.end 'bow'|'stern', facing)
 //   m5_banner      hanging Legion war banner fluttering (props.h)
 //   m5_cable       sagging cable from (x, y) to (x + props.dx, y + props.dy)
+//   m5_strut       gantry leg under a raised catwalk (props.h, facing = brace side)
 // Anchors: (x, y) = bottom centre on the deck surface unless noted.
 
 import { sprites } from '../../../engine/sprites';
@@ -388,7 +389,35 @@ const cableDecor: DecorRenderer = (g, d) => {
   }
 };
 
+/** Gantry leg under a raised catwalk: a riveted steel post with a brace, from the deck (y) up props.h. */
+const strutDecor: DecorRenderer = (g, d) => {
+  const x = Math.round(d.x);
+  const y = Math.round(d.y);
+  const h = Math.max(4, Math.round((d.props?.h as number) ?? 30));
+  const top = y - h;
+  const px = (c: string, xx: number, yy: number, w = 1, hh = 1) => {
+    g.fillStyle = c;
+    g.fillRect(xx, yy, w, hh);
+  };
+  // Outline, then the post (lit left edge) with a foot plate.
+  px(P5.dark, x - 2, top, 5, h);
+  px(P5.hullL, x - 1, top, 1, h);
+  px(P5.hull, x, top, 1, h);
+  px(P5.hullD, x + 1, top, 1, h);
+  for (let yy = top + 3; yy < y - 2; yy += 6) px(P5.hullLL, x - 1, yy);
+  px(P5.dark, x - 4, y - 3, 9, 3);
+  px(P5.hullD, x - 3, y - 2, 7, 1);
+  // Diagonal brace toward the catwalk's middle.
+  const dir = d.props?.facing === -1 ? -1 : 1;
+  const bl = Math.min(10, Math.floor(h / 2));
+  for (let i = 0; i < bl; i++) {
+    px(P5.dark, x + dir * (2 + i), top + 4 + i, 1, 2);
+    px(P5.hullD, x + dir * (2 + i), top + 4 + i);
+  }
+};
+
 export const STORM_DECOR: Record<string, DecorRenderer> = {
+  m5_strut: strutDecor,
   m5_ship: shipDecor,
   m5_mast: mastDecor,
   m5_searchlight: searchlightDecor,

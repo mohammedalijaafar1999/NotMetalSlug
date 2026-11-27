@@ -81,7 +81,7 @@ b.add('jetpack', 1560, S(126), { ...JET }, 1580);
 // ------------------------------------------------------------------ LOCK 1: intercept
 
 b.barge(1530, 1690, S(170), -1, [1560, 1660]);
-b.platform(1572, S(170) - 34, 76, 'catwalk');
+b.gantry(1572, S(170), 34, 76);
 b.deco('m5_cargo', 1600, S(170), { kind: 1 });
 
 // ------------------------------------------------------------------ B: cargo convoy
@@ -163,7 +163,7 @@ b.add('m5_supply', 4080, undefined, { item: 'fuel' }, 4140);
 b.add('fighter', 4340, undefined, { facing: -1, passes: 3, alt: 100 });
 b.add('fighter', 4400, undefined, { facing: 1, passes: 2, alt: 136 }, 4420);
 b.barge(4330, 4560, S(160), 1, [4362, 4528]);
-b.platform(4452, S(160) - 30, 60, 'catwalk');
+b.gantry(4452, S(160), 30, 60);
 b.add('rifleman', 4380, S(160), { behavior: 'patrol' });
 b.add('bazooka', 4418, S(160), { behavior: 'guard' });
 b.add('hostage', 4448, S(160), { mode: 'caged', drop: 'fuel', look: 2 });
@@ -193,7 +193,7 @@ b.barge(5050, 5200, S(176), 1, [5080, 5170]);
   const f2 = b.ship('frigate', 5640, S(150), -1);
   b.deco('m5_searchlight', f2.deck0 + 12, f2.deckY, { facing: -1 });
   b.deco('m5_mast', f2.deck1 - 18, f2.deckY, { h: 36 });
-  b.platform(5600, f2.deckY - 32, 70, 'catwalk');
+  b.gantry(5600, f2.deckY, 32, 70);
   b.add('airship_turret', 5560, f2.deckY, { mount: 'top' });
   b.add('airship_turret', 5706, f2.deckY, { mount: 'top' });
   b.add('rifleman', 5590, f2.deckY, { behavior: 'sleep', facing: -1 });

@@ -88,4 +88,12 @@ export class LevelBuilder {
   platform(x: number, y: number, w: number, style = 'catwalk', y2?: number): void {
     this.platforms.push(y2 === undefined ? { x, y, w, style } : { x, y, w, y2, style });
   }
+
+  /** A raised catwalk over a deck at deckY, standing on gantry legs near both ends. */
+  gantry(x: number, deckY: number, height: number, w: number): void {
+    this.platform(x, deckY - height, w, 'catwalk');
+    const h = height - 4;
+    this.decor.push({ kind: 'm5_strut', x: x + 5, y: deckY, layer: 'back', props: { h, facing: 1 } });
+    this.decor.push({ kind: 'm5_strut', x: x + w - 6, y: deckY, layer: 'back', props: { h, facing: -1 } });
+  }
 }
