@@ -230,6 +230,9 @@ export class NameEntryScene implements Scene {
     uiSfx('tally_bonus');
     this.flash = 0.5;
     this.cur++;
+    // Player 1's new entry can push player 2's score off the table: don't ask for a name
+    // that would not be listed.
+    while (this.cur < this.queue.length && !qualifiesForHighScore(this.session.players[this.queue[this.cur]].score)) this.cur++;
     this.entry = '';
     this.row = 0;
     this.col = 0;

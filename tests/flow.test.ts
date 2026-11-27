@@ -5,7 +5,8 @@ import './helpers';
 import { app } from '../src/app';
 import { SceneManager } from '../src/engine/scene';
 import { input, InputManager, DEFAULT_BINDINGS, type ActionMask } from '../src/engine/input';
-import { settings } from '../src/engine/storage';
+import { settings, resetHighScores, getHighScores } from '../src/engine/storage';
+import { NameEntryScene } from '../src/scenes/gameover';
 import { installUiFlow } from '../src/scenes/install';
 import { GameplayScene } from '../src/scenes/gameplay';
 import { EndingScene, endingSquad } from '../src/scenes/ending';
@@ -444,5 +445,21 @@ describe('gamepads', () => {
       if (hadNav) Object.defineProperty(gl, 'navigator', hadNav);
       else delete gl.navigator;
     }
+  });
+});
+
+describe('name entry', () => {
+  it("skips player 2's name when player 1's new entry pushed their score off the table", () => {
+    resetHighScores(); // lowest two: 30000, 10000
+    const s = new GameSession({ characters: ['dex', 'juno'], twoPlayer: true });
+    s.players[0].score = 20000;
+    s.players[1].score = 15000; // qualifies now, but not once 20000 is in (10000 drops out)
+    const ne = new NameEntryScene(s, [0, 1], false) as any;
+    app.scenes.set(ne, { fade: false });
+    ne.entry = 'AAA';
+    ne.commit();
+    expect(ne.done).toBe(true);
+    expect(getHighScores().map((h) => h.score)).toContain(20000);
+    resetHighScores();
   });
 });
