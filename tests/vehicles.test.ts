@@ -467,6 +467,58 @@ describe('hostages', () => {
     expect(wand.mode).not.toBe('wander');
     expect(w.stats.rescues).toBe(2);
   });
+
+  /** A rescued hostage's run-off on a test strip; returns the modes seen and whether it got wet. */
+  function runOff(lvl: LevelDef, hx: number, frames = 60 * 8): { h: Hostage; modes: Set<string>; wet: boolean; fell: boolean } {
+    const w = makeWorld(lvl, { god: true });
+    hold(w, null, 70);
+    const p = w.players[0];
+    const h = spawn<Hostage>(w, 'hostage', hx, undefined, { drop: 'bomb' });
+    p.x = hx + 30;
+    h.damage({ amount: 1, kind: 'bullet', owner: p });
+    const modes = new Set<string>();
+    let wet = false;
+    let fell = false;
+    for (let i = 0; i < frames && !h.dead; i++) {
+      hold(w, null, 1);
+      modes.add(h.mode);
+      if (w.terrain.waterAt(h.x, h.y - 2)?.deadly) wet = true;
+      if (h.y > 184) fell = true;
+    }
+    return { h, modes, wet, fell };
+  }
+
+  it('a rescued hostage never runs into deep water (canal at the left) and never parachutes over it', () => {
+    const canal: LevelDef = {
+      id: 'test_hostage_canal', mission: 0, name: 'CANAL', theme: 'default', music: 'm1', width: 1600, height: 352, start: { x: 300 },
+      ground: [[[0, 180], [160, 180]], [[384, 180], [1600, 180]]],
+      water: [{ x: 160, y: 182, w: 224, h: 170, deadly: true }],
+    };
+    const r = runOff(canal, 470);
+    expect(r.modes.has('run')).toBe(true);
+    expect(r.modes.has('chute')).toBe(false);
+    expect(r.wet).toBe(false);
+    expect(r.fell).toBe(false);
+    expect(r.h.x).toBeGreaterThan(384);
+  });
+
+  it('...nor off a pit edge on the ground, but still parachutes off a sky deck', () => {
+    const pit: LevelDef = {
+      id: 'test_hostage_pit', mission: 0, name: 'PIT', theme: 'default', music: 'm1', width: 1600, height: 216, start: { x: 300 },
+      ground: [[[0, 180], [200, 180]], [[240, 180], [1600, 180]]],
+    };
+    const r = runOff(pit, 330);
+    expect(r.modes.has('chute')).toBe(false);
+    expect(r.fell).toBe(false);
+    expect(r.h.x).toBeGreaterThan(240);
+    const sky: LevelDef = {
+      id: 'test_hostage_sky', mission: 0, name: 'SKY', theme: 'default', music: 'm1', width: 1600, height: 216, start: { x: 300 },
+      ground: [[[0, 210], [60, 210]]],
+      solids: [{ x: 200, y: 180, w: 400, h: 12 }],
+    };
+    const s = runOff(sky, 330);
+    expect(s.modes.has('chute')).toBe(true);
+  });
 });
 
 describe('autopilot with vehicles', () => {

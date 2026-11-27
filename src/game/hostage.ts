@@ -263,6 +263,8 @@ export class Hostage extends Actor {
   private walkPhase = 0;
   private thanked = false;
   private beatT = 0;
+  /** Running off after the rescue: times turned back at a pit edge / deep water (stops at 2). */
+  private runTurns = 0;
 
   constructor(props: Record<string, any> = {}) {
     super();
@@ -384,6 +386,26 @@ export class Hostage extends Actor {
     return null;
   }
 
+  /**
+   * What lies just ahead (dir) of a hostage on foot: 'floor' (keep going; a drop onto a lower
+   * floor is fine), 'sky' (the edge of a deck over open sky with nothing below: the parachute
+   * exit of the sky mission) or 'stop' (a pit edge or deadly water).
+   */
+  ahead(dir: number): 'floor' | 'sky' | 'stop' {
+    const T = this.world.terrain;
+    const x = this.x + dir * (this.w / 2 + 6);
+    const f = T.floorAt(x, this.y - this.stepUp - 2, this.y + 200, { solidTolerance: 0 });
+    if (f) return T.waterAt(x, f.y - 2)?.deadly ? 'stop' : 'floor';
+    if (this.waterBelow(x)) return 'stop';
+    // Bottomless: nothing down to the bottom of the level (a kill floor below it does not count).
+    return this.groundSolid && !T.floorAt(x, this.y, T.height, { solidTolerance: 0 }) ? 'sky' : 'stop';
+  }
+
+  /** Any real water body below the feet at x (a canal, the harbour): never parachute into it. */
+  private waterBelow(x = this.x): boolean {
+    return this.world.terrain.water.some((wb) => x >= wb.x && x < wb.x + wb.w && wb.y + wb.h > this.y && wb.h >= 8);
+  }
+
   override update(dt: number): void {
     this.modeTime += dt;
     if (this.cageFlash > 0) this.cageFlash -= dt;
@@ -405,7 +427,7 @@ export class Hostage extends Actor {
         } else {
           if (Math.abs(this.x - this.homeX) > 26) this.facing = this.x > this.homeX ? -1 : 1;
           this.vx = this.facing * 20;
-          if (!this.floorAhead(this.facing)) {
+          if (this.ahead(this.facing) !== 'floor') {
             this.facing = (-this.facing) as 1 | -1;
             this.vx = 0;
           }
@@ -428,7 +450,7 @@ export class Hostage extends Actor {
         if (r) this.facing = (r.vehicle ?? r).x < this.x ? -1 : 1;
         this.vx = this.facing * 34;
         const rx = r ? (r.vehicle ?? r).x : this.x;
-        if (this.modeTime > 0.6 || Math.abs(rx - this.x) < 18 || !this.floorAhead(this.facing)) {
+        if (this.modeTime > 0.6 || Math.abs(rx - this.x) < 18 || this.ahead(this.facing) !== 'floor') {
           this.vx = 0;
           this.setMode('give');
         }
@@ -453,18 +475,25 @@ export class Hostage extends Actor {
           this.facing = -1;
         }
         break;
-      case 'run':
-        this.vx = -110;
-        this.facing = -1;
-        if (this.onGround && this.hitWall) this.jump(220);
+      case 'run': {
+        // Off to the left; never into a pit or deep water: turn back once, then stay put (waving)
+        // until the screen leaves him behind. Only a deck edge over open sky is a way out.
+        const way = this.onGround ? this.ahead(this.facing) : 'floor';
+        if (way === 'stop' && this.runTurns < 2) {
+          this.runTurns++;
+          if (this.runTurns < 2) this.facing = (-this.facing) as 1 | -1;
+        }
+        this.vx = this.runTurns >= 2 ? 0 : this.facing * 110;
+        if (this.onGround && this.hitWall && this.vx !== 0) this.jump(220);
         // Ran off an edge with nothing below (a sky deck): parachute away instead of falling.
-        if (!this.onGround && this.vy > 40 && !this.world.terrain.floorAt(this.x, this.y, this.y + 200)) {
+        if (!this.onGround && this.vy > 40 && !this.world.terrain.floorAt(this.x, this.y, this.y + 200) && !this.waterBelow()) {
           this.setMode('chute');
           this.gravityScale = 0;
           this.world.sfx('parachute', this.x, { vol: 0.5, pitch: 1.3 });
         }
         if (!this.onScreen(24)) this.remove();
         break;
+      }
       case 'chute':
         this.vx = -24 + Math.sin(this.modeTime * 1.6) * 10;
         this.vy += (30 - this.vy) * Math.min(1, dt * 4);
@@ -506,7 +535,8 @@ export class Hostage extends Actor {
         f = HF.SALUTE + (this.modeTime > 0.35 ? 1 : 0);
         break;
       case 'run':
-        f = HF.RUN + (Math.floor(this.walkPhase) % HF.RUN_N);
+        // Stopped at an edge: wave (salute frames) until the screen moves on.
+        f = this.vx === 0 && this.onGround ? HF.SALUTE + (Math.floor(t * 3) % 2) : HF.RUN + (Math.floor(this.walkPhase) % HF.RUN_N);
         break;
       case 'chute': {
         // Hanging from the risers, waving thanks.
