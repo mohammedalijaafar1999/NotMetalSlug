@@ -136,10 +136,10 @@ export class WeakBridge extends Entity {
   }
 
   override render(g: CanvasRenderingContext2D): void {
-    if (!this.onScreen(80) && !(this.x < this.world.camera.x + 400 && this.x + this.len > this.world.camera.x)) return;
+    const cam = this.world.camera;
+    if (this.x > cam.x + 400 || this.x + this.len < cam.x - 16) return;
     const bent = sprites.get('m3_bridge_bent');
     const deck = sprites.get('m3_bridge_deck');
-    const legH = Math.max(8, this.floorY - this.y - 4);
     // Trestle bents (cropped to the ravine depth); they stay standing as broken stumps.
     const bents = Math.max(2, Math.round(this.len / 56) + 1);
     for (let i = 0; i < bents; i++) {
@@ -150,7 +150,6 @@ export class WeakBridge extends Entity {
       const srcH = Math.min(c.height, h + 1);
       g.drawImage(c, 0, c.height - srcH, c.width, srcH, bx - bent.ox - 1, Math.round(this.floorY - srcH + 1), c.width, srcH);
     }
-    void legH;
     if (!this.broken) {
       const cracked = this.load > 0 ? 1 : 0;
       for (let x = 0; x < this.len; x += 16) {

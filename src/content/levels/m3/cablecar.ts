@@ -62,11 +62,7 @@ export class CableCar extends Entity {
   private stopIdx = 0;
   private humT = 0;
   private wheel = 0;
-  private sway = 0;
-  private swayV = 0;
   private lampT = 0;
-  /** Seconds since the last ride (players can tell it is moving). */
-  rideTime = 0;
 
   constructor(props: Record<string, any> = {}) {
     super();
@@ -194,7 +190,6 @@ export class CableCar extends Entity {
         if (this.modeT > 0.9 && (everyone || this.modeT > 2.6)) {
           this.setMode('ride');
           this.world.sfx('vehicle_enter', this.x, { vol: 0.7, pitch: 0.7 });
-          this.kick(-1.2);
         }
         break;
       }
@@ -203,11 +198,9 @@ export class CableCar extends Entity {
         const dist = tg.x - this.pos;
         this.v = Math.min(this.speed, this.v + ACCEL * dt, Math.sqrt(2 * DECEL * Math.max(0, dist)) + 2);
         this.pos = Math.min(tg.x, this.pos + this.v * dt);
-        this.rideTime += dt;
         if (tg.x - this.pos < 0.05) {
           this.pos = tg.x;
           this.v = 0;
-          this.kick(1.6);
           this.world.sfx('metal_hit', this.x, { vol: 0.8, pitch: 0.6 });
           this.world.particles.sparks(this.x, this.y - HANG, 8, '#ffd060', 120);
           this.world.shake(1.5, 0.2);
@@ -226,7 +219,6 @@ export class CableCar extends Entity {
           this.stopIdx++;
           this.setMode('ride');
           this.ding();
-          this.kick(-1.2);
         }
         break;
       }
@@ -267,10 +259,8 @@ export class CableCar extends Entity {
       }
     }
 
-    // Cosmetics: wheel spin, pendulum sway (art only), motor hum, lamp.
+    // Cosmetics: wheel spin, motor hum, sparks at the grip, beacon.
     this.wheel += (this.v * dt) / 3;
-    this.swayV += (-this.sway * 30 - this.swayV * 3.2) * dt;
-    this.sway += this.swayV * dt;
     this.lampT += dt;
     if (this.mode === 'ride') {
       this.humT -= dt;
@@ -290,11 +280,6 @@ export class CableCar extends Entity {
   private ding(): void {
     this.world.sfx('metal_hit', this.x, { vol: 0.6, pitch: 1.6 });
     this.world.sfx('alarm', this.x, { vol: 0.35, pitch: 1.3 });
-  }
-
-  /** Nudge the (purely visual) pendulum sway. */
-  private kick(v: number): void {
-    this.swayV += v;
   }
 
   override remove(): void {

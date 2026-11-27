@@ -7,7 +7,7 @@
 // Heights: G = 488 low ground (camera top 304), S = 456 station shelf, D = 420 cable-car decks,
 // P = 184 fortress plateau (camera top 0, as the boss requires). Camera keys pin the camera to the
 // bottom except for the ride (a little headroom) and the climb (free vertical follow).
-//   ?level=m3&autoplay=1&invincible=1      (warp=<cameraX> to jump around; warp before 3000 keeps the cable car)
+//   ?level=m3&autoplay=1&invincible=1   (warp=<cameraX> skips ahead; warp <= 2600 still spawns the bridge and cable car)
 
 import { registerLevel, type DecorDef, type PlatformDef } from '../../game/level';
 import type { SpawnSpec } from '../../game/registry';
