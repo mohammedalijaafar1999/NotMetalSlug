@@ -13,3 +13,6 @@ Branch review/core (from claude/metal-slug-game-sogjdj). Commit after each fix: 
 
 ## Gotchas
 - Fuzz: FUZZ_LEVEL=m3 FUZZ_SEED=3001 FUZZ_VERBOSE=1 npx vitest run tests/fuzz.test.ts to reproduce one case.
+
+## Interrupted (usage limit)
+- The previous attempt was cut off; its uncommitted files were committed as 'WIP review_core: salvaged after interruption'. Review them (git show --stat HEAD), keep what is good, delete throwaway files, and continue.

@@ -264,8 +264,13 @@ export class Player extends Actor {
     if (this.vehicle) this.exitVehicle(false);
   }
 
-  /** Killed by script (time over, crushed...). */
+  /** Killed by script (time over, crushed...). A vehicle is wrecked first, its pilot thrown out. */
   kill(): void {
+    if (this.state === 'vehicle') {
+      const v = this.vehicle;
+      if (v && !v.destroyed) v.startDestruction();
+      else this.exitVehicle(false);
+    }
     if (this.state === 'play' || this.state === 'respawn') {
       this.hp = 0;
       this.die({ amount: 99, kind: 'crush', dir: -this.facing });
