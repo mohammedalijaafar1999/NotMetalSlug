@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { makeWorld, step, simulateMission, DT } from './helpers';
 import { Bot } from '../src/debug/bot';
 import { input } from '../src/engine/input';
-import { Grinder, GRINDER_PHASES } from '../src/content/bosses/boss_m1';
+import { Grinder, GRINDER_ARMOUR_BLAST, GRINDER_PHASES } from '../src/content/bosses/boss_m1';
 import { GroundMarker, Lobbed, Wreck } from '../src/content/bosses/common/kit';
 import { getEntityType } from '../src/game/registry';
 import { getLevel } from '../src/game/level';
@@ -236,6 +236,29 @@ describe('boss_m1 GRINDER', () => {
     stepUntil(w, () => b.state === 'idle', 6);
     b.forceAttack('deploy');
     expect(stepUntil(w, () => w.query((e) => e.type === 'rifleman').length > 0, 4)).toBe(true);
+  });
+
+  it('armour plates soak part of every blast until they fly off; the boiler and the stack take blasts in full', () => {
+    const { w, p } = arena();
+    const b = waitBoss(w);
+    stepUntil(w, () => b.introDone, 4);
+    const blast = (x: number, y: number) => {
+      const before = b.hp;
+      b.damage({ amount: 10, kind: 'explosion', owner: p, x, y });
+      return before - b.hp;
+    };
+    // Blade front (plated) vs the boiler top (lobbed over the blade) vs a bullet on the blade.
+    const blade = blast(b.frontX + 2, b.groundY - 12);
+    expect(blade).toBeCloseTo(10 * GRINDER_ARMOUR_BLAST, 5);
+    const boiler = b.zones.find((z) => z.id === 'boiler')!;
+    expect(blast(boiler.x + boiler.w / 2 + 20, boiler.y - 1)).toBeCloseTo(10, 5);
+    const bullet = b.hp;
+    b.damage({ amount: 1, kind: 'bullet', owner: p, x: b.frontX + 1, y: b.groundY - 20 });
+    expect(bullet - b.hp).toBeCloseTo(1, 5);
+    // Once the plates are gone (25%), blasts bite in full (+30% like every hit).
+    b.hp = b.maxHp * 0.2;
+    expect(stepUntil(w, () => b.armourOff, 12)).toBe(true);
+    expect(blast(b.frontX + 2, b.groundY - 12)).toBeCloseTo(10 * b.armorMul, 5);
   });
 
   it('dies with a long death sequence, completes the mission and leaves a burning wreck', () => {

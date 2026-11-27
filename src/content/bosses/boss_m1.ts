@@ -16,7 +16,10 @@
 //  - FLAME VENTS (phase 2+): nozzles in the blade glow and hiss for 0.8/0.65 s, then a ground-hugging
 //    flame jet 96/108 px forward for 1.1/1.3 s. Back off toward the left edge.
 //  - Weak point: the smoke stack on the boiler (x2; jump-shots near the apex, grenades on the boiler).
-//    At 75% a skirt plate is torn off; at 50% the stack blows off (the burning stub stays a x2 weak
+//    The armour plates (blade, hull, turret) shrug off part of every blast and flame (x0.6) until they
+//    fly off at 25%, so a hoard of grenades dumped on the blade does not scrap it in seconds; blasts on
+//    the boiler (lob them over the blade with UP) and the stack bite in full. At 75% a skirt plate is
+//    torn off; at 50% the stack blows off (the burning stub stays a x2 weak
 //    point) and the turret catches fire; at 25% the armour plates fly off (every hit +30%), the boiler
 //    vents steam and the attacks come faster (shells while reversing).
 //  - Death (4.4 s): shudders, the crew bails out and flees, stack / hatch / barrel / turret blow off,
@@ -59,6 +62,8 @@ const INTRO_DRIVE = 1.9;
 const INTRO_TIME = 2.6;
 const CHARGE_ACCEL = 600;
 const DUST = '#b89c70';
+/** Blast / fire damage taken by the armoured zones (blade, hull, turret) until the plates fly off. */
+export const GRINDER_ARMOUR_BLAST = 0.6;
 
 export type GrinderAttack = 'volley' | 'deploy' | 'charge' | 'flame';
 type Attack = GrinderAttack;
@@ -1113,7 +1118,9 @@ export class Grinder extends BigBoss {
 
   override applyHit(d: Damage, mul: number, id: string): boolean {
     if (d.x !== undefined && d.y !== undefined) this.hitAt[id] = { x: d.x, y: d.y, big: d.kind === 'explosion' || d.amount >= 5 };
-    const ok = super.applyHit(d, mul, id);
+    // Armour plates soak part of blasts and flames (until they are blown off at 25%).
+    const plated = !this.armourOff && (d.kind === 'explosion' || d.kind === 'fire') && (id === 'blade' || id === 'hull' || id === 'turret');
+    const ok = super.applyHit(d, plated ? mul * GRINDER_ARMOUR_BLAST : mul, id);
     // Heavy hits (grenades, rockets, cannon shells) jolt the suspension.
     if (ok && !this.dying && d.amount * mul >= 8) this.bobV += Math.min(40, d.amount * mul * 2);
     return ok;

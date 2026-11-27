@@ -79,6 +79,21 @@ describe('mission m1 - level data', () => {
     expect(weaponPickups.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('keeps the grenade budget in check (a bomb case before each arena, no more) and repairs the BULLDOG on the road', () => {
+    const L = def();
+    const specs = allSpawns(L);
+    const bombs = specs.filter((s) => s.props?.item === 'bomb' || s.props?.drop === 'bomb');
+    // 10 to start with + 7 cases: more and players reach the GRINDER with 60-90 grenades.
+    expect(bombs.length).toBeLessThanOrEqual(7);
+    for (const lock of L.locks ?? []) {
+      const before = bombs.filter((s) => s.x < lock.x + VIEW_W && s.x > lock.x - 600);
+      expect(before.length, `bomb case before lock ${lock.x}`).toBeGreaterThan(0);
+    }
+    const tank = specs.find((s) => s.type === 'tank')!;
+    const fuel = specs.filter((s) => (s.props?.drop === 'fuel' || s.props?.item === 'fuel') && s.x > tank.x && s.x < M1.riverX0);
+    expect(fuel.length).toBeGreaterThan(0);
+  });
+
   it('parks the BULLDOG 35-45% into the level and keeps machine counts tutorial-sized', () => {
     const L = def();
     const specs = allSpawns(L);

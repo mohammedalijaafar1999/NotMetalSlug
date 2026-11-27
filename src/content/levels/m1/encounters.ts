@@ -6,6 +6,8 @@
 // climb to the fuel depot (the only mortar crew), the minefield, then the stockade gauntlet (shield
 // troopers, the Hornet, an officer on the watchtower) and a calm walk to the stockade gate.
 // One sniper, on a hut roof. 10 hostages drop the good weapons; bomb crates sit before the arenas.
+// Grenade budget: 7 bomb cases (+10 each) and the fire-bomb case on top of the 10 you start with -
+// with more, a player walks into the GRINDER's yard with 60-90 grenades and scraps it in ~15 s.
 //
 // Wave rules learned the hard way: riflemen and grenadiers only walk toward you from beyond ~130-170
 // px and back away when you get close - spawned at (or pushed past) the LEFT edge of a locked screen
@@ -56,8 +58,9 @@ export const ENTITIES: SpawnSpec[] = [
   at('grenadier', 1098, { behavior: 'guard', facing: -1 }),
   at('barrel', 1118),
   at('crate_prop', 1150, { drop: 'bomb' }),
-  // Arena 1 hostage (tied up at the jetty, rescued during the fight).
-  hostage(1480, 'bomb', 'tied', 1),
+  // Arena 1 hostage (tied up at the jetty, rescued during the fight): a score item (the crate above
+  // already refilled the grenades).
+  hostage(1480, 'item:item_watch', 'tied', 1),
   // ---- Stilt village: a sleeper and two chatters on the boardwalk, a grenadier on the first roof,
   // the sniper on the second, a swordsman guarding the far end.
   rifle(1764, 'sleep', { facing: 1 }, DECK),
@@ -68,7 +71,7 @@ export const ENTITIES: SpawnSpec[] = [
   at('sniper', 2121, { facing: -1 }, 234),
   at('saber', 2262, { behavior: 'guard', facing: -1 }),
   at('crate_prop', 2346, { drop: 'bomb' }),
-  hostage(2384, 'bomb', 'wander', 1),
+  hostage(2384, 'item:item_gem', 'wander', 1),
   // ---- Jungle road: the BULLDOG waits at a Legion cache; fodder, a lookout, a Stomper to crush.
   at('tank', 2884, { facing: 1 }, undefined, 2852),
   at('pickup', 2944, { item: 'bomb' }),
@@ -76,7 +79,8 @@ export const ENTITIES: SpawnSpec[] = [
   rifle(3064, 'chat', {}, G - 10),
   rifle(3104, 'patrol', { facing: -1 }, G - 10),
   at('barrel', 3126, {}, G - 10),
-  hostage(3164, 'bomb', 'tied', 2),
+  // A fuel can for the BULLDOG (repairs half its armour) before the Stomper.
+  hostage(3164, 'fuel', 'tied', 2),
   at('grenadier', 3312, { behavior: 'guard', facing: -1 }, 266),
   at('light_tank', 3340, { facing: -1, behavior: 'hold' }, undefined, 3310),
   rifle(3392, 'patrol', { facing: -1 }),
@@ -95,7 +99,7 @@ export const ENTITIES: SpawnSpec[] = [
   rifle(4362, 'guard', { facing: -1 }, G - 40),
   at('grenadier', 4410, { behavior: 'guard', facing: -1 }, G - 80),
   rifle(4466, 'guard', { facing: -1 }, P),
-  hostage(4528, 'bomb', 'tied', 2, P),
+  hostage(4528, 'item:item_ration', 'tied', 2, P),
   at('crate_prop', 4566, { drop: 'bomb' }, P),
   // Depot props: barrels and a fuel tank among the Legion troops.
   at('barrel', 4662, {}, P),
