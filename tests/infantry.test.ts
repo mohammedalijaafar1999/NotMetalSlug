@@ -431,6 +431,22 @@ describe('officer', () => {
     expect(sleeper.buffTime).toBeGreaterThan(0);
   });
 
+  it('rallies foot soldiers (mortar crews included) but never machines', () => {
+    const w = arena();
+    const p = w.players[0];
+    const rifle = w.spawn('rifleman', p.x + 240, undefined, { behavior: 'guard' }) as Rifleman;
+    const mortar = w.spawn('mortar', p.x + 300) as Enemy;
+    const heli = w.spawn('heli', p.x + 220, w.camera.y + 78) as Enemy;
+    const tank = w.spawn('light_tank', p.x + 330, undefined, { behavior: 'hold', facing: -1 }) as Enemy;
+    const off = w.spawn('officer', p.x + 200) as Officer;
+    step(w, 2);
+    expect(until(w, () => off.state === 'point', 600)).toBeGreaterThan(0);
+    expect(rifle.buffTime).toBeGreaterThan(0);
+    expect(mortar.buffTime).toBeGreaterThan(0);
+    expect(heli.buffTime).toBe(0);
+    expect(tank.buffTime).toBe(0);
+  });
+
   it('panics when hurt and flees off-screen for good when left alone', () => {
     const w = arena();
     const p = w.players[0];

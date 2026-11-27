@@ -15,6 +15,7 @@ import type { Entity } from '../../game/entity';
 import { Enemy } from '../../game/enemy';
 import { registerEntity } from '../../game/registry';
 import { BUBBLE, Infantry } from './infantry';
+import { MortarCrew } from './mortar';
 import { uprightFrame } from './gear';
 
 export const OFFICER_STYLE = styleVariant(RUSTCOAT, {
@@ -98,9 +99,9 @@ export class Officer extends Infantry {
     else if (this.props.drop === 'none' || this.props.drop === null) this.props.drop = undefined;
   }
 
-  /** Legion troops near enough to rally. */
+  /** Legion foot soldiers near enough to rally (infantry and mortar crews; never machines). */
   private troops(): Enemy[] {
-    return this.alliesNear(this.rally).filter((e) => !(e instanceof Officer));
+    return this.alliesNear(this.rally).filter((e) => (e instanceof Infantry || e instanceof MortarCrew) && !(e instanceof Officer));
   }
 
   override onDamaged(d: Damage): void {
