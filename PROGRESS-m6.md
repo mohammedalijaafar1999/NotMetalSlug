@@ -11,11 +11,14 @@ Branch wave2/m6 (boss merged from wave2/boss_m6). Dev server port 5406.
 - tests/_m6_probe.test.ts = throwaway probe (DELETE before final commit)
 
 ## Done
-- theme registered (layers/tiles from the salvaged attempt + decor + overlay), mechanics written,
-  level skeleton with all sections/locks/hostages; headless autopilot completes (~213 s, 11/12 rescues)
+- theme (layers/tiles + 20 decor kinds incl. wall panels, hangar door, truss, pit + overlay), mechanics,
+  full level; tests/mission_m6.test.ts (12 tests) green; full suite green; smoke + play.mjs run reach
+  the ending; mortal-autopilot probe (99 lives) completes 6/6 seeds.
+- core fix: src/content/enemies/infantry.ts sees(): off-screen wave members always notice (they used to
+  idle off-screen forever after losing the target during a player respawn -> lock stalled).
 
 ## Next
-- browser visual pass of every section (port 5406), art polish, tests/mission_m6.test.ts, full suite
+- final review, delete tests/_m6_probe.test.ts + tests/_m6_deaths.test.ts + PROGRESS, final commit
 
 ## Decisions / gotchas
 - Deadly water does NOT kill in the engine: molten pits = gaps in the ground + LevelDef.water (deadly,

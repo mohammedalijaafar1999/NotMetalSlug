@@ -271,6 +271,10 @@ export abstract class Infantry extends Enemy {
 
   /** Can this soldier see a player (within range, on screen)? */
   sees(range = this.sightRange, vrange = 90): boolean {
+    // Arena-wave soldiers are sent in after the players: one still off-screen never waits to be
+    // sighted (losing the target while a player respawns used to leave it idling off-screen for
+    // good, which stalled the camera lock).
+    if (this.waveId >= 0 && !this.onScreen(-10)) return !!this.target();
     const t = this.target(range + 80);
     if (!t) return false;
     return Math.abs(t.x - this.x) < range && Math.abs(t.y - this.y) < vrange && this.onScreen(-10);

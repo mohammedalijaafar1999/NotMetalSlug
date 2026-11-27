@@ -155,9 +155,11 @@ add(
   E('barrel', 1200),
   E('barrel', 1214),
 );
-// a guard post past the gate with a marksman on it
-solids.push({ x: 1440, y: 388, w: 44, h: 38 });
-add(E('sniper', 1466, 388, { facing: -1 }), E('rifleman', 1520, undefined, { behavior: 'guard', facing: -1 }));
+// a watchtower past the gate with a marksman on it (walk under it and shoot up)
+platforms.push({ x: 1436, y: 360, w: 52, style: 'girder' });
+D('girder', 1442, GL, { h: 60 });
+D('girder', 1482, GL, { h: 60 });
+add(E('sniper', 1462, 360, { facing: -1 }), E('rifleman', 1520, undefined, { behavior: 'guard', facing: -1 }));
 
 const LOCK_GATE: LockDef = {
   x: 1000,
@@ -419,6 +421,7 @@ add(
     GL,
     {
       top: GU,
+      w: SHAFT_R - SHAFT_L,
       speed: 44,
       events: [
         { at: 0.1, type: 'drone', dx: 420, props: { kind: 'zap' } },

@@ -4,7 +4,7 @@
 // second player (or a fallen one) can catch it. Optional scripted ambushes fire at given points of
 // the first ride (drones swooping in, jetpacks dropping from above...).
 //   spawn: { type: 'm6_lift', x: <centre>, y: <bottom stop = floor y>, trigger: <early>,
-//            props: { top: <upper stop y>, w: 88, speed: 46,
+//            props: { top: <upper stop y>, w: <shaft width, default 88>, speed: 46,
 //                     events: [{ at: 0..1, type, dx, dy?, props? }] } }  (dx/dy relative to the camera)
 
 import { sprites } from '../../../engine/sprites';
@@ -56,7 +56,8 @@ function deckArt(w: number): (p: PixelArt) => void {
   };
 }
 
-sprites.define({ name: 'm6_lift_deck', w: 88, h: 15, ox: 0, oy: 0, draw: deckArt(88) });
+const DECK_ART_W = 88;
+sprites.define({ name: 'm6_lift_deck', w: DECK_ART_W, h: 15, ox: 0, oy: 0, draw: deckArt(DECK_ART_W) });
 
 // railing posts on the deck ends (with a top rail)
 sprites.define({
@@ -102,7 +103,8 @@ export class Lift extends Entity {
 
   override spawned(): void {
     const P = this.props;
-    this.w = 88;
+    // the walkable deck spans the whole shaft (props.w) so nobody can stand beside it; the art is 88 wide
+    this.w = typeof P.w === 'number' ? Math.max(DECK_ART_W, P.w) : DECK_ART_W;
     this.bottomY = this.y;
     this.topY = typeof P.top === 'number' ? P.top : this.y - 120;
     this.speed = typeof P.speed === 'number' ? P.speed : 46;
@@ -206,8 +208,8 @@ export class Lift extends Entity {
   }
 
   override render(g: CanvasRenderingContext2D): void {
-    const x0 = Math.round(this.x - this.w / 2);
-    const x1 = Math.round(this.x + this.w / 2);
+    const x0 = Math.round(this.x - DECK_ART_W / 2);
+    const x1 = Math.round(this.x + DECK_ART_W / 2);
     const dy = Math.round(this.deckY);
     const top = Math.round(this.topY) - 90;
     const bot = Math.round(this.bottomY) + 30;
