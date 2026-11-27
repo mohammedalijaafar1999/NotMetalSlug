@@ -324,9 +324,11 @@ const entities: SpawnSpec[] = [
   { type: 'barrel', x: 5346 },
   { type: 'mortar', x: 5420, props: { facing: -1 } },
   { type: 'rifleman', x: 5500, y: B - 40, props: { behavior: 'guard', facing: -1 } },
-  { type: 'fuel_tank', x: 5590 },
   { type: 'hostage', x: 5640, props: { drop: 'F', look: 1 } },
   { type: 'shield_trooper', x: 5700, props: { behavior: 'patrol', facing: -1 } },
+  // The fuel tank stands by the shield trooper (blow it from range to get him) instead of on the
+  // path to the tied hostage at 5640, where players shot it point-blank at enemies behind it.
+  { type: 'fuel_tank', x: 5724 },
   { type: 'pickup', x: 5740, props: { item: 'R' } },
   { type: 'crate_prop', x: 5790, props: { drop: 'bomb' } },
   { type: 'barrel', x: 6070 },
@@ -437,7 +439,8 @@ const locks: LevelDef['locks'] = [
         delay: 1,
         spawns: [
           { type: 'light_tank', x: 6340, props: { behavior: 'advance', facing: -1 } },
-          { type: 'm2_incoming', x: 5820, props: { type: 'jeep', props: { stopX: 5960, facing: 1 } } },
+          // The jeep from behind brakes near the edge: at 5960 it rammed a player standing mid-screen.
+          { type: 'm2_incoming', x: 5820, props: { type: 'jeep', props: { stopX: 5928, facing: 1 } } },
         ],
       },
       {
