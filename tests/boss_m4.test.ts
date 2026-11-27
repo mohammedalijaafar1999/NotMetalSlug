@@ -69,6 +69,14 @@ function dodgeFight(seed: number, difficulty: 0 | 1 | 2): { completed: boolean; 
     for (const e of w.entities) if (e instanceof Torpedo && !e.dead && e.onDeck && e.x > p.x - 6 && e.x - p.x < 40) wantJump = true;
     if (boss.state === 'claw' && st === 'rake' && p.x > boss.arm.rx - 4 && p.x - boss.arm.rx < 34) wantJump = true;
     if (boss.state === 'claw' && st === 'clench' && Math.abs(p.x - boss.arm.rx) < 20 && boss.stepT > CLENCH_TIME - 0.2) wantJump = true;
+    // Like a human, never step into a missile landing zone just before the blast (wait for it instead):
+    // a salvo can pin you at the pier tip while the claw's shadow comes for you there.
+    const blast = (x: number) => {
+      let d = 0;
+      for (const e of w.entities) if (!e.dead && e instanceof LandingMarker && e.remaining < 0.6 && Math.abs(x - e.x) < 22) d = Math.max(d, 22 - Math.abs(x - e.x));
+      return d;
+    };
+    if (blast(p.x) === 0 && blast(p.x + Math.sign(target - p.x) * 4) > 0) target = p.x;
     if (target < p.x - 2) m.left = true;
     else if (target > p.x + 2) m.right = true;
     else if (p.facing < 0) m.right = frame % 10 < 1;

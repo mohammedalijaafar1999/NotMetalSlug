@@ -1151,7 +1151,7 @@ registerEntity(
   'boss_m3',
   'boss',
   () => new FrostBastion(),
-  'FROST BASTION (mission 3 boss, 260 hp): a fortified gatehouse wall that rises out of the snow and fills the right side of the arena. ' +
+  'FROST BASTION (mission 3 boss, 230 hp): a fortified gatehouse wall that rises out of the snow and fills the right side of the arena. ' +
     'Weak point: the frost core behind blast doors at the foot of the wall (hittable only while pushed out - plain forward fire hits it); ' +
     '3 destructible turrets (MG under the gallery tip, ice flak + mortar nest on the gallery - shoot them from below). Attacks: head-height ' +
     'frost lance (crouch), floor spike wave (jump), avalanche boulders (jump or shoot), mortar/flak marks, icicles (shadows). ' +
