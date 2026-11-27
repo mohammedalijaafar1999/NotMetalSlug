@@ -16,7 +16,7 @@ import { Bubble, Infantry } from '../src/content/enemies/infantry';
 import { ShieldTrooper } from '../src/content/enemies/shield_trooper';
 import { Sniper } from '../src/content/enemies/sniper';
 import { MortarCrew, MortarMan } from '../src/content/enemies/mortar';
-import { FlameJet, Harpoon, LegionRocket, MortarShell, SniperRound, EnergyBolt } from '../src/content/enemies/projectiles';
+import { FlameJet, Harpoon, LegionRocket, MortarShell, SniperRound, EnergyBolt, MORTAR_RADIUS } from '../src/content/enemies/projectiles';
 import { Paratrooper } from '../src/content/enemies/paratrooper';
 import { Frogman } from '../src/content/enemies/frogman';
 import { Officer } from '../src/content/enemies/officer';
@@ -243,6 +243,29 @@ describe('telegraphed attacks', () => {
     expect(boom.length).toBeGreaterThan(0);
   });
 
+  it('mortar: the landing marker ring is as wide as the real blast (body touching the ring = hit, clear of it = safe)', () => {
+    const marker = sprites.get('mortar_marker');
+    expect(marker.ox).toBe(MORTAR_RADIUS);
+    expect(marker.w).toBe(MORTAR_RADIUS * 2 + 1);
+    expect(marker.pixelArt(0).opaqueCount()).toBeGreaterThan(60);
+    for (const [gap, hit] of [
+      [-2, true],
+      [3, false],
+    ] as const) {
+      const w = arena(false);
+      const p = w.players[0];
+      p.invuln = 0;
+      // Shell landing so the near edge of the player's body sits `gap` px outside the ring.
+      const tx = p.x - p.w / 2 - MORTAR_RADIUS - gap;
+      const crew = w.spawn('mortar', p.x + 200) as MortarCrew;
+      step(w, 1);
+      const s = w.add(new MortarShell(crew, crew.x, crew.y - 20, tx, p.y, 1.4));
+      expect(s.radius).toBe(MORTAR_RADIUS);
+      until(w, () => s.dead, 200);
+      expect(p.state === 'dying', `gap ${gap}`).toBe(hit);
+    }
+  });
+
   it('mortar crew: two separate crewmen; the survivor keeps firing alone; the crew stops blocking when both are down', () => {
     const w = arena();
     const p = w.players[0];
@@ -414,6 +437,31 @@ describe('special movers', () => {
     expect(jp.dying).toBe(true);
     expect(until(w, () => jp.onGround, 300)).toBeGreaterThanOrEqual(0);
   });
+
+  it('jetpack never fires from out of view: a wind-up that drifts off-screen is dropped, grounded ones never shoot', () => {
+    const shotsBy = (w: World, e: Entity) => w.query((x) => x instanceof Projectile && x.team === 'enemy' && x.owner === e).length;
+    for (const attack of ['aim', 'drop'] as const) {
+      const w = arena();
+      const p = w.players[0];
+      const jp = w.spawn('jetpack', p.x + (attack === 'drop' ? 0 : 60), p.y - 70) as JetpackTrooper;
+      (jp as any).nextAttack = attack === 'aim' ? 'burst' : 'drop';
+      expect(until(w, () => jp.state === attack, 600), attack).toBeGreaterThanOrEqual(0);
+      // The camera "moves on" mid wind-up: he is now well outside the view.
+      jp.x = w.camera.x - 121;
+      for (let i = 0; i < 60 * 2; i++) {
+        jp.x = Math.min(jp.x, w.camera.x - 121);
+        step(w, 1);
+        expect(shotsBy(w, jp), `${attack}: nothing fired from off-screen`).toBe(0);
+      }
+    }
+    // Grounded (no y) and off-screen: stays quiet.
+    const w = arena();
+    const jp = w.spawn('jetpack', w.camera.x + VIEW_W + 140) as JetpackTrooper;
+    for (let i = 0; i < 60 * 4; i++) {
+      step(w, 1);
+      if (!jp.onScreen(-6)) expect(shotsBy(w, jp)).toBe(0);
+    }
+  });
 });
 
 describe('officer', () => {
@@ -429,6 +477,22 @@ describe('officer', () => {
     expect(until(w, () => off.state === 'point', 600)).toBeGreaterThan(0);
     expect(sleeper.state).not.toBe('sleep');
     expect(sleeper.buffTime).toBeGreaterThan(0);
+  });
+
+  it('rallies foot soldiers (mortar crews included) but never machines', () => {
+    const w = arena();
+    const p = w.players[0];
+    const rifle = w.spawn('rifleman', p.x + 240, undefined, { behavior: 'guard' }) as Rifleman;
+    const mortar = w.spawn('mortar', p.x + 300) as Enemy;
+    const heli = w.spawn('heli', p.x + 220, w.camera.y + 78) as Enemy;
+    const tank = w.spawn('light_tank', p.x + 330, undefined, { behavior: 'hold', facing: -1 }) as Enemy;
+    const off = w.spawn('officer', p.x + 200) as Officer;
+    step(w, 2);
+    expect(until(w, () => off.state === 'point', 600)).toBeGreaterThan(0);
+    expect(rifle.buffTime).toBeGreaterThan(0);
+    expect(mortar.buffTime).toBeGreaterThan(0);
+    expect(heli.buffTime).toBe(0);
+    expect(tank.buffTime).toBe(0);
   });
 
   it('panics when hurt and flees off-screen for good when left alone', () => {

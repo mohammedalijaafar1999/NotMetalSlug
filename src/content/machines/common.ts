@@ -864,6 +864,79 @@ export class EdgeWarning extends Entity {
   }
 }
 
+/** Seconds a ground machine waits behind the left screen edge, announced, before it drives in. */
+export const REAR_ENTRY_HOLD = 1.0;
+
+/**
+ * Rear-entry telegraph for ground machines (the look of the levels' m2_incoming sign): a blinking
+ * "!" plate with an arrow on the left screen edge at the machine's floor, an engine rumble and dust
+ * there while it waits (Machine.entryHold), shown until it has rolled into view.
+ */
+export class RearEntryWarning extends Entity {
+  private rumble = 0;
+
+  constructor(readonly machine: Machine) {
+    super();
+    this.z = Z.FRONT;
+    this.persistent = true;
+    this.w = 1;
+    this.h = 1;
+  }
+
+  /** World x of the sign (just inside the left edge) and the floor y it stands on. */
+  private spot(): [number, number] {
+    const c = this.world.camera;
+    return [c.x + 10, Math.max(c.y + 70, Math.min(c.y + VIEW_H - 6, this.machine.y))];
+  }
+
+  override update(dt: number): void {
+    const m = this.machine;
+    if (m.dead || m.dying || (m.entryHold <= 0 && m.onScreen(-12)) || this.age > 8) {
+      this.remove();
+      return;
+    }
+    this.rumble -= dt;
+    if (this.rumble <= 0 && m.entryHold > 0) {
+      this.rumble = 0.4;
+      const [ex, fy] = this.spot();
+      this.world.sfx('engine', ex, { vol: 0.5, pitch: 0.8 });
+      this.world.particles.dust(ex - 6, fy, 3);
+    }
+  }
+
+  override render(g: CanvasRenderingContext2D): void {
+    const hot = Math.floor(this.age * 6) % 2 === 1;
+    const [ex, fy] = this.spot();
+    const x = Math.round(ex);
+    const y = Math.round(fy - 40);
+    // Sign: 11x13 plate with a "!", flashing yellow / red.
+    const bx = x + 2;
+    g.fillStyle = MC.black;
+    g.fillRect(bx - 1, y - 1, 13, 15);
+    g.fillStyle = hot ? '#e8402c' : '#ffd040';
+    g.fillRect(bx, y, 11, 13);
+    g.fillStyle = hot ? '#ff8a6a' : '#fff4b0';
+    g.fillRect(bx, y, 11, 1);
+    g.fillStyle = hot ? '#9c2018' : '#c87818';
+    g.fillRect(bx, y + 12, 11, 1);
+    g.fillStyle = hot ? '#ffffff' : MC.black;
+    g.fillRect(bx + 4, y + 2, 3, 6);
+    g.fillRect(bx + 4, y + 9, 3, 2);
+    // Arrow pointing at the left edge the threat comes from.
+    const ax = x - 7;
+    const ay = y + 6;
+    for (let i = 0; i < 6; i++) {
+      const xx = ax + i;
+      g.fillStyle = MC.black;
+      g.fillRect(xx, ay - i - 1, 1, i * 2 + 3);
+      if (i > 0) {
+        g.fillStyle = hot ? '#ffd040' : '#ff5a3a';
+        g.fillRect(xx, ay - i + 1, 1, Math.max(1, i * 2 - 1));
+      }
+    }
+  }
+}
+
 // ------------------------------------------------------------------ enemy projectiles
 
 /** Falling bomb (helicopters): explodes on terrain or on contact. */
@@ -1009,6 +1082,15 @@ export abstract class Machine extends Enemy {
   killer: Entity | null = null;
   /** Brief render jitter after heavy hits. */
   jolt = 0;
+  /**
+   * Drives in along the ground and rams / crushes (jeep, truck, snowmobile, light tank): spawned
+   * behind the left screen edge heading in, it first waits REAR_ENTRY_HOLD s behind a
+   * RearEntryWarning (no unannounced rams from behind). Not when a level's m2_incoming already
+   * announced it.
+   */
+  rearWarn = false;
+  /** Seconds left waiting behind the left edge while the rear-entry warning blinks. */
+  entryHold = 0;
   protected touchCd = new Map<number, number>();
   private fxT = 0;
   private sparkT = 0.5;
@@ -1080,9 +1162,32 @@ export abstract class Machine extends Enemy {
       // Nobody to face yet: face the middle of the screen.
       this.facing = this.x > this.world.camera.x + VIEW_W / 2 ? -1 : 1;
     }
+    if (this.rearWarn && this.entersFromBehind()) {
+      // Like a level's m2_incoming: not in play (nor a target) until the warning has run.
+      this.entryHold = REAR_ENTRY_HOLD;
+      this.hittable = false;
+      this.world.invalidateTargets();
+      this.world.add(new RearEntryWarning(this));
+      this.world.sfx('enemy_alert', this.world.camera.x + 10, { vol: 0.8 });
+    }
+  }
+
+  /** Spawned at / behind the left view edge heading in during play, with no level warning of its own? */
+  private entersFromBehind(): boolean {
+    const w = this.world;
+    if (this.flying || this.facing < 0 || this.x > w.camera.x + 8 || !w.activePlayers().length) return false;
+    return w.query((e) => e.type === 'm2_incoming' && (e as any).child === this).length === 0;
   }
 
   override update(dt: number): void {
+    if (this.entryHold > 0 && !this.dying) {
+      // Announced rear entry: wait behind the edge (RearEntryWarning blinks), then drive in.
+      this.entryHold -= dt;
+      if (this.entryHold > 0) return;
+      this.entryHold = 0;
+      this.hittable = true;
+      this.world.invalidateTargets();
+    }
     if (this.hitSfxT > 0) this.hitSfxT -= dt;
     if (this.jolt > 0) this.jolt -= dt;
     super.update(dt);
@@ -1170,7 +1275,10 @@ export abstract class Machine extends Enemy {
       const until = this.touchCd.get(t.id) ?? -1;
       if (this.age < until) continue;
       this.touchCd.set(t.id, this.age + cd);
-      if (t.damage({ amount, kind, owner: this, x: t.cx, y: t.cy, dir: Math.sign(t.cx - this.x) || this.facing })) hit = true;
+      // Treads and rams flatten soldiers; on a player vehicle's armour a contact is one crush unit
+      // (22 HP), not a capped 45 HP hit (a point-blank brawl with a light tank cost half a BULLDOG).
+      const amt = kind === 'crush' && (t as any).isVehicle === true ? Math.min(amount, 1) : amount;
+      if (t.damage({ amount: amt, kind, owner: this, x: t.cx, y: t.cy, dir: Math.sign(t.cx - this.x) || this.facing })) hit = true;
     }
     return hit;
   }

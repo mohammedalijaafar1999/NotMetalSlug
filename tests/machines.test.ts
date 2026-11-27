@@ -13,7 +13,7 @@ import { sprites } from '../src/engine/sprites';
 import type { LevelDef } from '../src/game/level';
 import type { World } from '../src/game/world';
 import type { Entity } from '../src/game/entity';
-import { MACHINE_SFX, Machine, Missile, FlakShell } from '../src/content/machines/common';
+import { MACHINE_SFX, Machine, Missile, FlakShell, RearEntryWarning } from '../src/content/machines/common';
 import { Truck } from '../src/content/machines/truck';
 import { Bunker } from '../src/content/machines/bunker';
 import { Heli } from '../src/content/machines/heli';
@@ -390,6 +390,54 @@ describe('fair attacks', () => {
     expect(kinds).toContain('crush');
   });
 
+  it('machine wrecks never hurt players or their vehicles; tread contact on a vehicle is one crush unit', () => {
+    for (const type of ['light_tank', 'jeep', 'truck', 'snowmobile', 'turret', 'bunker', 'heli', 'drone', 'fighter']) {
+      const w = arena({ god: false });
+      const p = w.players[0];
+      const tank = w.spawn('tank', p.x + 4) as Entity;
+      step(w, 20);
+      input.setVirtual(0, { down: true });
+      step(w, 3);
+      input.setVirtual(0, null);
+      expect(p.vehicle, type).toBe(tank);
+      // Point-blank (hulls overlapping), then destroyed by the player.
+      const m = w.spawn(type, tank.x + 30, FLYERS.includes(type) ? tank.y - 30 : undefined, { facing: -1 }) as Machine;
+      step(w, 2);
+      tank.invuln = 0;
+      const hp0 = tank.hp;
+      kill(m, w);
+      for (let i = 0; i < 60 * 3; i++) {
+        tank.invuln = 0;
+        step(w, 1);
+      }
+      expect(tank.hp, `${type} wreck`).toBe(hp0);
+    }
+    // On foot next to a wreck: the blast only hurts enemies.
+    const w = arena({ god: false });
+    const p = w.players[0];
+    p.invuln = 0;
+    const t = w.spawn('light_tank', p.x + 24, undefined, { facing: -1 }) as LightTank;
+    step(w, 1);
+    kill(t, w);
+    step(w, 60 * 3);
+    expect(p.state, 'a player beside an exploding tank survives').toBe('play');
+    // A light tank grinding into a driven BULLDOG: one crush unit (22 HP) per contact, not a capped 45.
+    const w2 = arena({ god: false });
+    const p2 = w2.players[0];
+    const bulldog = w2.spawn('tank', p2.x + 4) as Entity;
+    step(w2, 20);
+    input.setVirtual(0, { down: true });
+    step(w2, 3);
+    input.setVirtual(0, null);
+    const lt = w2.spawn('light_tank', bulldog.x + 36, undefined, { facing: -1 }) as LightTank;
+    step(w2, 1);
+    bulldog.invuln = 0;
+    const hpb = bulldog.hp;
+    lt.vx = -26;
+    step(w2, 2);
+    expect(hpb - bulldog.hp).toBe(22);
+  });
+
   it('show damage smoke below half health', () => {
     const w = arena();
     const t = w.spawn('light_tank', w.camera.x + 260) as LightTank;
@@ -516,6 +564,61 @@ describe('snowmobile', () => {
     }
     expect(skid).toBe(true);
     expect(facings.size).toBe(2);
+  });
+});
+
+describe('rear entries (no unannounced rams from behind)', () => {
+  /** Arena world scrolled right so there is level behind the left view edge; sfx calls recorded. */
+  function scrolled(): { w: World; sounds: string[] } {
+    const w = arena();
+    w.players[0].x = 900;
+    w.camera.snapTo(900, 180);
+    step(w, 30);
+    expect(w.camera.x).toBeGreaterThan(500);
+    const sounds: string[] = [];
+    w.sfx = (name: string) => void sounds.push(name);
+    return { w, sounds };
+  }
+
+  for (const type of ['snowmobile', 'jeep', 'truck', 'light_tank']) {
+    it(`a ${type} spawned behind the left edge waits ~1 s behind a blinking edge warning, then drives in`, () => {
+      const { w, sounds } = scrolled();
+      const m = w.spawn(type, w.camera.x - 70, undefined, { facing: 1, behavior: 'advance' }) as Machine;
+      step(w, 1);
+      const warn = () => w.query((e) => e instanceof RearEntryWarning && e.machine === m);
+      expect(warn().length, 'edge warning shown').toBe(1);
+      expect(sounds).toContain('enemy_alert');
+      const x0 = m.x;
+      step(w, 50);
+      expect(m.x, 'holds behind the edge while the warning blinks').toBe(x0);
+      expect(m.onScreen()).toBe(false);
+      expect(m.hittable, 'not a target until it enters (like m2_incoming)').toBe(false);
+      expect(m.blocksProgress).toBe(true);
+      let seen = -1;
+      for (let i = 0; i < 60 * 4 && seen < 0; i++) {
+        step(w, 1);
+        if (m.onScreen(-12)) seen = i;
+      }
+      expect(seen, 'then it enters').toBeGreaterThanOrEqual(0);
+      expect(m.x).toBeGreaterThan(x0 + 20);
+      expect(m.hittable).toBe(true);
+      step(w, 2);
+      expect(warn().length, 'the warning goes once it is in view').toBe(0);
+    });
+  }
+
+  it('is not doubled when a level announces the entry with m2_incoming, and front entries are not held', () => {
+    const { w } = scrolled();
+    w.spawn('m2_incoming', w.camera.x - 40, undefined, { type: 'snowmobile', delay: 1, props: { facing: 1 } });
+    step(w, 70);
+    const sled = w.query((e) => e instanceof Snowmobile)[0] as Snowmobile;
+    expect(sled).toBeTruthy();
+    expect(sled.entryHold).toBe(0);
+    expect(w.query((e) => e instanceof RearEntryWarning).length).toBe(0);
+    const jeep = w.spawn('jeep', w.camera.x + VIEW_W + 40, undefined, { facing: -1 }) as Jeep;
+    step(w, 1);
+    expect(jeep.entryHold).toBe(0);
+    expect(w.query((e) => e instanceof RearEntryWarning).length).toBe(0);
   });
 });
 

@@ -166,6 +166,7 @@ export class Jeep extends Machine {
 
   constructor(props: Record<string, any> = {}) {
     super();
+    this.rearWarn = true;
     this.w = 24;
     this.h = 26;
     this.bodyW = 46;

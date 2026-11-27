@@ -115,27 +115,31 @@ sprites.define({
   },
 });
 
+/** Mortar shell blast radius (px). Its landing marker ring is drawn exactly this wide. */
+export const MORTAR_RADIUS = 22;
+
 sprites.define({
   name: 'mortar_marker',
-  w: 21,
+  w: MORTAR_RADIUS * 2 + 1,
   h: 11,
-  ox: 10,
+  ox: MORTAR_RADIUS,
   oy: 6,
   frames: 2,
   outline: null,
   draw: (p, f) => {
     const c = f ? '#ff3a2a' : '#ffd040';
     const d = f ? '#8a1a10' : '#a07010';
-    // Perspective ring on the ground + crosshair ticks.
-    p.ellipse(10.5, 6, 9.5, 3.6, d);
-    p.ellipse(10.5, 6, 8.3, 2.6, 'transparent');
-    p.ellipse(10.5, 5.5, 9.5, 3.6, c);
-    p.ellipse(10.5, 5.5, 8.3, 2.6, 'transparent');
+    const R = MORTAR_RADIUS;
+    // Perspective ring on the ground covering the whole blast + crosshair ticks.
+    p.ellipse(R + 0.5, 6, R - 0.5, 3.6, d);
+    p.ellipse(R + 0.5, 6, R - 1.7, 2.6, 'transparent');
+    p.ellipse(R + 0.5, 5.5, R - 0.5, 3.6, c);
+    p.ellipse(R + 0.5, 5.5, R - 1.7, 2.6, 'transparent');
     p.rect(0, 5, 3, 1, c);
-    p.rect(18, 5, 3, 1, c);
-    p.rect(10, 0, 1, 3, c);
-    p.rect(10, 8, 1, 3, c);
-    p.rect(9.5, 5, 2, 1, c);
+    p.rect(2 * R - 2, 5, 3, 1, c);
+    p.rect(R, 0, 1, 3, c);
+    p.rect(R, 8, 1, 3, c);
+    p.rect(R - 0.5, 5, 2, 1, c);
   },
 });
 
@@ -271,7 +275,8 @@ export class MortarShell extends Entity {
   private sy: number;
   private whistled = false;
   phase: 'up' | 'wait' | 'down' | 'done' = 'up';
-  radius = 22;
+  /** Blast radius: the 'mortar_marker' ring is baked this wide, so keep them in step. */
+  readonly radius = MORTAR_RADIUS;
 
   constructor(owner: Entity, x: number, y: number, tx: number, ty: number, impactAt: number) {
     super();

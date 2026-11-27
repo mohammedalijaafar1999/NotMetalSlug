@@ -49,6 +49,20 @@ export class Bot {
         nearest = e;
       }
     }
+    // Nothing hostile in view: treat the nearest caged hostage as the thing to line up with and
+    // shoot (its cage only breaks under fire). Bombs stay reserved for enemies.
+    let aimAt: Entity | null = nearest;
+    if (!aimAt) {
+      let cd = Infinity;
+      for (const e of world.targets('player')) {
+        if (e.team !== 'neutral' || !(e as any).caged || !e.onScreen(-4)) continue;
+        const d = Math.hypot(e.cx - ctrl.cx, e.cy - ctrl.cy);
+        if (d < cd) {
+          cd = d;
+          aimAt = e;
+        }
+      }
+    }
     if (lvl.locked || lvl.bossActive) {
       const center = cam.x + VIEW_W * (lvl.bossActive ? 0.25 : 0.4);
       // Hysteresis: once heading back to the centre, go most of the way, so facing taps don't
@@ -72,29 +86,29 @@ export class Bot {
         aimUp = Math.abs(tx - ctrl.x) < 80;
       }
     }
-    // Turn to face enemies behind us occasionally.
-    if (nearest && nearest.cx < ctrl.cx - 10) {
+    // Turn to face enemies (or a cage) behind us occasionally.
+    if (aimAt && aimAt.cx < ctrl.cx - 10) {
       this.turnTimer += dt;
       if (this.turnTimer > 0.4) dir = -1;
       if (this.turnTimer > 1.0) this.turnTimer = 0;
     } else this.turnTimer = 0;
     if (dir > 0) mask.right = true;
     if (dir < 0) mask.left = true;
-    if (dir === 0 && nearest) {
+    if (dir === 0 && aimAt) {
       // On foot, only tap toward the enemy while facing away from it (each tap also nudges us).
-      const want = nearest.cx > ctrl.cx ? 1 : -1;
+      const want = aimAt.cx > ctrl.cx ? 1 : -1;
       if (p.vehicle || ctrl.facing !== want) {
         if (want > 0) mask.right = this.frame % 30 < 2;
         else mask.left = this.frame % 30 < 2;
       }
     }
     // Aim up at enemies overhead.
-    if (!flying && (aimUp || (nearest && nearest.cy < ctrl.cy - 40 && Math.abs(nearest.cx - ctrl.cx) < 70))) mask.up = true;
+    if (!flying && (aimUp || (aimAt && aimAt.cy < ctrl.cy - 40 && Math.abs(aimAt.cx - ctrl.cx) < 70))) mask.up = true;
     // Crouch-shoot low targets (mines, ground turrets, crawling things) that pass under the standing
     // muzzle line (~22 px above the feet); only on foot, so DOWN never means "eject" or "drop".
-    if (!p.vehicle && !mask.up && p.onGround && nearest && Math.abs(nearest.cx - p.x) < 220) {
-      const hb = nearest.hurtboxes();
-      const boxes = hb.length ? hb : [nearest.box];
+    if (!p.vehicle && !mask.up && p.onGround && aimAt && Math.abs(aimAt.cx - p.x) < 220) {
+      const hb = aimAt.hurtboxes();
+      const boxes = hb.length ? hb : [aimAt.box];
       const top = Math.min(...boxes.map((b) => b.y));
       const bottom = Math.max(...boxes.map((b) => b.y + b.h));
       if (top > p.y - 21 && bottom > p.y - 16) mask.down = true;
@@ -106,11 +120,11 @@ export class Bot {
       mask.left = ctrl.x > want + 12;
       // Holding position: turn to face the nearest enemy (fire is released every few frames,
       // which is when the strafe lock lets a flying vehicle turn).
-      if (!mask.right && !mask.left && nearest && (nearest.cx - ctrl.cx) * ctrl.facing < -10) {
-        if (nearest.cx > ctrl.cx) mask.right = true;
+      if (!mask.right && !mask.left && aimAt && (aimAt.cx - ctrl.cx) * ctrl.facing < -10) {
+        if (aimAt.cx > ctrl.cx) mask.right = true;
         else mask.left = true;
       }
-      const ty = nearest ? nearest.cy : cam.y + 100;
+      const ty = aimAt ? aimAt.cy : cam.y + 100;
       const dy = ty - ctrl.cy;
       mask.up = dy < -8 && ctrl.top > cam.y + 20;
       mask.down = dy > 8 && ctrl.bottom < cam.y + 200;

@@ -210,6 +210,12 @@ export class JetpackTrooper extends Infantry {
         break;
       case 'aim':
         if (this.stateTime > 0.45) {
+          // Drifted out of view during the wind-up (camera moved on): no shot from off-screen.
+          if (!this.canAttack()) {
+            this.attackTimer = 0.4;
+            this.setState('hover');
+            break;
+          }
           this.shots = 3;
           this.setState('burst');
           this.fireShot();
@@ -228,7 +234,10 @@ export class JetpackTrooper extends Infantry {
         }
         break;
       case 'drop':
-        if (this.stateTime > 0.4) {
+        if (this.stateTime > 0.4 && !this.canAttack()) {
+          this.attackTimer = 0.4;
+          this.setState('hover');
+        } else if (this.stateTime > 0.4) {
           this.world.add(new Grenade({ team: 'enemy', owner: this, x: this.x + this.facing * 3, y: this.y - 8, vx: this.vx * 0.4, vy: 30, radius: 20, damage: 1, maxBounces: 0 }));
           this.sfx('enemy_throw', { vol: 0.5 });
           this.attackTimer = this.fireDelay(1.6);

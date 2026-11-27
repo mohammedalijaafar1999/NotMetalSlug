@@ -402,16 +402,20 @@ export abstract class Infantry extends Enemy {
   }
 
   private leashT = 0;
+  /** Direction of a leash hop in progress (carried across the gap while airborne), else 0. */
+  private leashHop = 0;
 
   /**
    * Arena leash. A soldier whose wave a camera lock is waiting on must never stay out of view - no
    * holding his preferred range just past the screen edge, no backing off out of it, no dozing
    * off-screen - or the arena could never be cleared. Out of view for a moment: wake up and walk
-   * (hopping walls) back in.
+   * back in at a brisk pace, hopping walls and small gaps, but never into deadly water (he waits at
+   * its edge, e.g. for a bridge to come down).
    */
   protected arenaLeash(dt: number): void {
     if (this.waveId < 0 || this.dying || !this.world.level.locked || this.state === 'panic' || this.state === 'flee') {
       this.leashT = 0;
+      this.leashHop = 0;
       return;
     }
     const cam = this.world.camera;
@@ -425,10 +429,37 @@ export abstract class Infantry extends Enemy {
     this.leashT += dt;
     if (this.leashT < 0.75) return; // let normal entrances play out
     if (this.calm) this.alert(null);
-    if (!this.onGround) return;
     const dir = this.x < left ? 1 : -1;
-    if (Math.sign(this.vx) !== dir) this.vx = dir * 40;
-    if (this.hitWall === dir) this.jump(240);
+    if (!this.onGround) {
+      if (this.leashHop === dir) this.vx = dir * 90; // carry the hop across the gap
+      return;
+    }
+    this.leashHop = 0;
+    if (Math.sign(this.vx) !== dir || Math.abs(this.vx) < 40) this.vx = dir * 40;
+    const way = this.leashWay(dir);
+    if (way === 'stop') this.vx = 0;
+    else if (way === 'hop' || this.hitWall === dir) {
+      this.jump(240);
+      this.leashHop = dir;
+      this.vx = dir * 90;
+    }
+  }
+
+  /**
+   * What a leashed soldier walking `dir` runs into: 'walk' (floor, or a drop onto safe floor; a
+   * wide dry pit too, as before), 'hop' (a small gap or strip of deadly water with safe floor
+   * within a hop) or 'stop' (deadly water too wide to hop).
+   */
+  private leashWay(dir: number): 'walk' | 'hop' | 'stop' {
+    const T = this.world.terrain;
+    const safe = (x: number, below: number): boolean => {
+      const f = T.floorAt(x, this.y - this.stepUp - 2, this.y + below, { solidTolerance: 0 });
+      return !!f && !T.waterAt(x, f.y - 2)?.deadly;
+    };
+    const near = this.x + dir * (this.w / 2 + 4);
+    if (safe(near, 120)) return 'walk';
+    for (let d = 20; d <= 44; d += 4) if (safe(this.x + dir * (this.w / 2 + d), 24)) return 'hop';
+    return T.water.some((wb) => wb.deadly && near >= wb.x && near < wb.x + wb.w && wb.y + wb.h > this.y) ? 'stop' : 'walk';
   }
 
   protected advanceWalk(dt: number): void {
