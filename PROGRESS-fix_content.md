@@ -9,7 +9,7 @@ Branch fix/content (from claude/metal-slug-game-sogjdj). Dev server: port 5603.
 | 3 | m5 lightning vs settings.flashes (+ audit) | done (m5 soft swell <=0.3, bolt no blink; m4 also unflickered; bosses use world.flash which is gated in gameplay.ts) |
 | 4 | m6 ladle offscreen globs | done (launch only when stream in view, targets clamped SPLASH_EDGE inside; tests) |
 | 5 | m6 crusher push-out when invulnerable | done (pushOut nearer side unless walled; test) |
-| 6 | m3 CABLE CAR sign under HUD | todo |
+| 6 | m3 CABLE CAR sign under HUD | done (terminal frame 1: sign on the facade; arrival uses f:1; screenshot artifacts/m3arr1.png) |
 | 7 | FROST BASTION flak shadows darker | todo |
 | 8 | HORNET KING band lower | todo |
 | 9 | m6 lift jetpack below HUD band | todo |

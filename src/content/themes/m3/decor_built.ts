@@ -186,12 +186,15 @@ sprites.define({
 
 // ------------------------------------------------------------------ cable-car terminal
 
+// Frame 0: the sign board stands on the roof. Frame 1 (arrival station on the high deck, where a
+// roof sign would sit under the HUD): the board hangs on the facade over the control room.
 sprites.define({
   name: 'm3_terminal',
   w: 150,
   h: 112,
+  frames: 2,
   outline: OUT,
-  draw: (p) => {
+  draw: (p, f) => {
     const G = 112;
     // Concrete ground floor.
     shadedBox(p, 4, G - 46, 142, 46, P3.concrete, P3.concreteHi, P3.concreteD);
@@ -214,12 +217,14 @@ sprites.define({
       p.px(wx + 2, G - 74, '#ffffff');
       snowCap(p, wx - 1, wx + 19, G - 60, 1, 40 + k, false);
     }
-    // Sign board on two short posts above the roof line.
+    // Sign board: on two short posts above the roof line, or bolted to the facade.
     const txt = 'CABLE CAR';
     const tw = textWidth(txt);
-    for (const sx of [75 - tw / 2, 75 + tw / 2 - 2]) p.rect(sx, G - 97, 2, 8, P3.steelD);
-    shadedBox(p, 75 - tw / 2 - 5, G - 108, tw + 10, 11, P3.red, P3.redHi, P3.redD);
-    pxText(p, 75 - tw / 2, G - 105, txt, '#f4e8d0');
+    const sy = f === 1 ? G - 80 : G - 108;
+    if (f !== 1) for (const sx of [75 - tw / 2, 75 + tw / 2 - 2]) p.rect(sx, G - 97, 2, 8, P3.steelD);
+    else for (const sx of [75 - tw / 2 - 3, 75 + tw / 2 + 2]) p.rect(sx, sy - 4, 1, 4, P3.steelD);
+    shadedBox(p, 75 - tw / 2 - 5, sy, tw + 10, 11, P3.red, P3.redHi, P3.redD);
+    pxText(p, 75 - tw / 2, sy + 3, txt, '#f4e8d0');
     // Flat roof with snow + overhang.
     p.rect(4, G - 88, 142, 4, P3.steelD);
     p.rect(4, G - 88, 142, 1, P3.steel);
