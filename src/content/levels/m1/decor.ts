@@ -116,6 +116,5 @@ export const DECOR: DecorDef[] = [
   d('drums', 6380, G),
   d('torch', 6440, G),
   // ---- Boss arena: the stockade yard (the gate the GRINDER smashes through is an entity).
-  d('banner', 6640, G),
   d('torch', 6760, G),
 ];

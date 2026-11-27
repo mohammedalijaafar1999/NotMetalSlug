@@ -38,9 +38,9 @@ export const GROUND: Array<[number, number]> = [
   [3956, G],
   // River crossing (shallow, gravel bed).
   [3974, 322],
-  [4130, 322],
-  [4148, G],
-  // Far bank (bunker) then the cliff climb: three 40 px ledges.
+  [4124, 322],
+  [4150, G], // the far bank is a walkable ~35 deg ramp (45 deg would need a jump)
+  // Far bank (a caged mechanic) then the cliff climb: three 40 px ledges.
   [4330, G],
   [4330, G - 40],
   [4382, G - 40],

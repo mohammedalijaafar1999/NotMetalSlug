@@ -70,7 +70,7 @@ export const ENTITIES: SpawnSpec[] = [
   at('barrel', 3126, {}, G - 10),
   hostage(3164, 'bomb', 'tied', 2),
   at('grenadier', 3312, { behavior: 'guard', facing: -1 }, 266),
-  at('light_tank', 3340, { facing: -1, behavior: 'advance' }),
+  at('light_tank', 3340, { facing: -1, behavior: 'hold' }),
   rifle(3392, 'patrol', { facing: -1 }),
   rifle(3418, 'idle', { facing: -1 }),
   at('barrel', 3436),

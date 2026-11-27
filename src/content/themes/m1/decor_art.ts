@@ -899,48 +899,128 @@ sprites.define({
 
 sprites.define({
   name: 'm1_jtree',
-  w: 80,
-  h: 214,
+  w: 104,
+  h: 222,
   draw: (p) => {
-    const cx = 40;
-    const bot = 213;
+    const cx = 52;
+    const bot = 221;
     const bark = '#7a6a54';
-    const barkL = '#9a8a6c';
-    const barkD = '#5a4c3c';
-    // Trunk with slight taper.
-    for (let y = 30; y <= bot; y++) {
-      const t = (y - 30) / (bot - 30);
-      const half = 6 + t * 3;
-      for (let x = Math.round(cx - half); x <= Math.round(cx + half); x++) {
-        const u = (x - (cx - half)) / (2 * half);
-        let c = u < 0.2 ? barkL : u > 0.75 ? barkD : bark;
-        if (h01(x, Math.floor(y / 3), 31) < 0.08) c = barkD;
+    const barkL = '#9c8c6e';
+    const barkLL = '#b4a684';
+    const barkD = '#5c4e3e';
+    const barkDD = '#463a2e';
+    // ---- Canopy (mostly above the screen): branches into a broad, layered umbrella of leaves.
+    p.line(cx - 2, 58, cx - 30, 30, barkD, 5);
+    p.line(cx - 3, 57, cx - 29, 30, bark, 3);
+    p.line(cx + 2, 62, cx + 32, 34, barkDD, 5);
+    p.line(cx + 2, 61, cx + 31, 34, barkD, 3);
+    p.line(cx, 50, cx + 4, 20, bark, 5);
+    const clumps: Array<[number, number, number]> = [
+      [cx - 34, 30, 15],
+      [cx + 34, 33, 15],
+      [cx - 14, 20, 17],
+      [cx + 14, 22, 17],
+      [cx, 12, 15],
+      [cx - 44, 38, 9],
+      [cx + 45, 41, 9],
+    ];
+    // Shadowed underside first, then the leaf masses, then sunlit tops (light from the top-left).
+    for (const [x, y, r] of clumps) p.ellipse(x + 2, y + r * 0.35, r * 1.1, r * 0.62, LEAF.dd);
+    for (const [x, y, r] of clumps) p.ellipse(x, y, r, r * 0.66, LEAF.d);
+    for (const [x, y, r] of clumps) p.ellipse(x - r * 0.25, y - r * 0.22, r * 0.68, r * 0.4, LEAF.b);
+    for (const [x, y, r] of clumps) p.ellipse(x - r * 0.42, y - r * 0.36, r * 0.32, r * 0.18, LEAF.l);
+    // Leaf speckle and ragged lower edge.
+    for (let i = 0; i < 120; i++) {
+      const x = 6 + Math.floor(h01(i, 1, 41) * 92);
+      const y = 4 + Math.floor(h01(i, 2, 41) * 44);
+      if (!p.opaque(x, y)) continue;
+      p.px(x, y, h01(i, 3, 41) < 0.5 ? LEAF.dd : LEAF.l);
+    }
+    for (let x = 10; x < 96; x += 5) {
+      const y = 44 + Math.floor(h01(x, 4, 41) * 6);
+      if (Math.abs(x - cx) > 12) p.ellipse(x, y, 2.5, 2, LEAF.dd);
+    }
+    // Hanging lianas from the canopy.
+    for (const [x, len] of [
+      [cx - 38, 34],
+      [cx - 24, 52],
+      [cx + 22, 44],
+      [cx + 40, 28],
+    ] as const) {
+      for (let y = 44; y < 44 + len; y++) p.px(x + Math.round(Math.sin(y * 0.15 + x) * 1.2), y, y % 9 < 5 ? '#2f6a2a' : '#3c7a34');
+      p.ellipse(x - 1.5, 44 + len, 2, 1.2, LEAF.d);
+      p.ellipse(x + 1.5, 45 + len, 2, 1.2, LEAF.b);
+    }
+    // ---- Trunk: tapered, lit from the left, with bark furrows and knots.
+    for (let y = 48; y <= bot; y++) {
+      const t = (y - 48) / (bot - 48);
+      const half = 6.5 + t * t * 3.5;
+      const x0 = Math.round(cx - half);
+      const x1 = Math.round(cx + half);
+      for (let x = x0; x <= x1; x++) {
+        const u = (x - x0) / Math.max(1, x1 - x0);
+        let c = u < 0.14 ? barkLL : u < 0.3 ? barkL : u > 0.8 ? barkDD : u > 0.62 ? barkD : bark;
+        // Vertical furrows.
+        const furrow = h01(x, Math.floor(y / 11), 31);
+        if (furrow < 0.14 && u > 0.1 && u < 0.9) c = u < 0.5 ? barkD : barkDD;
         p.px(x, y, c);
       }
     }
-    // Buttress roots.
-    p.poly([cx - 30, bot + 1, cx - 6, bot - 42, cx - 4, bot + 1], bark);
-    p.poly([cx - 30, bot + 1, cx - 6, bot - 42, cx - 9, bot + 1], barkL);
-    p.poly([cx + 32, bot + 1, cx + 7, bot - 36, cx + 5, bot + 1], barkD);
-    p.poly([cx - 14, bot + 1, cx - 2, bot - 18, cx + 2, bot + 1], barkD);
-    // Moss patches and a spiralling liana.
-    for (let k = 0; k < 6; k++) p.ellipse(cx - 4 + (k % 2) * 6, 60 + k * 24, 3, 2, PH.moss);
-    for (let y = 26; y < bot - 10; y++) {
-      const x = cx + Math.sin(y * 0.09) * 9;
-      p.px(x, y, Math.cos(y * 0.09) > 0 ? '#3c7a34' : '#2a5a28');
-      if (y % 11 === 0) p.ellipse(x + 2, y, 2.2, 1.2, LEAF.b);
-    }
-    // Branches with leaf clumps at the top (mostly above the screen).
-    p.line(cx, 40, cx - 26, 18, bark, 4);
-    p.line(cx, 46, cx + 28, 24, barkD, 4);
-    for (const [x, y, r] of [
-      [cx - 30, 14, 11],
-      [cx + 30, 20, 11],
-      [cx, 8, 13],
+    for (const [x, y] of [
+      [cx - 2, 96],
+      [cx + 3, 150],
+      [cx - 3, 182],
     ] as const) {
-      p.ellipse(x + 1, y + 2, r * 1.2, r * 0.75, LEAF.dd);
-      p.ellipse(x, y, r * 1.15, r * 0.7, LEAF.d);
-      p.ellipse(x - r * 0.35, y - r * 0.3, r * 0.6, r * 0.32, LEAF.b);
+      p.ellipse(x, y, 2.4, 3.2, barkDD);
+      p.ellipse(x - 0.6, y - 0.8, 1.2, 1.6, barkD);
+      p.px(x - 2, y - 3, barkLL);
+    }
+    // ---- Buttress roots: thin plank-like blades radiating from the trunk, curving out over the
+    // ground, with deep shadow in the gaps between them (light from the top-left).
+    const flareTop = bot - 56;
+    for (let y = flareTop; y <= bot; y++) {
+      const s = (y - flareTop) / (bot - flareTop);
+      const half = 10 + 30 * Math.pow(s, 2.4);
+      for (let x = Math.round(cx - half); x <= Math.round(cx + half * 0.92); x++) {
+        if (Math.abs(x - cx) < 9 - s * 3) continue; // the trunk itself carries on to the ground
+        p.px(x, y, h01(x, y, 5) < 0.1 ? '#2e261e' : '#3a3026');
+      }
+    }
+    const blade = (topX: number, topY: number, footX: number, thick: number, face: string, ridge: string): void => {
+      const dir = footX < topX ? -1 : 1;
+      for (let y = topY; y <= bot; y++) {
+        const s = (y - topY) / (bot - topY);
+        const outer = topX + (footX - topX) * Math.pow(s, 2.2);
+        const th = 1.5 + thick * s;
+        for (let k = 0; k <= th; k++) p.px(Math.round(outer - dir * k), y, k < 1 ? ridge : face);
+      }
+    };
+    blade(cx - 11, bot - 34, cx - 22, 4, barkD, bark); // back blades (in shade)
+    blade(cx + 11, bot - 38, cx + 24, 4, barkDD, barkD);
+    blade(cx - 8, bot - 58, cx - 42, 7, barkL, barkLL); // big sunlit blade
+    blade(cx + 8, bot - 52, cx + 40, 7, barkD, bark); // big shaded blade
+    blade(cx - 1, bot - 30, cx - 6, 5, bark, barkL); // front blade, almost facing us
+    blade(cx + 3, bot - 26, cx + 14, 4, barkD, bark);
+    // Moss on the sunlit side and a spiralling liana with leaves.
+    for (let k = 0; k < 7; k++) {
+      const y = 70 + k * 21;
+      p.ellipse(cx - 5 + (k % 2) * 2, y, 3, 2, PH.moss);
+      p.px(cx - 6 + (k % 2) * 2, y - 1, PH.mossL);
+    }
+    for (let y = 52; y < bot - 14; y++) {
+      const x = cx + Math.sin(y * 0.085) * 9;
+      p.px(x, y, Math.cos(y * 0.085) > 0 ? '#3c7a34' : '#2a5a28');
+      if (y % 13 === 0) {
+        p.ellipse(x + 2, y, 2.4, 1.3, LEAF.b);
+        p.px(x + 1, y - 1, LEAF.l);
+      }
+    }
+    // Ferns tucked between the roots.
+    for (const [x, d] of [
+      [cx - 26, -1],
+      [cx + 26, 1],
+    ] as const) {
+      for (let k = 0; k < 4; k++) p.line(x, bot, x + d * (3 + k * 2), bot - 5 - k, k % 2 ? LEAF.d : LEAF.b);
     }
   },
 });
