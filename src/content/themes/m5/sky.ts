@@ -5,9 +5,11 @@
 //   a distant Legion fleet (tiny airship silhouettes with lit windows) and, late in the mission,
 //     the flagship's silhouette looming on the horizon
 //   mid cloud banks, then the cloud sea far below (the level's "floor").
+// Clouds are volumetric blob clouds (clouds.ts): each billow is a shaded dome, masses get volume
+// light from the top-left, self-shadowing, warm dusk glow underneath and lit rims.
 // Every image is procedural PixelArt baked once; per frame only drawImage calls are made.
 
-import { PixelArt, mixColor } from '../../../engine/pixelart';
+import { PixelArt } from '../../../engine/pixelart';
 import { Rng } from '../../../engine/rng';
 import { VIEW_H, VIEW_W } from '../../../engine/renderer';
 import { bandedGradient } from '../../../art/textures';
