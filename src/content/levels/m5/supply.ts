@@ -92,7 +92,8 @@ export class SkySupply extends Actor {
     }
     if (!this.onGround) {
       this.vx = this.drift + Math.sin(this.age * 1.4 + this.sway) * 10;
-      this.vy = this.fall;
+      // Dropped in from above the view: drop quickly past the HUD band, then float.
+      this.vy = this.startAbove && this.y < this.world.camera.y + 44 ? 48 : this.fall;
     } else {
       this.vx = 0;
       if (this.landedT < 0) {
