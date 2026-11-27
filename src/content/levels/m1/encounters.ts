@@ -99,8 +99,8 @@ export const LOCKS: LockDef[] = [
   {
     x: ARENAS.beach,
     waves: [
-      { spawns: [charge('rifleman', 1600), charge('rifleman', 1632), charge('rifleman', 1158)], delay: 0.8 },
-      { spawns: [charge('grenadier', 1596), charge('rifleman', 1628), charge('rifleman', 1150)], delay: 1.0 },
+      { spawns: [charge('rifleman', 1600), charge('rifleman', 1632), charge('rifleman', ARENAS.beach + 12, { facing: 1 })], delay: 0.8 },
+      { spawns: [charge('grenadier', 1596), charge('rifleman', 1628), charge('rifleman', ARENAS.beach + 12, { facing: 1 })], delay: 1.0 },
       { spawns: [at('jeep', 1660, { facing: -1, stopX: 1452, bursts: 3 })], delay: 1.2 },
     ],
   },
@@ -109,7 +109,7 @@ export const LOCKS: LockDef[] = [
     x: ARENAS.village,
     waves: [
       { spawns: [at('paratrooper', 2540), at('paratrooper', 2640), at('paratrooper', 2736)], delay: 0.8 },
-      { spawns: [at('truck', 2860, { facing: -1, stopX: 2700, troops: 3 }), charge('rifleman', 2378)], delay: 1.0 },
+      { spawns: [at('truck', 2860, { facing: -1, stopX: 2700, troops: 3 }), charge('rifleman', ARENAS.village + 12, { facing: 1 })], delay: 1.0 },
       { spawns: [at('paratrooper', 2490), at('paratrooper', 2690), charge('saber', 2824), charge('grenadier', 2836)], delay: 1.0 },
     ],
   },
@@ -117,28 +117,28 @@ export const LOCKS: LockDef[] = [
   {
     x: ARENAS.road,
     waves: [
-      { spawns: [charge('rifleman', 3880), charge('rifleman', 3904), charge('grenadier', 3920), charge('rifleman', 3438)], delay: 0.8 },
-      { spawns: [at('light_tank', 3910, { facing: -1 }), charge('rifleman', 3436), charge('rifleman', 3930)], delay: 1.2 },
-      { spawns: [charge('saber', 3900), charge('saber', 3436), charge('rifleman', 3926)], delay: 1.0 },
+      { spawns: [charge('rifleman', 3880), charge('rifleman', 3904), charge('grenadier', 3920), charge('rifleman', ARENAS.road + 12, { facing: 1 })], delay: 0.8 },
+      { spawns: [at('light_tank', 3910, { facing: -1 }), charge('rifleman', ARENAS.road + 12, { facing: 1 }), charge('rifleman', 3930)], delay: 1.2 },
+      { spawns: [charge('saber', 3900), charge('saber', ARENAS.road + 12, { facing: 1 }), charge('rifleman', 3926)], delay: 1.0 },
     ],
   },
   // Arena 4 - fuel depot on the plateau: riflemen, then the mortar crew, then a shield trooper.
   {
     x: ARENAS.depot,
     waves: [
-      { spawns: [charge('rifleman', 5016), charge('rifleman', 5040), charge('grenadier', 5052), charge('rifleman', 4578)], delay: 0.8 },
+      { spawns: [charge('rifleman', 5016), charge('rifleman', 5040), charge('grenadier', 5052), charge('rifleman', ARENAS.depot + 12, { facing: 1 })], delay: 0.8 },
       { spawns: [at('mortar', 4930, { facing: -1 }), charge('rifleman', 5020), charge('rifleman', 5044)], delay: 1.2 },
-      { spawns: [charge('shield_trooper', 5020), charge('rifleman', 5044), charge('rifleman', 4578)], delay: 1.0 },
+      { spawns: [charge('shield_trooper', 5020), charge('rifleman', 5044), charge('rifleman', ARENAS.depot + 12, { facing: 1 })], delay: 1.0 },
     ],
   },
   // Arena 5 - the gauntlet at the stockade: shields, the Hornet, an officer's rally, a last rush.
   {
     x: ARENAS.gauntlet,
     waves: [
-      { spawns: [charge('shield_trooper', 6020), charge('shield_trooper', 6052), charge('grenadier', 6040), charge('rifleman', 5578)], delay: 0.8 },
-      { spawns: [at('heli', 6080, { facing: -1 }), charge('rifleman', 6024), charge('rifleman', 5576)], delay: 1.2 },
-      { spawns: [at('officer', 6044, { facing: -1 }), charge('rifleman', 6004), charge('rifleman', 6024), charge('saber', 6064), charge('rifleman', 5578)], delay: 1.2 },
-      { spawns: [charge('saber', 5576), charge('shield_trooper', 6030), charge('grenadier', 6050)], delay: 1.0 },
+      { spawns: [charge('shield_trooper', 6020), charge('shield_trooper', 6052), charge('grenadier', 6040), charge('rifleman', ARENAS.gauntlet + 12, { facing: 1 })], delay: 0.8 },
+      { spawns: [at('heli', 6080, { facing: -1 }), charge('rifleman', 6024), charge('rifleman', ARENAS.gauntlet + 12, { facing: 1 })], delay: 1.2 },
+      { spawns: [at('officer', 6044, { facing: -1 }), charge('rifleman', 6004), charge('rifleman', 6024), charge('saber', 6064), charge('rifleman', ARENAS.gauntlet + 12, { facing: 1 })], delay: 1.2 },
+      { spawns: [charge('saber', ARENAS.gauntlet + 12, { facing: 1 }), charge('shield_trooper', 6030), charge('grenadier', 6050)], delay: 1.0 },
     ],
   },
   // Boss - GRINDER (no announce: the boss shows its own WARNING banner).
