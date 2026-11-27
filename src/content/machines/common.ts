@@ -1163,7 +1163,10 @@ export abstract class Machine extends Enemy {
       this.facing = this.x > this.world.camera.x + VIEW_W / 2 ? -1 : 1;
     }
     if (this.rearWarn && this.entersFromBehind()) {
+      // Like a level's m2_incoming: not in play (nor a target) until the warning has run.
       this.entryHold = REAR_ENTRY_HOLD;
+      this.hittable = false;
+      this.world.invalidateTargets();
       this.world.add(new RearEntryWarning(this));
       this.world.sfx('enemy_alert', this.world.camera.x + 10, { vol: 0.8 });
     }
@@ -1180,7 +1183,10 @@ export abstract class Machine extends Enemy {
     if (this.entryHold > 0 && !this.dying) {
       // Announced rear entry: wait behind the edge (RearEntryWarning blinks), then drive in.
       this.entryHold -= dt;
-      return;
+      if (this.entryHold > 0) return;
+      this.entryHold = 0;
+      this.hittable = true;
+      this.world.invalidateTargets();
     }
     if (this.hitSfxT > 0) this.hitSfxT -= dt;
     if (this.jolt > 0) this.jolt -= dt;

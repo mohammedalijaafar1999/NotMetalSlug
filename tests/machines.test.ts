@@ -592,6 +592,8 @@ describe('rear entries (no unannounced rams from behind)', () => {
       step(w, 50);
       expect(m.x, 'holds behind the edge while the warning blinks').toBe(x0);
       expect(m.onScreen()).toBe(false);
+      expect(m.hittable, 'not a target until it enters (like m2_incoming)').toBe(false);
+      expect(m.blocksProgress).toBe(true);
       let seen = -1;
       for (let i = 0; i < 60 * 4 && seen < 0; i++) {
         step(w, 1);
@@ -599,6 +601,7 @@ describe('rear entries (no unannounced rams from behind)', () => {
       }
       expect(seen, 'then it enters').toBeGreaterThanOrEqual(0);
       expect(m.x).toBeGreaterThan(x0 + 20);
+      expect(m.hittable).toBe(true);
       step(w, 2);
       expect(warn().length, 'the warning goes once it is in view').toBe(0);
     });
