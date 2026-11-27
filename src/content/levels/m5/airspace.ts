@@ -15,7 +15,7 @@
 //    the first helper eases each starting gyro down into open sky during the mission banner.
 // Place a few along the level (x = trigger point); extras remove themselves.
 
-import { VIEW_H } from '../../../engine/renderer';
+import { VIEW_H, VIEW_W } from '../../../engine/renderer';
 import { rectsOverlap } from '../../../engine/math';
 import { Entity } from '../../../game/entity';
 import { registerEntity } from '../../../game/registry';
@@ -147,7 +147,9 @@ export class Airspace extends Entity {
       const t = (this.afoot.get(p.index) ?? 0) + (p.onGround ? dt : 0);
       this.afoot.set(p.index, t);
       if (t < SPARE_DELAY) return;
-      const g = w.spawn(type!, p.x, w.camera.y - 6, { ammo: SPARE_AMMO });
+      // Drop in from the top, ahead of him (the top-left corner is under the HUD).
+      const sx = Math.min(w.camera.x + VIEW_W - 40, Math.max(w.camera.x + 150, p.x + 70));
+      const g = w.spawn(type!, sx, w.camera.y - 6, { ammo: SPARE_AMMO });
       if (!g || !isVehicle(g)) return;
       g.facing = p.facing;
       this.ferries.set(p.index, { gyro: g, t: 0 });

@@ -39,6 +39,8 @@ export const LOW = 112;
 export const BOSS_X = M5_W - 384;
 /** Screen y (at the low camera) -> world y. */
 const S = (y: number) => LOW + y;
+/** Jetpack escorts hover close to the gyro's altitude (dogfight), clear of the HUD band. */
+const JET = { height: 44 };
 
 const b = new LevelBuilder();
 
@@ -69,12 +71,12 @@ b.add('fighter', 1040, undefined, { facing: -1, passes: 3, alt: 92 });
   b.add('rifleman', 1160, g1.deckY, { behavior: 'guard' });
   b.add('bazooka', 1186, g1.deckY, { behavior: 'guard' });
 }
-b.add('drone', 1300, undefined, { kind: 'zap', alt: 70 });
-b.add('drone', 1316, undefined, { kind: 'zap', alt: 104 });
-b.add('drone', 1332, undefined, { kind: 'zap', alt: 136 });
+b.add('drone', 1300, undefined, { kind: 'zap', alt: 70 }, 1276);
+b.add('drone', 1316, undefined, { kind: 'zap', alt: 104 }, 1276);
+b.add('drone', 1332, undefined, { kind: 'zap', alt: 136 }, 1276);
 b.add('m5_supply', 1250, undefined, { item: 'bomb' }, 1320);
-b.add('jetpack', 1520, S(80));
-b.add('jetpack', 1560, S(126), {}, 1580);
+b.add('jetpack', 1520, S(80), { ...JET });
+b.add('jetpack', 1560, S(126), { ...JET }, 1580);
 
 // ------------------------------------------------------------------ LOCK 1: intercept
 
@@ -96,8 +98,8 @@ b.add('m5_supply', 1830, undefined, { item: 'fuel' }, 1890);
   b.add('rifleman', 2026, a.deckY, { behavior: 'chat', facing: 1 });
   b.add('rifleman', 2046, a.deckY, { behavior: 'chat', facing: -1 });
 }
-b.add('jetpack', 2230, S(70));
-b.add('jetpack', 2270, S(118), {}, 2300);
+b.add('jetpack', 2230, S(70), { ...JET });
+b.add('jetpack', 2270, S(118), { ...JET }, 2300);
 b.add('fighter', 2440, undefined, { facing: 1, passes: 2, alt: 104 });
 {
   const bl = b.ship('blimp', 2370, S(92), 1);
@@ -126,7 +128,7 @@ b.add('m5_supply', 3090, undefined, { item: 'fuel' }, 3150);
   b.add('bazooka', 3204, f1.deckY, { behavior: 'guard' });
   b.add('rifleman', 3260, f1.deckY, { behavior: 'patrol' });
 }
-b.add('drone', 3560, 70, { kind: 'zap' });
+b.add('drone', 3576, 70, { kind: 'zap' }, 3552);
 b.add('drone', 3576, 104, { kind: 'zap' }, 3560);
 b.add('drone', 3592, 138, { kind: 'zap' }, 3560);
 {
@@ -136,8 +138,8 @@ b.add('drone', 3592, 138, { kind: 'zap' }, 3560);
   b.add('rifleman', 3462, g2.deckY, { behavior: 'guard' });
   b.add('sniper', 3540, g2.deckY, { behavior: 'guard' });
 }
-b.add('jetpack', 3690, 70);
-b.add('jetpack', 3720, 124, {}, 3700);
+b.add('jetpack', 3690, 70, { ...JET });
+b.add('jetpack', 3720, 124, { ...JET }, 3700);
 b.add('m5_supply', 3700, undefined, { item: 'bomb' }, 3770);
 
 // ------------------------------------------------------------------ LOCK 3: carrier deck
@@ -201,8 +203,8 @@ b.barge(5050, 5200, S(176), 1, [5080, 5170]);
   b.add('grenadier', 5680, f2.deckY, { behavior: 'guard' });
 }
 b.add('fighter', 5890, undefined, { facing: -1, passes: 2, alt: 92 });
-b.add('jetpack', 5780, S(66));
-b.add('jetpack', 5820, S(118), {}, 5830);
+b.add('jetpack', 5780, S(66), { ...JET });
+b.add('jetpack', 5820, S(118), { ...JET }, 5830);
 b.add('m5_supply', 6040, undefined, { item: 'fuel' }, 6100);
 {
   // Abandoned skiff adrift with the last prisoner; its lamp blinks SOS.
@@ -289,7 +291,7 @@ registerLevel({
             { type: 'paratrooper', x: 1566, props: { drift: 0 } },
             { type: 'paratrooper', x: 1612, props: { drift: 0 } },
             { type: 'paratrooper', x: 1660, props: { drift: 0 } },
-            { type: 'jetpack', x: 1320, y: S(96), props: { facing: 1 } },
+            { type: 'jetpack', x: 1320, y: S(96), props: { ...JET, facing: 1 } },
           ],
         },
       ],
@@ -302,8 +304,8 @@ registerLevel({
           delay: 0.6,
           spawns: [
             { type: 'm5_fuel_zeppelin', x: 2836, y: S(100), props: { facing: -1 } },
-            { type: 'jetpack', x: 2540, y: S(70), props: { facing: 1 } },
-            { type: 'jetpack', x: 2970, y: S(150), props: { facing: -1 } },
+            { type: 'jetpack', x: 2540, y: S(120), props: { ...JET, facing: 1 } },
+            { type: 'jetpack', x: 2970, y: S(150), props: { ...JET, facing: -1 } },
           ],
         },
         {
@@ -346,8 +348,8 @@ registerLevel({
             { type: 'paratrooper', x: 3728, props: { drift: 0 } },
             { type: 'paratrooper', x: 3800, props: { drift: 0 } },
             { type: 'paratrooper', x: 3880, props: { drift: 0 } },
-            { type: 'jetpack', x: 3980, y: 60, props: { facing: -1 } },
-            { type: 'jetpack', x: 3990, y: 112, props: { facing: -1 } },
+            { type: 'jetpack', x: 3980, y: 60, props: { ...JET, facing: -1 } },
+            { type: 'jetpack', x: 3990, y: 112, props: { ...JET, facing: -1 } },
           ],
         },
         {
@@ -383,9 +385,9 @@ registerLevel({
         {
           delay: 1.0,
           spawns: [
-            { type: 'jetpack', x: 4880, y: S(60), props: { facing: 1 } },
-            { type: 'jetpack', x: 5300, y: S(100), props: { facing: -1 } },
-            { type: 'jetpack', x: 5310, y: S(150), props: { facing: -1 } },
+            { type: 'jetpack', x: 4880, y: S(60), props: { ...JET, facing: 1 } },
+            { type: 'jetpack', x: 5300, y: S(100), props: { ...JET, facing: -1 } },
+            { type: 'jetpack', x: 5310, y: S(150), props: { ...JET, facing: -1 } },
             { type: 'paratrooper', x: 5080, props: { drift: 0 } },
             { type: 'paratrooper', x: 5126, props: { drift: 0 } },
             { type: 'paratrooper', x: 5170, props: { drift: 0 } },

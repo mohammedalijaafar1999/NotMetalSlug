@@ -31,22 +31,37 @@ export function rainTile(seed: number, count: number, minLen: number, maxLen: nu
   return p;
 }
 
-/** Small translucent cloud wisp (drawn with low alpha). */
+/**
+ * A wind-torn cloud wisp (drawn with low alpha): a long tapered streak with a brighter core, frayed
+ * into thin trailing strands downwind (to the right - the wind blows them past, right to left).
+ */
 export function wispArt(seed: number, w: number, h: number): PixelArt {
   const p = new PixelArt(w, h);
   const r = new Rng(seed);
-  const n = Math.round(w / 9);
-  for (let i = 0; i < n; i++) {
-    const k = i / (n - 1);
-    const x = 6 + k * (w - 12) + r.range(-2, 2);
-    const y = h / 2 + r.range(-1.5, 1.5) + Math.abs(k - 0.4) * 3;
-    const rad = (1 - Math.abs(k - 0.45) * 1.3) * (h / 2 - 1) + r.range(-0.5, 0.8);
-    if (rad < 1.5) continue;
-    p.circle(x, y + 1, rad, P5.wispShade);
-    p.circle(x - 0.5, y - 0.5, rad - 1, P5.wisp);
+  const cy = h / 2;
+  const head = r.range(0.18, 0.3);
+  const phase = r.range(0, 6);
+  for (let x = 0; x < w; x++) {
+    const t = x / (w - 1);
+    // Thick near the head, tapering into the tail.
+    const prof = t < head ? Math.sin((t / head) * Math.PI * 0.5) : Math.pow(1 - (t - head) / (1 - head), 0.8);
+    const half = prof * (h / 2 - 1) * (0.85 + 0.15 * Math.sin(x * 0.35 + phase));
+    const mid = cy + Math.sin(x * 0.09 + phase) * 1.2;
+    for (let y = 0; y < h; y++) {
+      const d = Math.abs(y + 0.5 - mid);
+      if (d > half) continue;
+      const core = d < half * 0.45;
+      if (!core && (x + y * 3) % 4 === 0) continue;
+      p.px(x, y, core ? P5.wisp : P5.wispShade);
+    }
   }
-  // Streaky tail.
-  for (let x = 0; x < w * 0.35; x++) if (x % 3 !== 0) p.px(w - 1 - x, Math.round(h / 2 + 1), P5.wispShade);
+  // Frayed strands trailing downwind.
+  for (let k = 0; k < 4; k++) {
+    const y = Math.round(cy + r.range(-h * 0.35, h * 0.35));
+    const x0 = Math.round(w * r.range(0.35, 0.6));
+    const len = Math.round(w * r.range(0.25, 0.4));
+    for (let x = x0; x < Math.min(w, x0 + len); x++) if ((x + k) % 5 !== 0) p.px(x, y, P5.wispShade);
+  }
   return p;
 }
 
@@ -63,7 +78,7 @@ function ensure(): Cache {
   cache = {
     rainFar: rainTile(5, 34, 3, 5, P5.rain).toCanvas(),
     rainNear: rainTile(9, 12, 6, 9, P5.rain).toCanvas(),
-    wisps: [wispArt(1, 64, 14), wispArt(2, 44, 11), wispArt(3, 86, 16)].map((w) => w.toCanvas()),
+    wisps: [wispArt(1, 150, 13), wispArt(2, 104, 10), wispArt(3, 210, 16)].map((w) => w.toCanvas()),
   };
   return cache;
 }
@@ -77,7 +92,7 @@ function tile(g: CanvasRenderingContext2D, c: HTMLCanvasElement, ox: number, oy:
 /** Wisp schedule: a long virtual strip of wisps that the camera flies through (fast parallax). */
 const WISPS = Array.from({ length: 14 }, (_, i) => {
   const r = new Rng(400 + i * 7);
-  return { x: i * 240 + r.range(0, 160), y: r.range(44, 200), kind: r.int(0, 2), a: r.range(0.16, 0.26) };
+  return { x: i * 240 + r.range(0, 160), y: r.range(44, 200), kind: r.int(0, 2), a: r.range(0.3, 0.42) };
 });
 const WISP_SPAN = 14 * 240;
 
@@ -95,8 +110,8 @@ export function renderStormOverlay(g: CanvasRenderingContext2D, camX: number, ca
   const fade = isFinite(bx) ? Math.max(0, Math.min(1, (bx - 420 - camX) / 360)) : 1;
   if (fade > 0) {
     for (const w of WISPS) {
-      const sx = ((((w.x - camX * 1.45 - time * 28) % WISP_SPAN) + WISP_SPAN) % WISP_SPAN) - 120;
-      if (sx > VIEW_W || sx < -100) continue;
+      const sx = ((((w.x - camX * 1.45 - time * 28) % WISP_SPAN) + WISP_SPAN) % WISP_SPAN) - 220;
+      if (sx > VIEW_W || sx < -220) continue;
       g.globalAlpha = w.a * fade * (0.6 + storm * 0.4);
       g.drawImage(C.wisps[w.kind], Math.round(sx), Math.round(w.y - camY * 0.2 + (level.height - VIEW_H) * 0.2));
     }
