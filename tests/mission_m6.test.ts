@@ -17,7 +17,9 @@ import { Crusher } from '../src/content/levels/m6/crusher';
 import { MoltenPool } from '../src/content/levels/m6/molten';
 import { Ladle, MoltenGlob } from '../src/content/levels/m6/ladle';
 import { Lift } from '../src/content/levels/m6/lift';
-import { BOSS_LOCK, GU, M6_W } from '../src/content/levels/m6';
+import { BOSS_LOCK, GU, LIFT_X, M6_W, SHAFT_R } from '../src/content/levels/m6';
+import { Projectile } from '../src/game/projectile';
+import type { Entity } from '../src/game/entity';
 import { app } from '../src/app';
 import { SceneManager } from '../src/engine/scene';
 import { flow } from '../src/scenes/flow';
@@ -300,6 +302,40 @@ describe('mission 6 mechanics', () => {
     expect(p.x).toBeGreaterThan(400);
     expect(p.y).toBe(60);
   });
+});
+
+describe('mission 6 reactor shaft', () => {
+  it('nobody on the hangar floor shoots down at a rider during the climb (only the flying ambush)', () => {
+    // A rider on the lift cannot shoot back at the floor above (his shots hit the shaft wall), so
+    // ground troops and guns up there must not be able to reach him until he has stepped off.
+    const w = makeWorld('m6', { seed: 3, god: true });
+    const p = w.players[0];
+    w.level.warp(4700);
+    p.x = 4760;
+    p.y = w.camera.y + 20;
+    const seen = new Set<Entity>();
+    const shooters: string[] = [];
+    let lift: Lift | null = null;
+    for (let i = 0; i < 60 * 60 && !(lift && lift.rides > 0); i++) {
+      // Walk onto the lift, then stand still on it.
+      input.setVirtual(0, p.x < LIFT_X - 4 ? { right: true } : {});
+      step(w, 1);
+      lift = lift ?? (w.entities.find((e) => e instanceof Lift) as Lift | undefined) ?? null;
+      if (!lift || lift.state !== 'up') continue;
+      for (const e of w.entities) {
+        if (!(e instanceof Projectile) || e.team !== 'enemy' || seen.has(e)) continue;
+        seen.add(e);
+        const t = e.owner?.type ?? '?';
+        if (t !== 'drone' && t !== 'jetpack') shooters.push(`${t} @${Math.round(e.x)},${Math.round(e.y)}`);
+      }
+    }
+    release();
+    expect(lift?.rides, 'the lift reached the hangar floor').toBe(1);
+    expect(shooters).toEqual([]);
+    // ...and the hangar floor next to the shaft is clear when he steps off.
+    const near = w.entities.filter((e) => e.team === 'enemy' && e.hittable && !(e as any).flying && e.y >= GU - 2 && e.x > SHAFT_R && e.x < SHAFT_R + 200);
+    expect(near.map((e) => e.type)).toEqual([]);
+  }, 60_000);
 });
 
 describe('mission 6 playthrough', () => {

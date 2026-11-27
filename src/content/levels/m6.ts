@@ -436,10 +436,11 @@ add(
     },
     5100,
   ),
-  E('turret', 5420, GU, { kind: 'mg', dir: -1 }),
-  E('robot', 5476, GU, { behavior: 'guard', facing: -1 }),
-  // a marksman watching the shaft from the hangar floor
-  E('sniper', 5446, GU, { facing: -1 }),
+  // The hangar's guard stands back from the shaft, out of view during the climb (camera right edge
+  // ~5562-5605): a rider on the lift cannot shoot back at the floor above him, so nobody up there
+  // may shoot down at him either, and he steps off onto clear floor before anyone engages. (A turret,
+  // a sniper and a robot used to wait at the shaft's lip and shot riders from the top edge.)
+  E('robot', 5640, GU, { behavior: 'guard', facing: -1 }),
 );
 
 // ================================================================== F: hangar (5390-end)
