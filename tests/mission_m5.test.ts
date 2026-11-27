@@ -4,6 +4,8 @@
 // set piece, and the invincible autopilot completing the mission.
 import { describe, expect, it } from 'vitest';
 import { makeWorld, simulateMission, step, DT } from './helpers';
+import { Bot } from '../src/debug/bot';
+import { input } from '../src/engine/input';
 import { VIEW_W } from '../src/engine/renderer';
 import { wrapText } from '../src/engine/font';
 import { getLevel, type LevelDef } from '../src/game/level';
@@ -287,5 +289,15 @@ describe('mission 5 autopilot', () => {
     if (!r.completed) console.log(JSON.stringify(r));
     expect(r.completed).toBe(true);
     expect(r.rescues).toBeGreaterThanOrEqual(3);
+  }, 300_000);
+
+  it('two autopilots complete it in co-op, both flying gyros', () => {
+    const w = makeWorld('m5', { players: 2, god: true });
+    expect(w.players.length).toBe(2);
+    for (const p of w.players) expect(p.vehicle?.type).toBe('gyro');
+    const bots = w.players.map((p) => new Bot(p.index));
+    for (let i = 0; i < 900 / DT && w.state !== 'complete'; i++) step(w, 1, bots);
+    for (let k = 0; k < 2; k++) input.setVirtual(k, null);
+    expect(w.state).toBe('complete');
   }, 300_000);
 });
