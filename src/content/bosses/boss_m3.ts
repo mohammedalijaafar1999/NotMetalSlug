@@ -72,8 +72,8 @@ const LANCE_CHARGE = 1.0;
 const LANCE_FIRE = 0.7;
 const SPIKE_TELE = 0.6;
 /** Flak shells burst this high above the floor after FLAK_FLIGHT seconds. */
-const FLAK_BURST_H = 92;
-const FLAK_FLIGHT = 0.85;
+export const FLAK_BURST_H = 92;
+export const FLAK_FLIGHT = 0.85;
 const MORTAR_FLIGHT = 1.35;
 const BOULDER_GAP = 0.95;
 const BOULDER_FLIGHT = 1.05;

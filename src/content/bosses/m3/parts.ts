@@ -232,6 +232,12 @@ export class FlakShell extends Projectile {
     [34, 30],
   ];
   static readonly FRAG_G = 190;
+  /**
+   * Radius of each fragment's landing shadow. The side fragments still drift ~5 px outward while
+   * they fall through head height, so a shadow covers the whole band where a fragment can clip a
+   * standing player: no "safe-looking" gap between two shadows kills (tests/boss_m3).
+   */
+  static readonly FRAG_SHADOW = 9;
   /** Shell gravity. */
   static readonly GRAV = 150;
 
@@ -267,7 +273,7 @@ export class FlakShell extends Projectile {
     for (const [vx, vy] of FlakShell.FRAGS) {
       w.add(new IceFrag(this.owner, x, y, vx, vy, FlakShell.FRAG_G));
       const l = fragLanding(x, y, vx, vy, FlakShell.FRAG_G, this.groundY);
-      if (isFinite(l.t)) w.add(new FloorMark(l.x, this.groundY, l.t, 'shadow', 5));
+      if (isFinite(l.t)) w.add(new FloorMark(l.x, this.groundY, l.t, 'shadow', FlakShell.FRAG_SHADOW));
     }
     this.remove();
   }

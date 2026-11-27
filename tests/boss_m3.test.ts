@@ -6,8 +6,8 @@ import { Bot } from '../src/debug/bot';
 import { input } from '../src/engine/input';
 import type { World } from '../src/game/world';
 import type { Player } from '../src/game/player';
-import { FrostBastion, FACE_X, LANCE_H } from '../src/content/bosses/boss_m3';
-import { FrostLance, SPIKE_SPEED, SpikeWave } from '../src/content/bosses/m3/parts';
+import { FrostBastion, FACE_X, LANCE_H, FLAK_BURST_H, FLAK_FLIGHT } from '../src/content/bosses/boss_m3';
+import { FrostLance, SPIKE_SPEED, SpikeWave, FlakShell, FloorMark } from '../src/content/bosses/m3/parts';
 import { Bullet } from '../src/game/projectile';
 import { getLevel, registerLevel } from '../src/game/level';
 
@@ -160,6 +160,32 @@ describe('boss_m3 FROST BASTION', () => {
     const wave = w.add(new SpikeWave(p, p.x + 140, p.x - 100, G));
     until(w, () => wave.dead || p.state !== 'play', 4);
     expect(p.state).toBe('dying');
+  });
+
+  it('flak fragments only hit a player who overlaps one of their landing shadows', () => {
+    // A player standing still anywhere around the burst: dying is fair only when the hitbox (12 px)
+    // touches a fragment shadow; the gap between two shadows must not be a trap.
+    let deaths = 0;
+    let gaps = 0;
+    for (let d = -60; d <= 60; d += 2) {
+      const { w, p, G } = hazardWorld();
+      const bx = p.x - d;
+      const marks: FloorMark[] = [];
+      w.add(new FlakShell(null, bx - 80, G - 150, bx, G - FLAK_BURST_H, FLAK_FLIGHT, G));
+      for (let t = 0; t < 2.5 && p.state === 'play'; t += DT) {
+        step(w, 1);
+        for (const e of w.entities) if (e instanceof FloorMark && e.style === 'shadow' && !marks.includes(e)) marks.push(e);
+      }
+      const touching = marks.some((m) => Math.abs(m.x - p.x) <= 6 + m.radius + 0.5);
+      if (p.state !== 'play') {
+        deaths++;
+        expect(touching, `killed at ${d} px from the burst, clear of every shadow (${marks.map((m) => Math.round(m.x - p.x)).join(', ')})`).toBe(true);
+      } else if (!touching) gaps++;
+      expect(marks.length).toBe(3);
+    }
+    // The flak is still a threat (a band of the floor is deadly) and there is room around it.
+    expect(deaths).toBeGreaterThan(8);
+    expect(gaps).toBeGreaterThan(8);
   });
 });
 
