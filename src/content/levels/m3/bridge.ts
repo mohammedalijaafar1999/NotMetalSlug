@@ -24,7 +24,6 @@ interface Plank {
   vy: number;
   rot: number;
   vr: number;
-  t: number;
 }
 
 export class WeakBridge extends Entity {
@@ -35,7 +34,6 @@ export class WeakBridge extends Entity {
   /** Seconds a heavy vehicle has been on the deck. */
   load = 0;
   broken = false;
-  private brokenT = 0;
   private planks: Plank[] = [];
   private creakT = 0;
 
@@ -80,8 +78,6 @@ export class WeakBridge extends Entity {
         }
         if (this.load >= this.creak) this.collapse(v.x);
       }
-    } else {
-      this.brokenT += dt;
     }
     // The icy creek wrecks any vehicle that lands in the ravine.
     for (const e of this.world.query((q) => (q as { isVehicle?: boolean }).isVehicle === true)) {
@@ -95,7 +91,6 @@ export class WeakBridge extends Entity {
     }
     // Plank debris.
     for (const p of this.planks) {
-      p.t += dt;
       if (p.y < this.floorY - 2) {
         p.vy += 700 * dt;
         p.x += p.vx * dt;
@@ -114,7 +109,6 @@ export class WeakBridge extends Entity {
   collapse(atX = this.x + this.len / 2): void {
     if (this.broken) return;
     this.broken = true;
-    this.brokenT = 0;
     if (this.deck) this.world.terrain.remove(this.deck);
     this.deck = null;
     const W = this.world;
@@ -123,7 +117,7 @@ export class WeakBridge extends Entity {
     W.shake(3, 0.35);
     for (let x = this.x + 4; x < this.x + this.len - 4; x += 10) {
       const near = 1 - Math.min(1, Math.abs(x - atX) / this.len);
-      this.planks.push({ x, y: this.y + 1, vx: fxRng.range(-40, 40), vy: fxRng.range(-120, -20) * near, rot: 0, vr: fxRng.range(-8, 8), t: 0 });
+      this.planks.push({ x, y: this.y + 1, vx: fxRng.range(-40, 40), vy: fxRng.range(-120, -20) * near, rot: 0, vr: fxRng.range(-8, 8) });
     }
     W.particles.debris(atX, this.y, 14, [P3.wood, P3.woodD, P3.woodHi, P3.snow], 180);
     W.particles.smokePuffs(atX, this.y, 4, 10, '#e8f0f8', '#b8c8dc');
