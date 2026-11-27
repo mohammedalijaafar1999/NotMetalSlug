@@ -287,4 +287,34 @@ describe('mission 4 mechanics', () => {
     expect(bridge!.progress).toBe(1);
     expect(w.terrain.floorAt(5930, 100, 300)?.y).toBe(180);
   }, 60_000);
+
+  it('a lock-wave truck from behind parks at the left edge instead of running down the screen', () => {
+    // Trucks ram while driving: one entering behind the player must stop as soon as it is in
+    // (its nose at most ~70 px into the view), where it is seen before it can reach you.
+    for (const lock of def.locks ?? []) {
+      for (const wave of lock.waves) {
+        for (const s of wave.spawns) {
+          if (s.type !== 'truck' || (s.props?.facing ?? -1) < 0) continue;
+          expect(s.props?.stopX, `truck from the left in lock ${lock.x}`).toBeDefined();
+          expect(s.props!.stopX - lock.x).toBeLessThanOrEqual(30);
+        }
+      }
+    }
+    const w = makeWorld('m4', { seed: 1, god: true });
+    step(w, 2);
+    w.level.warp(5150);
+    const bots = [new Bot(0)];
+    let stopFront = -1;
+    for (let i = 0; i < 60 * 90 && stopFront < 0; i++) {
+      step(w, 1, bots);
+      const t = w.entities.find((e) => e.type === 'truck' && !e.dead) as (World['entities'][number] & { state: string; bw: number }) | undefined;
+      if (t && t.state !== 'drive') stopFront = t.x + t.bw / 2 - w.camera.x;
+      if (w.level.activeLock?.def.x === 5600 && i % 30 === 0) {
+        for (const e of w.entities) if (e.team === 'enemy' && e.hittable && !e.dead && e.type !== 'truck') e.damage({ amount: 9999, kind: 'explosion', owner: w.players[0] });
+      }
+    }
+    for (let k = 0; k < 2; k++) input.setVirtual(k, null);
+    expect(stopFront).toBeGreaterThan(0);
+    expect(stopFront).toBeLessThanOrEqual(70);
+  }, 60_000);
 });

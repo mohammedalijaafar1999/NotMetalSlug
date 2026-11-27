@@ -18,5 +18,10 @@ Probes (gitignored, restored from /home/user/review-artifacts/review_m34): artif
    docs/CONTENT.md still says 260 / 360 (not my file -> outsideIssues).
 3. [test, FIXED] boss_m4 'mortal dodger' (seed 2, Hard) died after the HP change: bot walked into a live missile landing zone to dodge the claw. Not unfair (1 s to wait for the blast, then cross); bot now never steps into a zone that is about to blast.
 
+4. [major, FIXED] FROST BASTION flak: the side ice fragments clip a standing player's head up to 14 px from their shadow (radius 5 drawn), so the 'gap' between two shadows killed (probe bot died there 2-5x per fight). Shadows now radius 9 (FlakShell.FRAG_SHADOW). Test boss_m3 'flak fragments only hit a player who overlaps one of their landing shadows' (failed before: killed at -16 px).
+5. [minor, FIXED] m4 slip gauntlet: wave-3 truck from behind drove ~95 px into the screen before stopping and ran the player down (mortal bot death). stopX 5626: nose parks <= 62 px in. Test mission_m4 'a lock-wave truck from behind parks at the left edge'.
+6. [checked, OK] m4 hostages: autopilot misses the cages at 2120 (tank section) and 5086 (between containers): scripted human route drops through the catwalk, shoots the cage, climbs out -> reachable (bot limitation).
+7. [checked, OK] mortal bot runs (seeds 1-3): no off-screen-origin enemy shots, no HUD-band shots in m3/m4; deaths mostly bot artefacts (stands still vs jetpacks/gunboats). Canal A pit deaths = bot jumps 50 px early.
+
 ## Gotchas
 - m3 boss deaths of the probe bot are 'crush' by flak IceFrags: the side fragments fly diagonally over the gap between two shadows (the gap between marks is NOT safe). Consider larger shadow radius / steeper fragments.

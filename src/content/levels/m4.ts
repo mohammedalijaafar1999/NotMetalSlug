@@ -394,7 +394,7 @@ locks.push({
     },
     {
       delay: 1,
-      spawns: [at('truck', 5540, { troops: 3, facing: 1 }), at('gunboat', 5900, { facing: -1 }), at('gunboat', 6000, { facing: -1 }), at('paratrooper', 5680, {})],
+      spawns: [at('truck', 5540, { troops: 3, facing: 1, stopX: 5626 }), at('gunboat', 5900, { facing: -1 }), at('gunboat', 6000, { facing: -1 }), at('paratrooper', 5680, {})],
     },
     {
       delay: 1.5,
