@@ -280,10 +280,11 @@ const entities: SpawnSpec[] = [
   at('crate_prop', 2340, { drop: 'fuel' }),
   at('turret', 2400, { kind: 'mg', dir: -1 }),
   at('grenadier', 2470, { behavior: 'guard', facing: -1 }, { y: 416 }),
-  at('barrel', 2426),
-  at('barrel', 2440),
+  at('barrel', 2430, {}, { y: 416 }),
+  at('barrel', 2444, {}, { y: 416 }),
   at('pickup', 2530, { item: 'bomb' }),
-  at('fuel_tank', 2912),
+  at('turret', 2862, { kind: 'flak', dir: -1 }),
+  at('fuel_tank', 2934, {}, { y: S }),
   // After the yard.
   at('hostage', 2964, { mode: 'wander', drop: 'fuel', look: 0 }),
   at('rifleman', 3000, { behavior: 'guard', facing: -1 }),
@@ -295,6 +296,7 @@ const entities: SpawnSpec[] = [
   at('bazooka', 3300, { behavior: 'guard', facing: -1 }),
   at('rifleman', 3390, { behavior: 'guard', facing: -1 }),
   at('rifleman', 3420, { behavior: 'idle', facing: -1 }),
+  at('pickup', 3372, { item: 'bomb' }),
   at('hostage', 3448, { drop: 'C', look: 1 }),
   // The ride, before the jam.
   at('drone', 3812, { kind: 'zap' }, { trigger: 3760 }),
@@ -309,7 +311,8 @@ const entities: SpawnSpec[] = [
   at('rifleman', 4600, { behavior: 'guard', facing: -1 }),
   at('shield_trooper', 4650, { behavior: 'guard', facing: -1 }),
   at('hostage', 4686, { mode: 'caged', drop: 'H', look: 2 }),
-  at('rifleman', 4790, { behavior: 'patrol' }),
+  at('turret', 4800, { kind: 'flak', dir: -1 }),
+  at('rifleman', 4776, { behavior: 'patrol' }),
   at('grenadier', 4830, { behavior: 'guard', facing: -1 }),
   // Frozen lake.
   at('snowmobile', 5010, { facing: -1 }),

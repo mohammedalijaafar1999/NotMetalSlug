@@ -63,6 +63,7 @@ export class CableCar extends Entity {
   private humT = 0;
   private wheel = 0;
   private lampT = 0;
+  private boarded = false;
 
   constructor(props: Record<string, any> = {}) {
     super();
@@ -177,6 +178,8 @@ export class CableCar extends Entity {
         if (riders.some((r) => r.onRoof) && this.toX > this.pos + 1) {
           this.setMode('board');
           this.ding();
+          if (!this.boarded) this.world.floatText('ALL ABOARD!', this.x, this.y - HANG - 14, '#ffe060', 1.4);
+          this.boarded = true;
         }
         break;
       case 'board': {
