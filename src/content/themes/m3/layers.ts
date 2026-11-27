@@ -305,50 +305,66 @@ export function stoneTile(): PixelArt {
   return p;
 }
 
-/** Sheer granite cliff face (tileable 64x64): vertical fractures, lit buttresses, snowy ledge lines
- *  with icicles. Painted over the ground mass where the level climbs a cliff (decor 'cliff'). */
+/** Sheer granite cliff face (tileable 128x112): lit buttresses with slanting fractures, broken
+ *  snow-dusted ledges (staggered, never a full-width line) with icicles, ice streaks.
+ *  Painted over the ground mass where the level climbs a cliff (decor 'cliff'). */
 export function cliffTile(): PixelArt {
-  const W = 64;
-  const H = 64;
+  const W = 128;
+  const H = 112;
   const p = new PixelArt(W, H);
   const r = new Rng(907);
-  const bandAt = (x: number) => Math.sin((x / W) * TAU * 2 + 0.6) + Math.sin((x / W) * TAU * 5 + 1.9) * 0.35;
-  // Buttresses: broad vertical bands, lit on their left edge.
-  for (let x = 0; x < W; x++) {
-    const band = bandAt(x);
-    for (let y = 0; y < H; y++) {
+  const wrapX = (x: number) => ((Math.round(x) % W) + W) % W;
+  const wrapY = (y: number) => ((Math.round(y) % H) + H) % H;
+  // Buttresses: broad vertical bands that wander a little with height, lit on their left edge.
+  const bandAt = (x: number, y: number) =>
+    Math.sin((x / W) * TAU * 3 + 0.6 + Math.sin((y / H) * TAU) * 0.5) + Math.sin((x / W) * TAU * 7 + 1.9 + Math.sin((y / H) * TAU * 2) * 0.4) * 0.35;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const band = bandAt(x, y);
+      const prev = bandAt(x - 1, y);
       let c = band > 0.55 ? '#7f90aa' : band > -0.2 ? '#6c7c96' : '#5c6b86';
-      if (hash01(x * 7 + y * 131) > 0.93) c = band > 0 ? '#8c9cb4' : '#52607a';
+      if (prev <= 0.55 && band > 0.55) c = '#98a8c0';
+      else if (prev > -0.2 && band <= -0.2) c = '#4a5872';
+      else if (hash01(x * 7 + y * 131) > 0.94) c = band > 0 ? '#8c9cb4' : '#52607a';
       p.px(x, y, c);
     }
-    const prev = bandAt(x - 1);
-    if (prev <= 0.55 && band > 0.55) for (let y = 0; y < H; y++) p.px(x, y, '#98a8c0');
-    if (prev > -0.2 && band <= -0.2) for (let y = 0; y < H; y++) p.px(x, y, '#4a5872');
   }
-  // Vertical fractures (random walks, wrapping).
-  for (let k = 0; k < 5; k++) {
+  // Slanting fractures (random walks, wrapping both ways).
+  for (let k = 0; k < 9; k++) {
     let x = r.int(0, W - 1);
     const y0 = r.int(0, H - 1);
-    const len = r.int(18, 40);
+    const len = r.int(14, 46);
+    const lean = r.chance(0.5) ? 1 : -1;
     for (let i = 0; i < len; i++) {
-      const y = (y0 + i) % H;
-      p.px(((x % W) + W) % W, y, '#3e4a62');
-      p.px((((x + 1) % W) + W) % W, y, '#8494ae');
-      if (r.chance(0.2)) x += r.chance(0.5) ? 1 : -1;
+      p.px(wrapX(x), wrapY(y0 + i), '#3e4a62');
+      p.px(wrapX(x + 1), wrapY(y0 + i), '#8494ae');
+      if (r.chance(0.28)) x += r.chance(0.75) ? lean : -lean;
     }
   }
-  // Two snowy ledge lines with icicles.
-  for (const ly of [14, 46]) {
-    for (let x = 0; x < W; x++) {
-      const yy = ly + Math.round(Math.sin((x / W) * TAU * 3 + ly) * 1.5);
-      p.px(x, yy - 1, '#c8d6e6');
-      p.px(x, yy, '#eef4fa');
-      p.px(x, yy + 1, '#3e4a62');
-      if (hash01(x * 17 + ly) > 0.8) {
-        const len = 1 + Math.floor(hash01(x * 5 + ly) * 4);
-        for (let i = 0; i < len; i++) p.px(x, yy + 2 + i, i === len - 1 ? '#e8f6ff' : '#b4def2');
+  // Broken ledges: short snowy shelves at staggered heights, icicles hanging under them.
+  for (let k = 0; k < 7; k++) {
+    const lx = r.int(0, W - 1);
+    const ly = 8 + k * 15 + r.int(-3, 3);
+    const len = r.int(14, 40);
+    for (let i = 0; i < len; i++) {
+      const x = wrapX(lx + i);
+      const edge = Math.min(i, len - 1 - i);
+      const yy = wrapY(ly + Math.round(Math.sin(i * 0.3 + k) * 0.8));
+      if (edge > 1) p.px(x, wrapY(yy - 1), '#c8d6e6');
+      p.px(x, yy, edge > 0 ? '#eef4fa' : '#c8d6e6');
+      p.px(x, wrapY(yy + 1), '#3e4a62');
+      if (edge > 2 && hash01(x * 17 + ly) > 0.72) {
+        const n = 1 + Math.floor(hash01(x * 5 + ly) * 5);
+        for (let j = 0; j < n; j++) p.px(x, wrapY(yy + 2 + j), j === n - 1 ? '#e8f6ff' : '#b4def2');
       }
     }
+  }
+  // Frozen seepage streaks.
+  for (let k = 0; k < 3; k++) {
+    const sx = r.int(0, W - 1);
+    const sy = r.int(0, H - 1);
+    const n = r.int(10, 26);
+    for (let j = 0; j < n; j++) p.px(wrapX(sx + (j % 9 === 0 ? 1 : 0)), wrapY(sy + j), j % 3 === 0 ? '#c4e2f4' : '#9ccbe6');
   }
   return p;
 }

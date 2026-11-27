@@ -32,29 +32,31 @@ function drawGondola(p: PixelArt, lit: number, spin: number): void {
   const cx = SW / 2;
   const L = 1;
   const R = SW - 1;
-  // ---- grip trolley on the cable (cable row = RY - HANG = 8)
+  // ---- grip trolley riding ON the cable (cable row = RY - HANG): carriage plate, two grooved
+  // wheels sitting on the rope, a grip clamp under it.
   const cy = RY - HANG;
-  shadedBox(p, cx - 11, cy - 3, 22, 8, P3.steelM, P3.steel, P3.steelDD);
-  p.rect(cx - 9, cy + 1, 18, 1, P3.steelDD);
+  shadedBox(p, cx - 10, cy - 8, 20, 5, P3.steelM, P3.steel, P3.steelDD);
+  p.rect(cx - 2, cy - 10, 4, 2, P3.olD);
+  p.px(cx - 2, cy - 10, P3.ol);
   for (const wx of [cx - 6, cx + 6]) {
-    p.circle(wx, cy - 3, 3.4, P3.steelDD);
-    p.circle(wx, cy - 3, 2.4, P3.steel);
-    // Spokes alternate to show the wheel turning.
+    p.circle(wx, cy - 4, 3.6, P3.steelDD);
+    p.circle(wx, cy - 4, 2.6, P3.steel);
+    p.circle(wx, cy - 4, 1.2, P3.steelM);
+    // Spoke glints alternate to show the wheel turning.
     if (spin) {
-      p.px(wx - 1, cy - 4, P3.steelHi);
-      p.px(wx + 1, cy - 2, P3.steelD);
+      p.px(wx - 2, cy - 5, P3.steelHi);
+      p.px(wx + 1, cy - 3, P3.steelD);
     } else {
-      p.px(wx + 1, cy - 4, P3.steelHi);
+      p.px(wx + 1, cy - 6, P3.steelHi);
       p.px(wx - 1, cy - 2, P3.steelD);
     }
-    p.px(wx, cy - 3, P3.steelDD);
   }
-  p.rect(cx - 2, cy - 7, 4, 3, P3.olD);
-  p.px(cx - 2, cy - 7, P3.ol);
+  // Grip clamp around the rope.
+  shadedBox(p, cx - 4, cy + 1, 8, 5, P3.steelM, P3.steel, P3.steelDD);
+  p.rect(cx - 4, cy + 3, 8, 1, P3.steelDD);
   // ---- hanger arm (slight dog-leg) down to the roof
-  for (let y = cy + 5; y < RY - 3; y++) {
-    const k = y < cy + 14 ? 0 : y < cy + 18 ? 1 : 2;
-    const ax = cx - 2 + (k === 2 ? 0 : 0);
+  for (let y = cy + 6; y < RY - 3; y++) {
+    const ax = cx - 2;
     p.rect(ax, y, 4, 1, P3.steel);
     p.px(ax, y, P3.steelHi);
     p.px(ax + 3, y, P3.steelD);
