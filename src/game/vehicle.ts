@@ -346,6 +346,7 @@ export abstract class Vehicle extends Actor {
     if (this.flying) {
       const top = cam.y + this.h + 14;
       const bottom = cam.y + VIEW_H - 6;
+      const from = this.y;
       if (this.y < top) {
         this.y = top;
         if (this.vy < 0) this.vy = 0;
@@ -354,6 +355,9 @@ export abstract class Vehicle extends Actor {
         this.y = bottom;
         if (this.vy > 0) this.vy = 0;
       }
+      // The top or bottom edge (the view rising or diving past a hull) pushed us into terrain:
+      // slide clear over or under it, as for a sideways shove (see shovedByScreen).
+      if (this.y !== from && this.bodyBlocked()) this.slideClear();
     }
   }
 

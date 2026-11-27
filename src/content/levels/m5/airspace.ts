@@ -104,9 +104,19 @@ export class Airspace extends Entity {
     const fy = Airspace.freeY(v);
     if (fy === null || fy === v.y) return;
     const d = fy - v.y;
-    v.y += Math.max(-PUSH, Math.min(PUSH, d));
+    const ny = v.y + Math.max(-PUSH, Math.min(PUSH, d));
+    // Merely out of the flying band (the view edge squeezing it against a hull): never nudge a
+    // clear gyro into the hull, its own view clamp pops it clear (Vehicle.clampToView).
+    if (!v.bodyBlocked() && v.bodyBlocked(v.x, ny)) return;
+    v.y = ny;
     if (d < 0 && v.vy > 0) v.vy = 0;
     if (d > 0 && v.vy < 0) v.vy = 0;
+    // Nudged up off a floor inside a hull: airborne, or it would settle straight back onto it.
+    if (d < 0 && v.onGround) {
+      v.onGround = false;
+      v.groundSurface = null;
+      v.groundSolid = null;
+    }
   }
 
   /** Loose pickups falling with nothing below them get a parachute (see header). */
