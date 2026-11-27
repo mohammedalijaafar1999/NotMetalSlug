@@ -1,7 +1,6 @@
 // Front-end / game-flow regression tests (review pass): input layouts and remaps, focus loss,
 // drop-in co-op, the ending squad, tally rows and mission presentation data.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import './helpers';
 import { app } from '../src/app';
 import { SceneManager } from '../src/engine/scene';
 import { input, InputManager, DEFAULT_BINDINGS, type ActionMask } from '../src/engine/input';
@@ -16,7 +15,11 @@ import { characters } from '../src/game/characters';
 import { missionInfo, countHostages } from '../src/content/ui/missions';
 import { getLevel } from '../src/game/level';
 import { RESPAWN_INVULN } from '../src/game/player';
-import { joinKey } from '../src/game/hud';
+import { joinKey, vehicleRow, PANEL_ROW_W } from '../src/game/hud';
+import { entityTypes } from '../src/game/registry';
+import { textWidth } from '../src/engine/font';
+import { makeWorld } from './helpers';
+import type { Vehicle } from '../src/game/vehicle';
 import { layoutLabel, sharedKeysHint } from '../src/scenes/ui';
 import { KeyRemapScene, assignKey } from '../src/scenes/options';
 
@@ -461,5 +464,30 @@ describe('name entry', () => {
     expect(ne.done).toBe(true);
     expect(getHighScores().map((h) => h.score)).toContain(20000);
     resetHighScores();
+  });
+});
+
+describe('HUD vehicle row', () => {
+  it('every vehicle name fits in full next to a usable armor bar and the ammo count', () => {
+    const w = makeWorld('sandbox');
+    const names: string[] = [];
+    for (const t of entityTypes('vehicle')) {
+      const v = w.spawn(t.type, 200, 100) as Vehicle | null;
+      if (!v || !(v as any).isVehicle) continue;
+      names.push(v.vehicleName);
+      for (const ammo of [true, false]) {
+        const row = vehicleRow(v.vehicleName, PANEL_ROW_W, ammo);
+        expect(row.name).toBe(v.vehicleName);
+        // A gap between the name and the bar, and between the bar and the ammo column.
+        expect(row.barX).toBeGreaterThanOrEqual(textWidth(v.vehicleName) + 4);
+        expect(row.barW).toBeGreaterThanOrEqual(16);
+        expect(row.barX + row.barW + 1 + (ammo ? textWidth('99') + 4 : 0)).toBeLessThanOrEqual(PANEL_ROW_W);
+      }
+    }
+    expect(names).toContain('DRAGONFLY');
+    // A made-up name too long for the row is shortened rather than drawn over the bar.
+    const long = vehicleRow('SUPERLONGVEHICLENAME', PANEL_ROW_W, true);
+    expect(long.barW).toBeGreaterThanOrEqual(16);
+    expect(textWidth(long.name) + 4).toBeLessThanOrEqual(long.barX);
   });
 });

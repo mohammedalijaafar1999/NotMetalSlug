@@ -49,6 +49,24 @@ export function weaponShortName(id: string, name: string): string {
     .join('.') + '.';
 }
 
+/** Inner width of a player panel's second row (the panel is 126 px; the portrait takes 23). */
+export const PANEL_ROW_W = 99;
+
+/**
+ * Vehicle row of a player panel: the name at full width (DRAGONFLY is 53 px), then the armor
+ * bar, then the secondary ammo count (at most 99, right-aligned). The bar starts at a fixed
+ * column for short names and moves right for long ones; only a name that would squeeze the bar
+ * under 16 px is shortened.
+ */
+export function vehicleRow(name: string, rowW: number, hasAmmo: boolean): { name: string; barX: number; barW: number } {
+  const ammoW = hasAmmo ? textWidth('99') + 5 : 0;
+  const minBar = 16;
+  let nm = name;
+  while (nm.length > 1 && textWidth(nm) + 5 + minBar + 1 + ammoW > rowW) nm = nm.slice(0, -1);
+  const barX = Math.max(50, textWidth(nm) + 5);
+  return { name: nm, barX, barW: rowW - barX - 1 - ammoW };
+}
+
 /** Continue-countdown summary for a session. */
 export function continueState(session: GameSession, timers: number[]): { allOut: boolean; counting: boolean; time: number } {
   const joined = session.players.filter((p) => p.joined);
@@ -214,12 +232,13 @@ export class Hud {
     const y2 = 14;
     const v = p.vehicle;
     const inner = L ? px + 23 : px + 4;
-    const innerW = pw - 27;
+    const innerW = PANEL_ROW_W;
     if (v) {
       const frac = Math.max(0, v.hp / Math.max(1, v.maxHp));
-      drawText(g, v.vehicleName.slice(0, 8), inner, y2, { color: C.blue, outline: C.out });
-      const bx = inner + 50;
-      const bw = innerW - 52 - (v.secondaryAmmo >= 0 ? 22 : 0);
+      const row = vehicleRow(v.vehicleName, innerW, v.secondaryAmmo >= 0);
+      drawText(g, row.name, inner, y2, { color: C.blue, outline: C.out });
+      const bx = inner + row.barX;
+      const bw = row.barW;
       rect(g, bx - 1, y2, bw + 2, 7, C.out);
       rect(g, bx, y2 + 1, bw, 5, '#3a2030');
       const fc = frac > 0.5 ? '#40e060' : frac > 0.25 ? C.gold : blink(this.time, 6) ? C.red : '#a02020';
