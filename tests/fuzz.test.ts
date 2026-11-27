@@ -59,9 +59,12 @@ describe('chaos fuzz', () => {
   for (const l of missionLevels) {
     it(
       `${l.id}: random sticky inputs + autopilot keep every invariant`,
-      () => {
+      async () => {
         const all: string[] = [];
         for (const c of casesFor(l.id, l.mission)) {
+          // Let the worker answer vitest's RPC between cases: a heavy run would otherwise block
+          // it for minutes and fail with "Timeout calling onTaskUpdate" although every case passed.
+          await new Promise((res) => setTimeout(res, 0));
           const r = runFuzz(c);
           if (process.env.FUZZ_VERBOSE)
             console.log(
