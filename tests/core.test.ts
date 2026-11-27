@@ -173,6 +173,40 @@ describe('respawns', () => {
   });
 });
 
+describe('respawn drop points', () => {
+  it('keep clear of the lip of a pit, so steering during the drop does not fall in', () => {
+    const w = makeWorld(
+      level('core_respawn_lip', {
+        ground: [
+          [
+            [0, 180],
+            [300, 180],
+          ],
+          [
+            [360, 180],
+            [3000, 180],
+          ],
+        ],
+      }),
+      { god: false },
+    );
+    settle(w);
+    const p = w.players[0];
+    const lives = p.profile.lives;
+    p.respawn(296);
+    expect(p.x).toBeLessThanOrEqual(300 - 24);
+    // Hold toward the pit for the whole drop.
+    while (p.state === 'respawn' && w.time < 10) {
+      input.setVirtual(0, { right: true });
+      step(w, 1);
+    }
+    input.setVirtual(0, null);
+    expect(p.state).toBe('play');
+    expect(p.onGround).toBe(true);
+    expect(p.profile.lives).toBe(lives);
+  });
+});
+
 describe('collision feel', () => {
   it('stepping off the edge of a box and stopping does not leave the body inside it', () => {
     const w = makeWorld(level('core_box_edge', { solids: [{ x: 300, y: 150, w: 40, h: 30 }], start: { x: 320, y: 150 } }), { god: true });

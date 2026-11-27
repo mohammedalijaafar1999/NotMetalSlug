@@ -11,6 +11,7 @@ import { Player } from '../src/game/player';
 import { Entity, type Actor } from '../src/game/entity';
 import type { World } from '../src/game/world';
 import type { Vehicle } from '../src/game/vehicle';
+import { getEntityType, type SpawnSpec } from '../src/game/registry';
 
 /** Max frames an actor may overlap solid terrain before it counts as stuck. */
 const STUCK_FRAMES = 12;
@@ -120,12 +121,14 @@ function describeEntity(e: Entity): string {
 }
 
 /** Why an actor's body overlaps solid terrain right now (null = it does not). */
-function insideTerrain(w: World, a: Actor, groundTol = 3): string | null {
+function insideTerrain(w: World, a: Actor, groundTol = 3, ignoreHazards = false): string | null {
   const T = w.terrain;
   if (a.w < 6 || a.h < 6) return null;
   const r = { x: a.x - a.w / 2 + 2, y: a.y - a.h + 3, w: a.w - 4, h: a.h - 5 };
   const s = T.solidOverlap(r, a);
-  if (s) return `solid#${s.id}(${s.x},${s.y} ${s.w}x${s.h}${s.owner ? ' owner=' + s.owner.type : ''}${s.dynamic ? ' dynamic' : ''})`;
+  // An invulnerable body is not crushed: a press head resting on it until it lifts is expected.
+  const crusher = s && ignoreHazards && s.dynamic && s.owner && getEntityType(s.owner.type)?.category === 'hazard';
+  if (s && !crusher) return `solid#${s.id}(${s.x},${s.y} ${s.w}x${s.h}${s.owner ? ' owner=' + s.owner.type : ''}${s.dynamic ? ' dynamic' : ''})`;
   const gy = T.groundTopAt(a.x);
   if (a.y > gy + groundTol) return `ground (feet ${fmt(a.y)} below ground top ${fmt(gy)})`;
   return null;
@@ -155,7 +158,15 @@ function joinPlayer(w: World, i: 0 | 1, god: boolean): Player {
 
 /** Warp like the debug API, but put players safely above the floor at their new x. */
 function warpTo(w: World, x: number): void {
+  // The debug warp drops every spawn whose trigger is already in view, set pieces included (cable
+  // car, pontoons, lift...): without them the section is impassable. Keep those still ahead.
+  const before: SpawnSpec[] = [...((w.level as any).pendingSpawns as SpawnSpec[])];
   w.level.warp(x);
+  const after = new Set((w.level as any).pendingSpawns as SpawnSpec[]);
+  for (const s of before) {
+    const cat = getEntityType(s.type)?.category;
+    if (!after.has(s) && (cat === 'misc' || cat === 'hazard') && s.x >= x - 40) w.spawn(s.type, s.x, s.y, s.props ?? {});
+  }
   const cam = w.camera;
   const px = x + 60;
   const fy = w.terrain.topFloorAt(px) ?? w.level.def.height - 40;
@@ -236,6 +247,8 @@ export function runFuzz(c: FuzzCase): FuzzReport {
     for (const d of drivers) if (w.session.players[d.index].joined) d.update(w);
     input.poll(DT);
     const allOut = w.players.length > 0 && w.players.every((p) => p.state === 'out');
+    // Frozen frames (continue prompt, hit-stop) do not run the cleanup pass.
+    const frozen = allOut || (w as any).hitstopTime > 0;
     try {
       // The scene freezes the world while everybody is at the continue prompt.
       if (!allOut) w.update(DT);
@@ -265,7 +278,7 @@ export function runFuzz(c: FuzzCase): FuzzReport {
       }
       if (e.dead) {
         nowDead.add(e.id);
-        if (prevDead.has(e.id)) report('deadlinger:' + e.type, `dead entity still in world.entities: ${describeEntity(e)}`);
+        if (prevDead.has(e.id) && !frozen) report('deadlinger:' + e.type, `dead entity still in world.entities: ${describeEntity(e)}`);
       }
       const dying = (e as any).dying === true || (e as any).destroyed === true;
       if (dying && !e.dead) {
@@ -310,7 +323,7 @@ export function runFuzz(c: FuzzCase): FuzzReport {
       if (p.state === 'play' && !p.hittable) report('phit' + p.index, `${tag} is in play but not hittable (god=${p.godMode})`);
       // Inside terrain (on foot, alive).
       if (p.state === 'play' || p.state === 'respawn' || p.state === 'victory') {
-        const why = insideTerrain(w, p);
+        const why = insideTerrain(w, p, 3, p.godMode || p.invuln > 0);
         const n = why ? (stuckFrames.get(p.id) ?? 0) + 1 : 0;
         stuckFrames.set(p.id, n);
         if (n > STUCK_FRAMES) report('pstuck' + p.index + ':' + why!.replace(/[\d.]+/g, '#'), `${tag} inside terrain for ${n} frames at (${fmt(p.x)},${fmt(p.y)}) state=${p.state}: ${why}`);

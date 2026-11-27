@@ -27,6 +27,8 @@ export const RESPAWN_INVULN = 2.6;
 export const MAX_GRENADES_OUT = 2;
 /** Highest ledge (px) the scrolling screen edge lifts a player onto instead of burying them in it. */
 export const SCREEN_PUSH_CLIMB = 48;
+/** Floor wanted on both sides of a respawn drop point (px): the drop is steerable. */
+export const SAFE_DROP_MARGIN = 24;
 /** Aim rotation speed (rad/s) when not sweeping a heavy weapon. */
 export const AIM_RATE = 15;
 /** Knife animation length (s) and damage per slash (x CharacterDef.meleeMul). */
@@ -224,13 +226,20 @@ export class Player extends Actor {
     const T = this.world.terrain;
     const cam = this.world.camera;
     const dropY = cam.y - 4;
-    for (let d = 0; d <= VIEW_W; d += 8) {
-      for (const s of d === 0 ? [0] : [d, -d]) {
-        const tx = x + s;
-        if (tx < cam.x + 16 || tx > cam.x + VIEW_W - 16) continue;
-        if (T.groundTopAt(tx) < dropY || T.solidOverlap({ x: tx - 6, y: dropY - 26, w: 12, h: 26 })) continue;
-        const fy = T.floorAt(tx, dropY, cam.y + 260);
-        if (fy && !T.waterAt(tx, fy.y - 2)?.deadly) return tx;
+    const lands = (tx: number): boolean => {
+      if (T.groundTopAt(tx) < dropY || T.solidOverlap({ x: tx - 6, y: dropY - 26, w: 12, h: 26 })) return false;
+      const fy = T.floorAt(tx, dropY, cam.y + 260);
+      return !!fy && !T.waterAt(tx, fy.y - 2)?.deadly;
+    };
+    // First choice: floor on both sides too, so steering during the drop cannot carry the player
+    // over the lip of a pit; then any floor at all.
+    for (const margin of [SAFE_DROP_MARGIN, 0]) {
+      for (let d = 0; d <= VIEW_W; d += 8) {
+        for (const s of d === 0 ? [0] : [d, -d]) {
+          const tx = x + s;
+          if (tx < cam.x + 16 || tx > cam.x + VIEW_W - 16) continue;
+          if (lands(tx) && (!margin || (lands(tx - margin) && lands(tx + margin)))) return tx;
+        }
       }
     }
     return x;
