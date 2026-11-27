@@ -85,6 +85,8 @@ export function joinKey(): string {
 /** Player i's START: START on the gamepad that drives them, else their (first) START key. */
 export function startKeyLabel(i: 0 | 1): string {
   if (input.hasPadFor(i)) return 'START';
+  // The touch controls' FIRE continues too (their II button pauses).
+  if (i === 0 && input.p1Device === 'touch') return 'FIRE';
   const ks = (i === 0 ? input.bindings.p1 : input.bindings.p2).start ?? [];
   const k = ks.find((c) => !c.startsWith('Numpad')) ?? ks[0];
   return k ? keyLabel(k) : 'START';
