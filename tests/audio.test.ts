@@ -268,3 +268,20 @@ describe('engine without WebAudio (Node)', () => {
     expect(await audio.renderSong('title', 1)).toBeNull();
   });
 });
+
+describe('music ducking', () => {
+  it('nests: the tab becoming visible again does not un-duck an open pause menu', () => {
+    expect(audio.isDucked).toBe(false);
+    audio.duck(true); // pause menu opens
+    audio.duck(true); // tab hidden
+    audio.duck(false); // tab visible again
+    expect(audio.isDucked).toBe(true);
+    audio.duck(false); // pause menu closes
+    expect(audio.isDucked).toBe(false);
+    audio.duck(false); // a stray release never goes below zero
+    audio.duck(true);
+    expect(audio.isDucked).toBe(true);
+    audio.duck(false);
+    expect(audio.isDucked).toBe(false);
+  });
+});

@@ -4,7 +4,7 @@
 
 import { PixelArt } from '../engine/pixelart';
 import { VIEW_H, VIEW_W } from '../engine/renderer';
-import { Terrain } from './terrain';
+import { Terrain, type Surface } from './terrain';
 import type { DecorDef, LevelDef } from './level';
 import { bandedGradient, brickTile, cloudLayer, darken, dirtTile, grassEdge, hillsLayer, mountainLayer } from '../art/textures';
 
@@ -74,6 +74,16 @@ export function themeIds(): string[] {
 
 const TILE = 256;
 const MAX_TILES = 36;
+const MAX_PLATFORMS = 64;
+
+interface BakedPlatform {
+  /** Geometry the bake was made for. */
+  key: string;
+  /** Baked art; null = the platform draws nothing; undefined = not cacheable (draw live). */
+  c: HTMLCanvasElement | null | undefined;
+  x: number;
+  y: number;
+}
 
 function toCanvas(a: PixelArt | HTMLCanvasElement): HTMLCanvasElement {
   return a instanceof PixelArt ? a.toCanvas() : a;
@@ -92,6 +102,7 @@ export class ThemeRenderer {
   private solidEdge: PixelArt | null = null;
   private skyCanvas: HTMLCanvasElement | null = null;
   private layerCanvases: (HTMLCanvasElement | null)[] = [];
+  private platformCache = new Map<Surface, BakedPlatform>();
   private decorBack: DecorDef[];
   private decorFront: DecorDef[];
 
@@ -280,12 +291,82 @@ export class ThemeRenderer {
         }
       }
     }
-    // Platforms.
+    // Platforms (static ones are baked once: theme platform art is drawn pixel by pixel, up to
+    // ~900 fillRect calls a frame for a screen of scaffolds).
     for (const p of this.terrain.platforms()) {
       if (p.x2 < camX - 8 || p.x1 > camX + VIEW_W + 8 || p.owner) continue;
-      (this.def.platform ?? defaultPlatform)(g, p.x1, p.y1, p.x2, p.y2, p.material);
+      const baked = p.dynamic ? null : this.bakedPlatform(p);
+      if (baked) {
+        if (baked.c) g.drawImage(baked.c, baked.x, baked.y);
+      } else (this.def.platform ?? defaultPlatform)(g, p.x1, p.y1, p.x2, p.y2, p.material);
     }
     for (const d of this.decorBack) if (!d.props?.behindTerrain) this.drawDecor(g, d, camX, time);
+  }
+
+  /**
+   * A static platform rendered once into a tight canvas. The theme's platform function draws in
+   * world space and has no time input, so its output never changes. It is drawn into a padded
+   * scratch canvas and cropped to the pixels it touched. Returns null (draw live every frame)
+   * when the art might not fit the scratch area or the canvas can't be read back.
+   */
+  private bakedPlatform(p: Surface): BakedPlatform | null {
+    const key = `${p.x1},${p.y1},${p.x2},${p.y2},${p.material}`;
+    const hit = this.platformCache.get(p);
+    if (hit && hit.key === key) return hit.c === undefined ? null : hit;
+    let baked: BakedPlatform = { key, c: undefined, x: 0, y: 0 };
+    try {
+      baked = this.bakePlatform(p, key) ?? baked;
+    } catch {
+      /* draw live */
+    }
+    this.platformCache.set(p, baked);
+    if (this.platformCache.size > MAX_PLATFORMS) this.platformCache.delete(this.platformCache.keys().next().value!);
+    return baked.c === undefined ? null : baked;
+  }
+
+  private bakePlatform(p: Surface, key: string): BakedPlatform | null {
+    if (typeof document === 'undefined') return null;
+    const PAD_X = 24;
+    const UP = 64;
+    const DOWN = 200;
+    const x0 = Math.floor(Math.min(p.x1, p.x2)) - PAD_X;
+    const top = Math.floor(Math.min(p.y1, p.y2)) - UP;
+    const w = Math.ceil(Math.abs(p.x2 - p.x1)) + PAD_X * 2;
+    const h = Math.ceil(Math.abs(p.y2 - p.y1)) + UP + DOWN;
+    const scratch = document.createElement('canvas');
+    scratch.width = w;
+    scratch.height = h;
+    const ctx = scratch.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return null;
+    ctx.setTransform(1, 0, 0, 1, -x0, -top);
+    (this.def.platform ?? defaultPlatform)(ctx, p.x1, p.y1, p.x2, p.y2, p.material);
+    const img = ctx.getImageData(0, 0, w, h);
+    if (!img?.data || img.data.length < w * h * 4) return null;
+    const a = img.data;
+    let minX = w;
+    let minY = h;
+    let maxX = -1;
+    let maxY = -1;
+    for (let y = 0; y < h; y++) {
+      const row = y * w * 4 + 3;
+      for (let x = 0; x < w; x++) {
+        if (a[row + x * 4] === 0) continue;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+    if (maxX < 0) return { key, c: null, x: 0, y: 0 }; // draws nothing (e.g. 'hidden' styles)
+    // Art that reaches the scratch border may be cut off: keep drawing it live.
+    if (minX === 0 || minY === 0 || maxX === w - 1 || maxY === h - 1) return null;
+    const out = document.createElement('canvas');
+    out.width = maxX - minX + 1;
+    out.height = maxY - minY + 1;
+    const octx = out.getContext('2d');
+    if (!octx) return null;
+    octx.drawImage(scratch, minX, minY, out.width, out.height, 0, 0, out.width, out.height);
+    return { key, c: out, x: x0 + minX, y: top + minY };
   }
 
   private drawDecor(g: CanvasRenderingContext2D, d: DecorDef, camX: number, time: number): void {
