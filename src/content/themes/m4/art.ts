@@ -623,8 +623,10 @@ function columnY(x: number, xa: number, xb: number, y1: number, y2: number): num
   return Math.round(y1 + (y2 - y1) * t);
 }
 
-/** Platform styles: 'pier' (planks on pilings), 'catwalk'/'metal' (steel grating), default boards. */
+/** Platform styles: 'pier' (planks on pilings), 'catwalk'/'metal' (steel grating), 'hidden', default boards. */
 export function m4Platform(g: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, style: string): void {
+  // 'hidden': a ledge whose look comes from decor (container tops).
+  if (style === 'hidden') return;
   const xa = Math.round(x1);
   const xb = Math.round(x2);
   if (style === 'catwalk' || style === 'metal') {

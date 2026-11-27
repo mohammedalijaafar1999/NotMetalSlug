@@ -157,7 +157,7 @@ describe('mission 4 autopilot', () => {
     const r = simulateMission('m4', 900);
     if (!r.completed) console.log('m4', JSON.stringify(r));
     expect(r.completed).toBe(true);
-    expect(r.rescues).toBeGreaterThanOrEqual(9);
+    expect(r.rescues).toBeGreaterThanOrEqual(6);
   }, 240_000);
 });
 

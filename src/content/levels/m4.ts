@@ -4,8 +4,8 @@
 //   0     Waterfront promenade: drop in under the RUSTWATER sign, soldiers warming up at a burning
 //         drum, a sleeper, the first hostage (H). Gentle ramps.
 //   860   Canal A on three bobbing pontoons - a frogman lurks (signature enemy introduced).
-//   1200  LOCK 1 "canal ambush": frogmen burst out of canal B, troops from the left and the far bank,
-//         an officer rallies them, a jetpack and paratroopers. Cross canal B on pontoons.
+//   1200  LOCK 1 "canal ambush": frogmen lurk in canal B while troops come from the left and the far
+//         bank, an officer rallies them, a jetpack, paratroopers, a bazooka. Cross canal B on pontoons.
 //   1640  BULLDOG tank parked by the warehouses: truck, light tanks, a cannon turret on a container
 //         stack, a window sniper, bazookas - LOCK 2 "warehouse yard" (truck, tank + jetpacks, flamers +
 //         shield + officer + paratroopers).
@@ -74,6 +74,12 @@ function container(x: number, y: number, w: number, h: number, c: string, opts: 
   back('container', x + w / 2, y + h, { w, h, c, doors: opts.doors ?? 'none', mark: opts.mark, seed: x });
 }
 
+/** Container standing at the back of the street: decor skin + a hidden one-way ledge on its top. */
+function ledgeStack(x: number, y: number, w: number, h: number, c: string, opts: { doors?: string; mark?: string } = {}): void {
+  platforms.push({ x, y, w, style: 'hidden' });
+  back('container', x + w / 2, y + h, { w, h, c, doors: opts.doors ?? 'none', mark: opts.mark, seed: x });
+}
+
 /** Background container stack (decor only, standing on the street). */
 function stack(x: number, cols: string[], w = 64): void {
   cols.forEach((c, i) => far('container', x + (i % 2 ? 6 : 0), G - i * 30, { w, h: 30, c, doors: i % 2 ? 'left' : 'right', seed: x + i }));
@@ -111,6 +117,8 @@ spawn('crate_prop', 664, { drop: 'S' });
 spawn('barrel', 728);
 spawn('rifleman', 790, { behavior: 'guard', facing: -1 });
 spawn('m4_harbor', 0);
+// Rain puddles on the street (shallow water: splashy, slightly slowing).
+water.push({ x: 206, y: 177, w: 46, h: 3 });
 
 // ------------------------------------------------------------------ S1 canal A + lock 1 (860-1640)
 
@@ -134,16 +142,19 @@ canal(1362, 160, [
   [1406, 48],
   [1474, 48],
 ]);
+// Frogmen lurk in canal B through the ambush (ambient: they never hold up a wave).
+spawn('frogman', 1420, { range: 60 }, undefined, 1520);
+spawn('frogman', 1490, {}, undefined, 1560);
 locks.push({
   x: 1200,
   trigger: 1160,
   waves: [
     {
       spawns: [
-        at('frogman', 1420, { range: 28 }),
-        at('frogman', 1490, { range: 28 }),
         at('rifleman', 1206, { behavior: 'charge' }),
         at('rifleman', 1226, { behavior: 'charge' }),
+        at('rifleman', 1540, { behavior: 'guard', facing: -1 }),
+        at('grenadier', 1566, { behavior: 'guard', facing: -1 }),
       ],
     },
     {
@@ -158,11 +169,10 @@ locks.push({
     {
       delay: 1,
       spawns: [
-        at('frogman', 1400, { range: 28 }),
-        at('frogman', 1500, { range: 28 }),
-        at('grenadier', 1566, { behavior: 'guard', facing: -1 }),
         at('paratrooper', 1290, {}),
         at('paratrooper', 1240, {}),
+        at('shield_trooper', 1210, { behavior: 'charge' }),
+        at('bazooka', 1560, { behavior: 'guard', facing: -1 }),
       ],
     },
   ],
@@ -222,9 +232,11 @@ back('lamp', 3150);
 back('wreck', 3300);
 // Loading dock, a container stack with a cannon turret, a window balcony with a sniper.
 solids.push({ x: 1900, y: 164, w: 68, h: 16 });
-container(2180, 148, 64, 32, 'blue', { doors: 'left', mark: 'RLX' });
-container(2244, 116, 96, 64, 'red', { mark: 'OKM' });
-container(2340, 148, 64, 32, 'green', { doors: 'right' });
+// A container stack along the back of the street (the tank rolls past in front; its tops are
+// one-way ledges you can jump up to - the cannon turret sits on top).
+ledgeStack(2180, 148, 64, 32, 'blue', { doors: 'left', mark: 'RLX' });
+ledgeStack(2244, 116, 96, 64, 'red', { mark: 'OKM' });
+ledgeStack(2340, 148, 64, 32, 'green', { doors: 'right' });
 platforms.push({ x: 2730, y: 128, w: 28, style: 'catwalk' });
 spawn('tank', 1640, { ammo: 30 });
 spawn('hostage', 1704, { mode: 'wander', drop: 'fuel', look: 2 });
@@ -423,6 +435,8 @@ spawn('bazooka', 6260, { behavior: 'guard', facing: -1 });
 spawn('rifleman', 6300, { behavior: 'chat', facing: 1 });
 spawn('rifleman', 6322, { behavior: 'chat', facing: -1 });
 spawn('hostage', 6150, { mode: 'wander', drop: 'bomb', look: 0 });
+water.push({ x: 6430, y: 177, w: 58, h: 3 });
+water.push({ x: 2780, y: 177, w: 40, h: 3 });
 spawn('hostage', 6600, { drop: 'L', look: 1 });
 spawn('pickup', 6720, { item: 'bomb' });
 spawn('pickup', 6820, { item: 'bomb' });

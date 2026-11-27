@@ -179,7 +179,7 @@ export class MagnetCrane extends Entity {
           this.setState('arm');
           W.sfx('alarm', this.x, { vol: 0.8 });
           W.sfx('boss_charge', this.x, { vol: 0.6 });
-          W.floatText('MAGNET!', this.trolleyX, this.magY - 30, '#ffd040', 1.4);
+          W.floatText('MAGNET!', this.trolleyX, this.magY + 14, '#ff5a3a', 1.4);
         }
         break;
       }

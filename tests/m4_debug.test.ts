@@ -37,7 +37,10 @@ it('m4 debug timeline', () => {
     if (i - lastProg > 60 * 60) {
       const a = w.level.activeLock as any;
       const alive = a ? a.tracked.filter((e: any) => !e.dead && e.blocksProgress).map((e: any) => `${e.type}@${Math.round(e.x)},${Math.round(e.y)} st=${e.state} hit=${e.hittable}`) : [];
-      log.push(`STUCK t=${(i / 60).toFixed(0)} cam=${Math.round(w.camera.x)} p=${Math.round(p.x)},${Math.round(p.y)} lock=${a?.def.x} wave=${a?.wave} alive=${alive.join(' | ')}`);
+      const c: any = p.vehicle ?? p;
+      log.push(`STUCK t=${(i / 60).toFixed(0)} cam=${Math.round(w.camera.x)} p=${Math.round(p.x)},${Math.round(p.y)} veh=${p.vehicle?.type} ctrl=${Math.round(c.x)},${Math.round(c.y)} onG=${c.onGround} wall=${c.hitWall} vx=${Math.round(c.vx)} vy=${Math.round(c.vy)} lock=${a?.def.x} wave=${a?.wave} alive=${alive.join(' | ')}`);
+      const near = w.entities.filter((e: any) => Math.abs(e.x - c.x) < 120 && !e.dead).map((e: any) => `${e.type}@${Math.round(e.x)},${Math.round(e.y)}`);
+      log.push('near: ' + near.join(' '));
       break;
     }
   }

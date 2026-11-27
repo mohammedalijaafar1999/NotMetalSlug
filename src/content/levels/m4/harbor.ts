@@ -4,13 +4,15 @@
 // read clearly: anything that drops through a deep-water surface throws up a splash (big for
 // people and vehicles, small for shells and debris) with the 'splash' sound, and a player who goes
 // under leaves a trail of bubbles.
-// Frogmen and gunboats handle their own water; bosses are skipped.
+// Players who drop back in over a canal are steered to the nearest solid quay (pontoons bob and are
+// too narrow to land on blind). Frogmen and gunboats handle their own water; bosses are skipped.
 
 import { registerEntity } from '../../../game/registry';
 import { Entity } from '../../../game/entity';
 import { Z } from '../../../game/constants';
 import { fxRng } from '../../../engine/rng';
 import type { Water } from '../../../game/terrain';
+import { VIEW_H, VIEW_W } from '../../../engine/renderer';
 
 const SKIP = new Set(['frogman', 'gunboat']);
 
@@ -44,9 +46,45 @@ export class HarborWater extends Entity {
     return null;
   }
 
+  /** Solid quay (ground, not a pontoon) at x, inside the view and not under deep water? */
+  private quayAt(x: number): boolean {
+    const T = this.world.terrain;
+    const cam = this.world.camera;
+    const gy = T.groundTopAt(x);
+    if (!isFinite(gy) || gy > cam.y + VIEW_H - 8) return false;
+    return !T.waterAt(x, gy - 2)?.deadly;
+  }
+
+  /** Room to land: quay under x and a little either side (players drift while dropping in). */
+  private landingAt(x: number): boolean {
+    return this.quayAt(x) && this.quayAt(x - 12) && this.quayAt(x + 28);
+  }
+
+  /**
+   * A player who just dropped back in (respawn, still near the top of the screen) over a canal is
+   * moved to the nearest solid quay with room to land, and dropped from lower down so he can't
+   * drift back over the water - pontoons bob and are too narrow to land on blind.
+   */
+  private steerRespawns(): void {
+    const cam = this.world.camera;
+    for (const p of this.world.players) {
+      if (p.state !== 'respawn' || p.y > cam.y + 40 || this.landingAt(p.x)) continue;
+      let to: number | null = null;
+      for (let d = 4; d <= VIEW_W && to === null; d += 4) {
+        if (p.x - d > cam.x + 16 && this.landingAt(p.x - d)) to = p.x - d;
+        else if (p.x + d < cam.x + VIEW_W - 16 && this.landingAt(p.x + d)) to = p.x + d;
+      }
+      if (to === null) continue;
+      p.x = to;
+      p.y = Math.max(p.y, this.world.terrain.groundTopAt(to) - 44);
+      p.vx = 0;
+    }
+  }
+
   override update(dt: number): void {
     this.sfxCool -= dt;
     const W = this.world;
+    this.steerRespawns();
     for (const e of W.entities) {
       if (e === this || e.dead) continue;
       const big = e.anchor === 'bottom';
