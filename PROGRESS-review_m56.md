@@ -24,7 +24,17 @@ NOTE: vitest sets process.env.MODE - use BMODE for probe modes.
 - checked OK: m5/m6 hostages reachable (m6 11/11 by autopilot; m5 misses are bot behaviour),
   SFX rates, jetpack first shots below the HUD band, missile rain has markers (from above by design).
 
+## Resumed run (2nd attempt)
+- re-verified: owned tests 49/49, full suite 620/620, typecheck clean; smoke m5+m6 browser OK (0 errors).
+- checked OK: THUNDERHEAD length 46-49 s autopilot (gyro, loadout-independent); m5 boss beam aim-line
+  telegraph readable (artifacts/m5/blsheet.png); m5 start/HUD; m6 visual sheets 1-4 (no seams/floating
+  decor); gauntlet screenshots (artifacts/m6/gsheet1.png); lift climb after the fix (liftCsheet.png: only
+  the flying ambush, hostage reward on the hangar floor); m6 boss kill -> MISSION COMPLETE -> tally ->
+  ending in the browser (endsheet.png); Hard/Easy spot checks complete (m6 hard 20 deaths, easy 11,
+  m5 hard 10 for the mortal autopilot; all deaths are visible, telegraphed threats).
+- first shots (firstshot probe): every m6 shooter fires >= 1.37 s after spawning, from inside the view.
+
 ## Next steps
-- m5 boss telegraph visual check, m5 start/HUD, m6 visuals (seams/decor), gauntlet check
+- final gates + commit
 - outsideIssues so far: fighter launches its missile 14-16 px outside the left edge (machines/fighter);
   HUD truncates vehicle name "DRAGONFLY" -> "DRAGONFL"
