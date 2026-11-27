@@ -287,4 +287,52 @@ describe('mission 4 mechanics', () => {
     expect(bridge!.progress).toBe(1);
     expect(w.terrain.floorAt(5930, 100, 300)?.y).toBe(180);
   }, 60_000);
+
+  it('lock-wave paratroopers land on the ground, never stranded on a catwalk or ledge', () => {
+    // Infantry never step down more than 24 px, so a wave trooper that lands on a high one-way
+    // platform stays there (unreachable for straight fire) and can stall the lock.
+    for (const lock of def.locks ?? []) {
+      for (const wave of lock.waves) {
+        for (const s of wave.spawns) {
+          if (s.type !== 'paratrooper') continue;
+          // Default drift is up to 8 px/s toward the player over a ~4 s descent.
+          const reach = s.props?.drift === 0 ? 8 : 40;
+          for (const pl of def.platforms ?? []) {
+            const over = s.x > pl.x - reach && s.x < pl.x + pl.w + reach;
+            expect(over, `paratrooper at ${s.x} (lock ${lock.x}) can land on the platform at ${pl.x}..${pl.x + pl.w}, y ${pl.y}`).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
+  it('a lock-wave truck from behind parks at the left edge instead of running down the screen', () => {
+    // Trucks ram while driving: one entering behind the player must stop as soon as it is in
+    // (its nose at most ~70 px into the view), where it is seen before it can reach you.
+    for (const lock of def.locks ?? []) {
+      for (const wave of lock.waves) {
+        for (const s of wave.spawns) {
+          if (s.type !== 'truck' || (s.props?.facing ?? -1) < 0) continue;
+          expect(s.props?.stopX, `truck from the left in lock ${lock.x}`).toBeDefined();
+          expect(s.props!.stopX - lock.x).toBeLessThanOrEqual(30);
+        }
+      }
+    }
+    const w = makeWorld('m4', { seed: 1, god: true });
+    step(w, 2);
+    w.level.warp(5150);
+    const bots = [new Bot(0)];
+    let stopFront = -1;
+    for (let i = 0; i < 60 * 90 && stopFront < 0; i++) {
+      step(w, 1, bots);
+      const t = w.entities.find((e) => e.type === 'truck' && !e.dead) as (World['entities'][number] & { state: string; bw: number }) | undefined;
+      if (t && t.state !== 'drive') stopFront = t.x + t.bw / 2 - w.camera.x;
+      if (w.level.activeLock?.def.x === 5600 && i % 30 === 0) {
+        for (const e of w.entities) if (e.team === 'enemy' && e.hittable && !e.dead && e.type !== 'truck') e.damage({ amount: 9999, kind: 'explosion', owner: w.players[0] });
+      }
+    }
+    for (let k = 0; k < 2; k++) input.setVirtual(k, null);
+    expect(stopFront).toBeGreaterThan(0);
+    expect(stopFront).toBeLessThanOrEqual(70);
+  }, 60_000);
 });

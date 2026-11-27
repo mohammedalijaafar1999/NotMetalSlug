@@ -25,7 +25,7 @@ import * as A from './art';
 import { ClawArm, fillConvex } from './arm';
 import { Torpedo, PodMissile, LaserBeam, m4sfx } from './weapons';
 
-export const LEVIATHAN_HP = 360;
+export const LEVIATHAN_HP = 300;
 /** How far the sub sinks for phase 2 (deck under water, tower out). */
 export const DIVE_SINK = 40;
 /** Default float depth: the hull rides this far below its painted waterline (dock 10 px above the water). */

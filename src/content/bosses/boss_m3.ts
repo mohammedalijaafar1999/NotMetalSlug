@@ -43,6 +43,7 @@ import { registerEntity } from '../../game/registry';
 import type { Damage } from '../../game/constants';
 import type { Solid } from '../../game/terrain';
 import { EnemyBullet } from '../../game/projectile';
+import type { World } from '../../game/world';
 import { BigBoss, BossPiece, FlyingPart, Lobbed, Wreck, flames, smoke, sparkBurst, type Zone } from './common/kit';
 import { puffSteam, puffSnow } from './common/fx';
 import { MG_FRAMES, WALL } from './m3/art';
@@ -55,7 +56,7 @@ export const FACE_X = 248;
 /** Height of the frost lance above the floor (crouch under it: crouched players are 17 px tall). */
 export const LANCE_H = 25;
 
-const HP = 260;
+const HP = 230;
 const TURRET_HP = { mg: 20, flak: 26, mortar: 26 } as const;
 /** Share of turret damage that also drains the boss bar. */
 const TURRET_MUL = 0.6;
@@ -63,7 +64,7 @@ const TURRET_MUL = 0.6;
 const INTRO_RISE = 2.15;
 const INTRO_END = 2.7;
 const CLOSED = [5.0, 4.1];
-const OPEN = [4.4, 4.6];
+const OPEN = [4.8, 5.0];
 const OPENING = 0.75;
 const CLOSING = 0.6;
 const WARN = 1.15;
@@ -72,9 +73,18 @@ const LANCE_CHARGE = 1.0;
 const LANCE_FIRE = 0.7;
 const SPIKE_TELE = 0.6;
 /** Flak shells burst this high above the floor after FLAK_FLIGHT seconds. */
-const FLAK_BURST_H = 92;
-const FLAK_FLIGHT = 0.85;
-const MORTAR_FLIGHT = 1.35;
+export const FLAK_BURST_H = 92;
+export const FLAK_FLIGHT = 0.85;
+export const MORTAR_FLIGHT = 1.35;
+/** Mortar shell blast radius; its floor cross is drawn just as wide (a player clear of the cross is safe). */
+export const MORTAR_BLAST = 17;
+
+/** Fires one mortar shell from (mx, my) onto tx with its floor cross (drawn as wide as the blast). */
+export function mortarShell(w: World, owner: Entity, mx: number, my: number, tx: number, G: number): Lobbed {
+  const shell = w.add(new Lobbed({ owner, x: mx, y: my, tx, ty: G - 2, time: MORTAR_FLIGHT, sprite: 'bm3_mshell', radius: MORTAR_BLAST, size: 'medium', marker: false, trail: '#c0c8d4', shake: 2 }));
+  w.add(new FloorMark(tx, G, MORTAR_FLIGHT, 'cross', MORTAR_BLAST, shell));
+  return shell;
+}
 const BOULDER_GAP = 0.95;
 const BOULDER_FLIGHT = 1.05;
 const BOULDER_SPEED = 104;
@@ -666,8 +676,7 @@ export class FrostBastion extends BigBoss {
             const o = this.mortarPos();
             const mx = o.x - 6;
             const my = o.y - 20;
-            const shell = w.add(new Lobbed({ owner: this, x: mx, y: my, tx, ty: this.G - 2, time: MORTAR_FLIGHT, sprite: 'bm3_mshell', radius: 17, size: 'medium', marker: false, trail: '#c0c8d4', shake: 2 }));
-            w.add(new FloorMark(tx, this.G, MORTAR_FLIGHT, 'cross', 10, shell));
+            mortarShell(w, this, mx, my, tx, this.G);
             t.recoil = 3;
             snd(w, 'mortar_fire', t.x, 0.7, 1);
             if (t.shots === 1) snd(w, 'mortar_whistle', tx, 0.5, 1);
@@ -1151,7 +1160,7 @@ registerEntity(
   'boss_m3',
   'boss',
   () => new FrostBastion(),
-  'FROST BASTION (mission 3 boss, 260 hp): a fortified gatehouse wall that rises out of the snow and fills the right side of the arena. ' +
+  'FROST BASTION (mission 3 boss, 230 hp): a fortified gatehouse wall that rises out of the snow and fills the right side of the arena. ' +
     'Weak point: the frost core behind blast doors at the foot of the wall (hittable only while pushed out - plain forward fire hits it); ' +
     '3 destructible turrets (MG under the gallery tip, ice flak + mortar nest on the gallery - shoot them from below). Attacks: head-height ' +
     'frost lance (crouch), floor spike wave (jump), avalanche boulders (jump or shoot), mortar/flak marks, icicles (shadows). ' +

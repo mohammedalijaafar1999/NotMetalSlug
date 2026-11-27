@@ -273,7 +273,7 @@ locks.push({
         at('shield_trooper', 3080, { behavior: 'charge' }),
         at('flametrooper', 2648, { behavior: 'charge' }),
         at('officer', 2996, { facing: -1 }),
-        at('paratrooper', 2720, {}),
+        at('paratrooper', 2690, { drift: 0 }), // clear of the sniper's catwalk (2730, 52 px up)
         at('paratrooper', 2880, {}),
       ],
     },
@@ -324,8 +324,10 @@ locks.push({
         at('shield_trooper', 4262, { behavior: 'charge' }),
         at('rifleman', 3912, { behavior: 'charge' }),
         at('officer', 4268, { facing: -1 }),
-        at('paratrooper', 4010, {}),
-        at('paratrooper', 4150, {}),
+        // Straight drops into the gaps between the catwalks: a trooper that lands on a catwalk
+        // (32-62 px up, one-way) never steps down and can stall the lock for straight fire.
+        at('paratrooper', 3966, { drift: 0 }),
+        at('paratrooper', 4057, { drift: 0 }),
       ],
     },
   ],
@@ -394,7 +396,7 @@ locks.push({
     },
     {
       delay: 1,
-      spawns: [at('truck', 5540, { troops: 3, facing: 1 }), at('gunboat', 5900, { facing: -1 }), at('gunboat', 6000, { facing: -1 }), at('paratrooper', 5680, {})],
+      spawns: [at('truck', 5540, { troops: 3, facing: 1, stopX: 5626 }), at('gunboat', 5900, { facing: -1 }), at('gunboat', 6000, { facing: -1 }), at('paratrooper', 5680, {})],
     },
     {
       delay: 1.5,

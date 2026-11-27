@@ -14,6 +14,8 @@ import { M3 } from '../src/content/levels/m3';
 import type { World } from '../src/game/world';
 import type { Player } from '../src/game/player';
 import type { Vehicle } from '../src/game/vehicle';
+import type { Entity } from '../src/game/entity';
+import { Projectile } from '../src/game/projectile';
 
 function release(): void {
   for (let k = 0; k < 2; k++) input.setVirtual(k, null);
@@ -227,6 +229,44 @@ describe('mission 3 FROSTBITE PASS', () => {
     expect(killed).toBe(true);
     expect(landedAgain).toBe(true);
     expect(p.profile.lives).toBe(4);
+  });
+
+  it('climb: no ledge enemy attacks from under the HUD band (y < 44 on screen), going up or back down', () => {
+    const w = makeWorld('m3', { god: true, seed: 1 });
+    const p = w.players[0];
+    step(w, 30);
+    w.level.warp(5700);
+    p.x = 5800;
+    p.y = M3.G - 8;
+    const shots: string[] = [];
+    let total = 0;
+    const add = w.add.bind(w);
+    (w as { add: (e: Entity) => Entity }).add = (e: Entity) => {
+      const o = (e as { owner?: Entity | null }).owner;
+      if (e instanceof Projectile && e.team === 'enemy' && o) {
+        total++;
+        if (o.y - w.camera.y < 44) shots.push(`${o.type} feet at screen y ${Math.round(o.y - w.camera.y)} (player ${Math.round(p.x)},${Math.round(p.y)})`);
+      }
+      return add(e);
+    };
+    // Walk to the wall, then stand on every ledge (both ends) on the way up and on the way back down.
+    input.setVirtual(0, { right: true });
+    step(w, 300);
+    release();
+    const tiers = [452, 416, 380, 344, 308, 272, 236, 200];
+    const spots: [number, number][] = [
+      [M3.CLIFF - 90, M3.G],
+      [M3.CLIFF - 10, M3.G],
+    ];
+    tiers.forEach((y, i) => spots.push([M3.CLIFF - (i % 2 === 0 ? 128 : 74) + 10, y], [M3.CLIFF - 10, y]));
+    for (const [x, y] of [...spots, ...spots.slice().reverse()]) {
+      p.x = x;
+      p.y = y;
+      p.vy = 0;
+      step(w, 150);
+    }
+    expect(total, 'the climb still fights back').toBeGreaterThan(20);
+    expect(shots).toEqual([]);
   });
 
   it('bridge holds people but collapses under the STRIDER, which the creek wrecks (pilot thrown clear)', () => {

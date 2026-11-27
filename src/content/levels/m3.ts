@@ -338,9 +338,12 @@ const entities: SpawnSpec[] = [
   at('pickup', 5850, { item: 'bomb' }),
   // Climb.
   at('rifleman', CLIFF - 40, { behavior: 'guard', facing: -1 }, { y: TIERS[1] }),
-  at('grenadier', CLIFF - 60, { behavior: 'guard', facing: -1 }, { y: TIERS[3] }),
+  // The camera keeps the climber's feet 138 px under the view top, so anything 3+ tiers up stands in
+  // the HUD band: the grenadier sits only 2 tiers above the foot of the climb, and the sniper's
+  // short range (dx <= 40 at <= 66 deg) keeps his shots to climbers at most 2 tiers below him.
+  at('grenadier', CLIFF - 100, { behavior: 'guard', facing: -1 }, { y: TIERS[2] }),
   at('hostage', CLIFF - 50, { drop: 'L', look: 2 }, { y: TIERS[4] }),
-  at('sniper', CLIFF - 100, { facing: -1 }, { y: TIERS[6] }),
+  at('sniper', CLIFF - 100, { facing: -1, range: 40 }, { y: TIERS[6] }),
   at('mortar', 6500, { facing: -1 }),
   // Plateau.
   at('rifleman', 6528, { behavior: 'patrol' }),
