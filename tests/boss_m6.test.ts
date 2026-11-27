@@ -155,6 +155,36 @@ describe('boss_m6 JUGGERNAUT', () => {
     });
   }
 
+  it('lasts like a final boss: the autopilot needs a real fight with pistol + grenades, less with the HMG', () => {
+    // The god-mode autopilot stands still and never stops shooting, so it is much faster than a
+    // human (who dodges): ~33 s with pistol + grenades here means roughly a minute for a player.
+    // With 300 HP it went down in 16 s - before its laser and desperation phases had any time.
+    const fight = (hmg: boolean): { done: boolean; t: number; phases: Set<number> } => {
+      const w = makeWorld('bosstest_m6', { seed: 1, god: true });
+      const bots = w.players.map((p) => new Bot(p.index));
+      let b: Juggernaut | null = null;
+      const phases = new Set<number>();
+      for (let i = 0; i < 60 * 200 && w.state !== 'complete'; i++) {
+        if (hmg) for (const p of w.players) if (p.weapon.id !== 'hmg') p.giveWeapon('hmg');
+        step(w, 1, bots);
+        b = bossOf(w) ?? b;
+        if (b && b.introDone) phases.add(b.phase);
+      }
+      release();
+      return { done: w.state === 'complete', t: b?.fightTime ?? 0, phases };
+    };
+    const pistol = fight(false);
+    const hmg = fight(true);
+    expect(pistol.done).toBe(true);
+    expect(hmg.done).toBe(true);
+    expect([...pistol.phases].sort()).toEqual([0, 1, 2]);
+    expect(pistol.t).toBeGreaterThan(25);
+    // ...but it fits the mission timer (99 units = 119 s) with room to spare for a human.
+    expect(pistol.t).toBeLessThan(60);
+    expect(hmg.t).toBeGreaterThan(14);
+    expect(hmg.t).toBeLessThan(pistol.t);
+  }, 120_000);
+
   it('is defeated by the autopilot in the test arena', () => {
     const r = simulateMission('bosstest_m6', 300);
     console.log('bosstest_m6', JSON.stringify(r));

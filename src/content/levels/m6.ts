@@ -562,7 +562,7 @@ export const M6_LEVEL: LevelDef = {
     [5420, 0, 0],
   ],
   checkpoints: [1100, 2300, 3400, 4500, 5250, 5900, 6600],
-  timeLimit: 85,
+  timeLimit: 99,
   entities,
   locks: [LOCK_GATE, LOCK_FOUNDRY, LOCK_CONVEYOR, LOCK_ASSEMBLY, LOCK_GAUNTLET, LOCK_BOSS],
   decor,
