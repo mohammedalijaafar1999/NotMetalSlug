@@ -5,7 +5,7 @@ Branch fix/flow (from claude/metal-slug-game-sogjdj). Worktree: /home/user/NotMe
 | # | item | status |
 |---|---|---|
 | 1 | HUD vehicle name DRAGONFLY clipped | done (vehicleRow in hud.ts + flow test, screenshot ok) |
-| 2 | WARNING banner behind boss hull | todo |
+| 2 | WARNING banner behind boss hull | done: HUD already drew after world (pixel check), band was 60% translucent -> 86%; NEW long WARNING texts clipped (HORNET KING) -> subject on sub line + scale fit; tests |
 | 3 | out player at next mission start | todo |
 | 4 | charselect 2P dead end (P2 back / touch confirm) | todo |
 | 5 | lone gamepad joins as P2 when P1 on keyboard | todo |

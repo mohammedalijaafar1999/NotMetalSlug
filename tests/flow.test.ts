@@ -13,9 +13,9 @@ import { TallyScene } from '../src/scenes/tally';
 import { GameSession } from '../src/game/session';
 import { characters } from '../src/game/characters';
 import { missionInfo, countHostages } from '../src/content/ui/missions';
-import { getLevel } from '../src/game/level';
+import { getLevel, allLevels } from '../src/game/level';
 import { RESPAWN_INVULN } from '../src/game/player';
-import { joinKey, vehicleRow, PANEL_ROW_W } from '../src/game/hud';
+import { joinKey, vehicleRow, PANEL_ROW_W, Hud, BANNER_MAX_W } from '../src/game/hud';
 import { entityTypes } from '../src/game/registry';
 import { textWidth } from '../src/engine/font';
 import { makeWorld } from './helpers';
@@ -489,5 +489,50 @@ describe('HUD vehicle row', () => {
     const long = vehicleRow('SUPERLONGVEHICLENAME', PANEL_ROW_W, true);
     expect(long.barW).toBeGreaterThanOrEqual(16);
     expect(textWidth(long.name) + 4).toBeLessThanOrEqual(long.barX);
+  });
+});
+
+describe('announcement banners', () => {
+  it('every level announcement fits the screen (a long WARNING moves its subject to the line below)', () => {
+    const hud = new Hud();
+    hud.banner('WARNING! HORNET KING APPROACHING');
+    expect(hud.banners[0].text).toBe('WARNING!');
+    expect(hud.banners[0].sub).toBe('HORNET KING APPROACHING');
+    expect(hud.banners[0].style).toBe('warning');
+    const texts = new Set<string>();
+    for (const def of allLevels()) {
+      for (const l of def.locks ?? []) if (l.announce) texts.add(l.announce);
+    }
+    expect(texts.size).toBeGreaterThan(3);
+    for (const t of texts) {
+      const h = new Hud();
+      h.banner(t, { color: '#ff4040', time: 2.2 });
+      const b = h.banners[0];
+      expect(textWidth(b.text, b.scale), t).toBeLessThanOrEqual(BANNER_MAX_W);
+      if (b.sub) expect(textWidth(b.sub), t).toBeLessThanOrEqual(BANNER_MAX_W);
+    }
+  });
+
+  it('the HUD (banners included) draws after every world entity', () => {
+    const s = new GameSession({ characters: ['dex', 'juno'], twoPlayer: false, mission: 1 });
+    const gp = new GameplayScene(s);
+    app.scenes.set(gp, { fade: false });
+    run(0.5);
+    const order: string[] = [];
+    const w = gp.world;
+    const e = w.entities[0];
+    const er = e.render.bind(e);
+    e.render = (gg) => {
+      order.push('entity');
+      er(gg);
+    };
+    const hr = gp.hud.render.bind(gp.hud);
+    gp.hud.render = (gg, ww) => {
+      order.push('hud');
+      hr(gg, ww);
+    };
+    gp.hud.banner('WARNING!');
+    gp.render(g);
+    expect(order).toEqual(['entity', 'hud']);
   });
 });

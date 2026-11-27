@@ -84,6 +84,9 @@ export function joinKey(): string {
   return k ? keyLabel(k) : 'START';
 }
 
+/** Widest banner line (the screen less a margin). */
+export const BANNER_MAX_W = VIEW_W - 16;
+
 export class Hud {
   banners: Banner[] = [];
   /** Continue countdown per player (seconds remaining, <0 = not counting). */
@@ -103,12 +106,23 @@ export class Hud {
   private bannerCount = 0;
 
   banner(text: string, opts: { sub?: string; color?: string; time?: number; scale?: number; style?: BannerStyle } = {}): void {
+    let scale = opts.scale ?? 3;
+    let sub = opts.sub;
+    // Fit the screen: a long "WARNING! <SUBJECT>" puts the subject on the line under the stripes
+    // (like the bosses' own WARNING! / ... APPROACHES); any other text too wide shrinks.
+    if (textWidth(text, scale) > BANNER_MAX_W) {
+      const m = /^WARNING!?\s+(.+)$/.exec(text);
+      if (m) {
+        text = 'WARNING!';
+        sub = sub ? `${m[1]} - ${sub}` : m[1];
+      }
+      while (scale > 1 && textWidth(text, scale) > BANNER_MAX_W) scale--;
+    }
     this.banners = this.banners.filter((b) => b.text !== text);
-    const scale = opts.scale ?? 3;
     const style: BannerStyle = opts.style ?? (/^WARNING/.test(text) ? 'warning' : scale >= 3 ? 'drop' : scale === 2 ? 'slide' : 'small');
     const time = opts.time ?? 2;
     this.bannerCount++;
-    this.banners.push({ text, sub: opts.sub, color: opts.color ?? C.gold, time, max: time, scale, style, dir: this.bannerCount % 2 ? 1 : -1 });
+    this.banners.push({ text, sub, color: opts.color ?? C.gold, time, max: time, scale, style, dir: this.bannerCount % 2 ? 1 : -1 });
     if (scale >= 2 || style === 'warning') uiSfx(style === 'warning' ? 'alarm' : 'banner', { vol: 0.8 });
   }
 
@@ -355,7 +369,8 @@ export class Hud {
         case 'warning': {
           const a = Math.min(1, age / 0.15, b.time / 0.25);
           g.globalAlpha = a;
-          rect(g, 0, by - 8, VIEW_W, h + 16, '#200408', 0.6);
+          // Nearly opaque: the boss rolling in under it must read as behind the banner.
+          rect(g, 0, by - 8, VIEW_W, h + 16, '#200408', 0.86);
           stripes(g, 0, by - 8, VIEW_W, 4, this.time, C.red, '#200408');
           stripes(g, 0, by + h + 4, VIEW_W, 4, -this.time, C.red, '#200408');
           g.globalAlpha = 1;
