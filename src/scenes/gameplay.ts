@@ -13,7 +13,7 @@ import { flow } from './flow';
 import { World } from '../game/world';
 import { LevelRuntime, getLevel, levelForMission, type LevelDef } from '../game/level';
 import { Player } from '../game/player';
-import { Hud, continueState } from '../game/hud';
+import { CONTROLS_HINT_SECONDS, Hud, continueState } from '../game/hud';
 import type { GameSession, PlayerProfile } from '../game/session';
 import type { Vehicle } from '../game/vehicle';
 import { PauseScene } from './pause';
@@ -199,6 +199,8 @@ export class GameplayScene implements Scene {
       audio.setMuted(true);
     }
     this.playMusic(this.def.music);
+    // First mission: which key does what, for the first seconds of play.
+    if (!this.demo && this.def.mission === 1) this.hud.controlsHint = CONTROLS_HINT_SECONDS;
     if (!app.debug.fast) {
       this.hud.banner(`MISSION ${this.def.mission || '-'}`, { time: 2.8, scale: 3, color: C.gold, sub: this.def.name });
       this.hud.banner('START!', { time: 2.6, scale: 2, color: C.white });

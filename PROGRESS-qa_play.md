@@ -11,6 +11,12 @@ Status: started. Branch qa/play from claude/metal-slug-game-sogjdj.
 6. Mobile touch (iPhone 13 landscape)
 
 ## Findings / fixes
-(none yet)
+- FIXED (b8c38a4) m4 opening: standing on the promenade (12 px up) your straight shots fly over the
+  street guard's helmet while his rifle aims up and kills you (13 deaths in 75 s scripted). Infantry
+  hurtboxes get 8 px head-room (INFANTRY_HEAD_ROOM). tests/qa_play.test.ts.
+- FIXED onboarding: nothing in game says which key is FIRE/JUMP/BOMB (menus say "PRESS FIRE"). Mission 1
+  shows a 9 s keycap strip at the bottom (live bindings; pad buttons; none on touch). tests/qa_play.test.ts.
+- Checked OK: cold start 0.5 s to title, menu, char select, briefing, m1 first 2 min by keyboard
+  (HMG from hostage, bomb crate, arenas 1-3, BULLDOG boarded, knife+grenades used).
 
 ## Known issues (unconfirmed)
