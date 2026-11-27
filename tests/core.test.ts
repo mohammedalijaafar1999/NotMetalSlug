@@ -393,6 +393,35 @@ describe('MISSION COMPLETE', () => {
   });
 });
 
+describe('co-op respawns land beside the partner', () => {
+  it('28 px behind the partner, ahead of them near the left view edge, never on top', () => {
+    const w = makeWorld(level('core_coop_drop', {}), { players: 2, god: false });
+    settle(w);
+    const [p1, p2] = w.players as [Player, Player];
+    p1.x = w.camera.x + 200;
+    p2.respawn();
+    expect(p2.x).toBe(p1.x - 28);
+    settle(w);
+    p1.x = w.camera.x + 50;
+    p2.respawn();
+    expect(p2.x).toBe(p1.x + 28);
+    step(w, 90);
+    expect(p2.state).toBe('play');
+    expect(Math.abs(p2.x - p1.x)).toBeGreaterThan(14);
+  });
+
+  it('the offset spot is still checked for safe floor (no drop into a pit behind the partner)', () => {
+    const w = makeWorld(level('core_coop_pit', { ground: [[[0, 180], [330, 180]], [[370, 180], [3000, 180]]] }), { players: 2, god: false });
+    settle(w);
+    const [p1, p2] = w.players as [Player, Player];
+    p1.x = 390;
+    p2.respawn();
+    const T = w.terrain;
+    for (const dx of [-24, 0, 24]) expect(T.floorAt(p2.x + dx, w.camera.y, w.camera.y + 260), `floor under ${p2.x + dx}`).toBeTruthy();
+    expect(p2.x).not.toBe(p1.x);
+  });
+});
+
 describe('players stay in view', () => {
   it('a respawn lands inside the view even when the partner stands at the far right', () => {
     const w = makeWorld(level('core_view', {}), { players: 2, god: false });

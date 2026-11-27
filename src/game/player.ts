@@ -173,7 +173,8 @@ export class Player extends Actor {
   private dropIn(x?: number): void {
     const cam = this.world.camera;
     const other = this.world.players.find((p) => p !== this && p.state === 'play');
-    this.x = x ?? (other ? other.x : cam.x + 64);
+    // Beside the partner, never on top of them: behind when there is room, else ahead.
+    this.x = x ?? (other ? other.x + (other.x - cam.x > 72 ? -28 : 28) : cam.x + 64);
     this.x = this.safeX(Math.max(cam.x + 24, Math.min(cam.x + VIEW_W - 24, this.x)));
     this.y = cam.y - 4;
     this.vx = 0;
