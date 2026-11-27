@@ -10,7 +10,7 @@ Branch fix/content (from claude/metal-slug-game-sogjdj). Dev server: port 5603.
 | 4 | m6 ladle offscreen globs | done (launch only when stream in view, targets clamped SPLASH_EDGE inside; tests) |
 | 5 | m6 crusher push-out when invulnerable | done (pushOut nearer side unless walled; test) |
 | 6 | m3 CABLE CAR sign under HUD | done (terminal frame 1: sign on the facade; arrival uses f:1; screenshot artifacts/m3arr1.png) |
-| 7 | FROST BASTION flak shadows darker | todo |
+| 7 | FROST BASTION flak shadows darker | done (FloorMark shadow override 0.4->0.75 alpha; screenshot artifacts/flak1_zoom.png; test) |
 | 8 | HORNET KING band lower | todo |
 | 9 | m6 lift jetpack below HUD band | todo |
 | 10 | HUD screenshot pass per mission | todo |

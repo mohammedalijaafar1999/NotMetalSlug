@@ -7,6 +7,7 @@ import { lightning, strikeAmount } from '../src/content/themes/m4/weather';
 import { Ladle, MoltenGlob, SPLASH_EDGE } from '../src/content/levels/m6/ladle';
 import { GroundMarker } from '../src/content/bosses/common/fx';
 import { Crusher } from '../src/content/levels/m6/crusher';
+import { FloorMark, SHADOW_ALPHA } from '../src/content/bosses/m3/parts';
 import { VIEW_W } from '../src/engine/renderer';
 import type { LevelDef } from '../src/game/level';
 import type { World } from '../src/game/world';
@@ -101,6 +102,39 @@ function pour(w: World, la: Ladle): { markers: GroundMarker[]; globs: MoltenGlob
     globs: fresh.filter((e): e is MoltenGlob => e instanceof MoltenGlob),
   };
 }
+
+/** A context that records the globalAlpha of every fill. */
+function alphaRecorder(): { g: CanvasRenderingContext2D; alphas: number[] } {
+  const alphas: number[] = [];
+  const store: Record<string, unknown> = { globalAlpha: 1 };
+  const g = new Proxy(store, {
+    get(t, k: string) {
+      if (k in t) return t[k];
+      if (k === 'fillRect' || k === 'fill') return () => alphas.push(store.globalAlpha as number);
+      return () => undefined;
+    },
+    set(t, k: string, v) {
+      t[k] = v;
+      return true;
+    },
+  }) as unknown as CanvasRenderingContext2D;
+  return { g, alphas };
+}
+
+describe('FROST BASTION floor shadows read on snow', () => {
+  it('start at SHADOW_ALPHA (not a faint grey) and darken toward impact', () => {
+    const mark = new FloorMark(100, 180, 1, 'shadow', 9);
+    const a = alphaRecorder();
+    mark.render(a.g);
+    expect(a.alphas.length).toBeGreaterThan(0);
+    expect(Math.min(...a.alphas)).toBeGreaterThanOrEqual(SHADOW_ALPHA - 1e-9);
+    expect(SHADOW_ALPHA).toBeGreaterThanOrEqual(0.4);
+    mark.life = 0.1; // progress 0.9
+    const b = alphaRecorder();
+    mark.render(b.g);
+    expect(Math.max(...b.alphas)).toBeGreaterThan(0.7);
+  });
+});
 
 describe('m6 crusher', () => {
   for (const [label, dx] of [
