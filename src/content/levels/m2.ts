@@ -3,17 +3,20 @@
 //
 //   0     canyon mouth: breather, sleeping/chatting riflemen, first hostage (H)
 //   760   oasis + sandstone ruins: ruin lintels on pillars, LOCK 1 introduces trucks + bazookas
-//   1600  Legion checkpoint: H crate, STRIDER walker parked behind the barrier, mortar crew
+//   1600  Legion checkpoint: H crate, officer + guards, STRIDER walker behind the barrier, mortar crew
 //   2200  canyon road (vehicle beat): jeep, bazooka nests, LOCK 2 convoy ambush (trucks, jeep,
 //         light tank, heli)
 //   3180  ramp up to the rigged rail bridge over the dry gorge: LOCK 3 on the bridge (jetpacks,
 //         paratroopers) ends with the Legion blowing the bridge (m2_bridge / m2_detonator):
 //         everyone drops into the riverbed and any vehicle on the deck is wrecked
-//   3640  vertical section: climb the mesa face (34 px rock steps, scaffold and ledges, camera keys)
-//   3994  mesa top lookout: MG turret, watchtower sniper, bunker, caged hostage (C)
-//   4700  switchback descent into the Legion oil field
+//   3640  vertical section: climb the red-rock mesa face (34 px steps, a scaffold, then a 62 px cliff
+//         with a rock ledge; camera keys let the view rise)
+//   3928  mesa top lookout: sniper, MG turret, watchtower sniper, bunker, caged hostage (C)
+//   4700  switchback descent into the Legion oil field (ridge MG on the ledge)
 //   5120  oil field: pumpjacks, derricks, pipelines, barrels and a fuel tank, LOCK 4 GAUNTLET
 //   6280  salt flat (calm, > 1 screen), then the HORNET KING arena (lock x 6800, flat y 408).
+//
+// Vehicles that enter an arena from behind the player come through m2_incoming (edge warning first).
 
 import { registerLevel, type DecorDef, type LevelDef, type PlatformDef, type SolidDef } from '../../game/level';
 import type { SpawnSpec } from '../../game/registry';
