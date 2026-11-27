@@ -45,7 +45,7 @@ export const ENTITIES: SpawnSpec[] = [
   rifle(614, 'idle', { facing: -1 }),
   // ---- Beach outpost: a patrol, a lookout on the tower, the grenadier behind the rock.
   rifle(800, 'patrol', { facing: -1 }),
-  at('sandbags', 900, { bags: 3, rows: 2 }),
+  at('sandbags', 900, { bags: 3, rows: 2 }, undefined, 880),
   rifle(950, 'guard', { facing: -1 }, 262),
   at('grenadier', 1098, { behavior: 'guard', facing: -1 }),
   at('barrel', 1118),
@@ -64,7 +64,7 @@ export const ENTITIES: SpawnSpec[] = [
   at('crate_prop', 2346, { drop: 'bomb' }),
   hostage(2384, 'bomb', 'wander', 1),
   // ---- Jungle road: the BULLDOG waits at a Legion cache; fodder, a lookout, a Stomper to crush.
-  at('tank', 2884, { facing: 1 }),
+  at('tank', 2884, { facing: 1 }, undefined, 2852),
   at('pickup', 2944, { item: 'bomb' }),
   rifle(3046, 'chat', {}, G - 10),
   rifle(3064, 'chat', {}, G - 10),
@@ -72,7 +72,7 @@ export const ENTITIES: SpawnSpec[] = [
   at('barrel', 3126, {}, G - 10),
   hostage(3164, 'bomb', 'tied', 2),
   at('grenadier', 3312, { behavior: 'guard', facing: -1 }, 266),
-  at('light_tank', 3340, { facing: -1, behavior: 'hold' }),
+  at('light_tank', 3340, { facing: -1, behavior: 'hold' }, undefined, 3310),
   rifle(3392, 'patrol', { facing: -1 }),
   rifle(3418, 'idle', { facing: -1 }),
   at('barrel', 3436),
@@ -80,7 +80,7 @@ export const ENTITIES: SpawnSpec[] = [
   // Arena 3 hostage.
   hostage(3700, 'R', 'tied', 0),
   // ---- The bunker guards the ford. The bridge is out and the river bed is mud: vehicles sink.
-  at('bunker', 3894, { facing: -1 }),
+  at('bunker', 3894, { facing: -1 }, undefined, 3860),
   at('m1_bog', (M1.riverX0 + M1.riverX1) / 2, { w: M1.riverX1 - M1.riverX0 - 20 }),
   // Far bank: a weapon case and a caged mechanic at the foot of the cliff.
   at('pickup', 4196, { item: 'H' }),
@@ -94,7 +94,7 @@ export const ENTITIES: SpawnSpec[] = [
   // Depot props: barrels and a fuel tank among the Legion troops.
   at('barrel', 4662, {}, P),
   at('barrel', 4846, {}, P),
-  at('fuel_tank', 4906, {}, P), // the mortar crew sets up right behind it
+  at('fuel_tank', 4906, {}, P, 4880), // the mortar crew sets up right behind it
   // ---- Down the slope: a patrol, a marked minefield, a wandering mechanic, weapon cases.
   rifle(5176, 'patrol', { facing: -1 }),
   at('mine', 5344),
@@ -109,7 +109,7 @@ export const ENTITIES: SpawnSpec[] = [
   at('pickup', 6386, { item: 'bomb' }),
   at('pickup', 6430, { item: 'H' }),
   // The stockade gate the GRINDER smashes through (cosmetic).
-  at('m1_gate', M1.bossL + 352, {}),
+  at('m1_gate', M1.bossL + 352, {}, undefined, M1.bossL + 310),
 ];
 
 const A = ARENAS;
