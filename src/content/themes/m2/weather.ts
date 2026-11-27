@@ -41,16 +41,30 @@ export function renderWeather(g: CanvasRenderingContext2D, camX: number, camY: n
       hazeGrad.addColorStop(1, key);
       hazeFor = key;
     }
-    g.globalAlpha = 0.2 * gust;
+    g.globalAlpha = 0.26 * gust;
     g.fillStyle = hazeGrad;
     g.fillRect(0, 60, VIEW_W, VIEW_H - 60);
-    g.globalAlpha = 0.05 * gust;
+    g.globalAlpha = 0.06 * gust;
     g.fillStyle = sand;
     g.fillRect(0, 0, VIEW_W, VIEW_H);
+    // Billowing dust clouds rolling across the low half of the screen.
+    for (let i = 0; i < 6; i++) {
+      const w = 46 + hash(i + 31) * 50;
+      const span = VIEW_W + w * 2;
+      const x = span - ((((hash(i + 7) * span + time * (150 + hash(i + 3) * 70) + camX) % span) + span) % span) - w;
+      const y = 110 + hash(i + 17) * 90 + Math.sin(time * 1.3 + i) * 4;
+      g.globalAlpha = 0.07 * gust;
+      g.fillStyle = i % 2 ? sand : sandD;
+      for (let k = 0; k < 4; k++) {
+        const ww = w * (1 - k * 0.2);
+        const hh = 7 + k * 3;
+        g.fillRect(Math.round(x + (w - ww) / 2), Math.round(y - hh / 2), Math.round(ww), Math.round(hh));
+      }
+    }
     g.globalAlpha = 1;
   }
   // Sand streaks blowing right -> left; a few always, many during gusts.
-  const n = 14 + Math.round(gust * 46);
+  const n = 16 + Math.round(gust * 64);
   const span = VIEW_W + 60;
   for (let i = 0; i < n; i++) {
     const h1 = hash(i);
@@ -61,7 +75,7 @@ export function renderWeather(g: CanvasRenderingContext2D, camX: number, camY: n
     const x = span - ((((h1 * span + time * speed + camX * 1.0) % span) + span) % span) - 30;
     const yBase = 40 + h2 * (VIEW_H - 50);
     const y = Math.round(yBase + Math.sin(time * 1.7 + i) * 3 + (camY % 7) * 0);
-    g.globalAlpha = (0.22 + h3 * 0.2) * (i < 14 ? 1 : gust);
+    g.globalAlpha = (0.24 + h3 * 0.22 + gust * 0.12) * (i < 16 ? 1 : gust);
     g.fillStyle = i % 3 ? sand : sandD;
     g.fillRect(Math.round(x), y, len, 1);
     if (len > 9) g.fillRect(Math.round(x + 3), y + 1, Math.round(len * 0.5), 1);
