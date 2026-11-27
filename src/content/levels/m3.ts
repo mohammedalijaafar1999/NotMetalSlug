@@ -410,7 +410,7 @@ registerLevel({
         },
         {
           delay: 1,
-          spawns: [at('snowmobile', 1268, { facing: 1 }), at('snowmobile', 1736, { facing: -1 }), at('officer', 1690), at('rifleman', 1712, { behavior: 'charge' })],
+          spawns: [at('snowmobile', 1268, { facing: 1 }), at('officer', 1668, { facing: -1 }), at('rifleman', 1712, { behavior: 'charge' }), at('rifleman', 1730, { behavior: 'charge' })],
         },
       ],
     },
@@ -423,7 +423,7 @@ registerLevel({
         {
           delay: 1,
           spawns: [
-            at('jetpack', 2540, { facing: 1 }, { y: 360 }),
+            at('paratrooper', 2650),
             at('jetpack', 2966, { facing: -1 }, { y: 350 }),
             at('grenadier', 2964, { behavior: 'charge' }),
             at('flametrooper', 2572, { behavior: 'charge' }),
@@ -459,7 +459,7 @@ registerLevel({
         { delay: 1, spawns: [at('paratrooper', 5300), at('paratrooper', 5380), at('paratrooper', 5460), at('shield_trooper', 5570, { behavior: 'charge' })] },
         {
           delay: 1,
-          spawns: [at('jetpack', 5580, { facing: -1 }, { y: 380 }), at('jetpack', 5140, { facing: 1 }, { y: 390 }), at('snowmobile', 5590, { facing: -1 }), at('grenadier', 5172, { behavior: 'charge' })],
+          spawns: [at('jetpack', 5580, { facing: -1 }, { y: 380 }), at('paratrooper', 5250), at('snowmobile', 5590, { facing: -1 }), at('grenadier', 5172, { behavior: 'charge' })],
         },
       ],
     },
@@ -473,7 +473,7 @@ registerLevel({
             at('rifleman', 6984, { behavior: 'charge' }),
             at('rifleman', 6572, { behavior: 'charge' }),
             at('shield_trooper', 6972, { behavior: 'charge' }),
-            at('officer', 6996),
+            at('officer', 6928, { facing: -1 }),
           ],
         },
         { delay: 1, spawns: [at('light_tank', 7000, { facing: -1, behavior: 'advance' }), at('grenadier', 6572, { behavior: 'charge' }), at('grenadier', 6586, { behavior: 'charge' })] },
