@@ -215,6 +215,73 @@ function bakeText(text: string, color: string, shadow: string | null, outline: s
   return { c, pad };
 }
 
+// Per-style glyph atlases: every glyph pre-composited with its outline or shadow, so a string that
+// is not baked (a counter that changes every few frames, or a string's first frame) costs one blit
+// per glyph instead of nine, and short strings never churn canvases. Only used with spacing >= 1:
+// glyphs are then far enough apart that one glyph's outline or shadow never covers its neighbour's
+// ink, so the result is the same as the glyph-by-glyph passes.
+interface StyleAtlas {
+  c: HTMLCanvasElement;
+  pad: number;
+  h: number;
+  x: Map<string, number>;
+  w: Map<string, number>;
+}
+const styleAtlases = new Map<string, StyleAtlas | null>();
+const styleSeen = new Set<string>();
+/** Strings this short are drawn from the style atlas and never baked on their own. */
+const SHORT_TEXT = 4;
+
+function styleAtlas(color: string, shadow: string | null, outline: string | null, scale: number): StyleAtlas | null {
+  const key = `${scale}|${color}|${outline ?? ''}|${shadow ?? ''}`;
+  const hit = styleAtlases.get(key);
+  if (hit !== undefined) return hit;
+  // Built on the style's second request: a one-off colour never pays for a whole atlas.
+  if (!styleSeen.has(key)) {
+    if (styleSeen.size > 512) styleSeen.clear();
+    styleSeen.add(key);
+    return null;
+  }
+  if (typeof document === 'undefined') return null;
+  if (styleAtlases.size >= 48) styleAtlases.clear();
+  const pad = outline ? scale : 0;
+  const tail = outline || shadow ? scale : 0;
+  const xs = new Map<string, number>();
+  const ws = new Map<string, number>();
+  let x = 0;
+  for (const [ch, info] of glyphInfo) {
+    const cw = pad + info.w * scale + tail;
+    xs.set(ch, x);
+    ws.set(ch, cw);
+    x += cw + 1;
+  }
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, x);
+  c.height = FONT_H * scale + pad + tail;
+  const ctx = c.getContext('2d');
+  if (!ctx) {
+    styleAtlases.set(key, null);
+    return null;
+  }
+  ctx.imageSmoothingEnabled = false;
+  for (const ch of glyphInfo.keys()) if (ch !== ' ') drawGlyphs(ctx, ch, xs.get(ch)! + pad, pad, color, shadow, outline, scale, 1);
+  const a: StyleAtlas = { c, pad, h: c.height, x: xs, w: ws };
+  styleAtlases.set(key, a);
+  return a;
+}
+
+function drawFromAtlas(g: CanvasRenderingContext2D, a: StyleAtlas, text: string, sx: number, sy: number, scale: number, spacing: number): void {
+  let cx = sx;
+  for (const ch of text) {
+    const n = normalizeChar(ch);
+    if (ch !== ' ') {
+      const w = a.w.get(n)!;
+      g.drawImage(a.c, a.x.get(n)!, 0, w, a.h, cx - a.pad, sy - a.pad, w, a.h);
+    }
+    cx += (glyphInfo.get(n)!.w + spacing) * scale;
+  }
+}
+
 /** Cached strings currently held (tests / debug). */
 export function textCacheSize(): number {
   return textCache.size;
@@ -236,24 +303,31 @@ export function drawText(g: CanvasRenderingContext2D, text: string, x: number, y
   const prevAlpha = g.globalAlpha;
   if (opts.alpha !== undefined) g.globalAlpha = prevAlpha * opts.alpha;
   const key = `${scale}|${spacing}|${color}|${outline ?? ''}|${shadow ?? ''}|${text}`;
-  let baked = textCache.get(key);
-  if (baked) {
-    // Keep recently used strings at the young end of the map (LRU).
-    textCache.delete(key);
-    textCache.set(key, baked);
-  } else if (textSeen.has(key)) {
-    textSeen.delete(key);
-    baked = bakeText(text, color, shadow, outline, scale, spacing, w) ?? undefined;
+  let baked: BakedText | undefined;
+  if (text.length > SHORT_TEXT) {
+    baked = textCache.get(key);
     if (baked) {
+      // Keep recently used strings at the young end of the map (LRU).
+      textCache.delete(key);
       textCache.set(key, baked);
-      if (textCache.size > TEXT_CACHE_MAX) textCache.delete(textCache.keys().next().value!);
+    } else if (textSeen.has(key)) {
+      textSeen.delete(key);
+      baked = bakeText(text, color, shadow, outline, scale, spacing, w) ?? undefined;
+      if (baked) {
+        textCache.set(key, baked);
+        if (textCache.size > TEXT_CACHE_MAX) textCache.delete(textCache.keys().next().value!);
+      }
+    } else {
+      if (textSeen.size > 2048) textSeen.clear();
+      textSeen.add(key);
     }
-  } else {
-    if (textSeen.size > 2048) textSeen.clear();
-    textSeen.add(key);
   }
   if (baked) g.drawImage(baked.c, sx - baked.pad, sy - baked.pad);
-  else drawGlyphs(g, text, sx, sy, color, shadow, outline, scale, spacing);
+  else {
+    const a = spacing >= 1 ? styleAtlas(color, shadow, outline, scale) : null;
+    if (a) drawFromAtlas(g, a, text, sx, sy, scale, spacing);
+    else drawGlyphs(g, text, sx, sy, color, shadow, outline, scale, spacing);
+  }
   g.globalAlpha = prevAlpha;
   return w;
 }
