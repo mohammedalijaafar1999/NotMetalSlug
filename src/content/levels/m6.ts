@@ -207,7 +207,7 @@ D('chain', 2400, 236, { len: 70 });
 D('girder', 2470, GL, { h: 230 });
 D('furnace', 2600, GL);
 D('banner', 2680, 296);
-D('pipes', 2760, GL);
+D('pipes', 2806, GL);
 D('furnace', 2860, GL);
 D('chain', 2915, 236, { len: 48, load: 'ingot' });
 
@@ -460,7 +460,7 @@ D('beacon', 6740, 132, { color: 'red' });
 D('banner', 6900, 84);
 D('beacon', 6950, 132, { color: 'red' });
 
-platforms.push({ x: 5800, y: 156, w: 84, style: 'grate' });
+platforms.push({ x: 5800, y: 156, w: 84, style: 'girder' });
 
 add(
   E('hostage', 5500, GU, { drop: 'bomb', look: 2 }),
