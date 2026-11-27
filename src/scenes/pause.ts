@@ -12,7 +12,7 @@ import { Menu } from './menu';
 import type { GameplayScene } from './gameplay';
 import { DIFFICULTY_NAMES } from '../game/constants';
 import { ControlsScene } from './controls';
-import { C, PLAYER_COLORS, blink, dimScreen, enterMenu, formatTime, panel, stripes, syncTouch, text, twoTone } from './ui';
+import { C, PLAYER_COLORS, blink, ctl, dimScreen, enterMenu, formatTime, panel, stripes, syncTouch, text, twoTone } from './ui';
 
 export class PauseScene implements Scene {
   name = 'pause';
@@ -108,6 +108,6 @@ export class PauseScene implements Scene {
     });
     const hint = this.confirm ? 'PRESS FIRE AGAIN TO CONFIRM' : this.menu.hint();
     text(g, hint, cx, 178, { align: 'center', color: this.confirm ? (blink(this.time, 3) ? C.red : C.gold) : C.grey });
-    drawText(g, 'START: RESUME', cx, VIEW_H - 18, { align: 'center', color: '#8a7aa0', outline: C.out });
+    drawText(g, ctl('START: RESUME', 'TAP RESUME TO PLAY ON'), cx, VIEW_H - 18, { align: 'center', color: '#8a7aa0', outline: C.out });
   }
 }

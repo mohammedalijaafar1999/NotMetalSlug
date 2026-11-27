@@ -12,7 +12,7 @@ import { app } from '../app';
 import { applySettings } from '../settings-apply';
 import { DIFFICULTY_NAMES } from '../game/constants';
 import { Menu, type MenuItem } from './menu';
-import { C, backButton, blink, dimScreen, enterMenu, keycap, panel, rect, text, titleBar, syncTouch } from './ui';
+import { C, backButton, blink, dimScreen, enterMenu, fitText, keycap, panel, rect, text, titleBar, syncTouch } from './ui';
 
 /** Let the nearest full screen below an overlay keep animating (title backdrop). */
 export function tickBelow(self: Scene, dt: number): void {
@@ -200,8 +200,11 @@ const ACTION_LABELS: Record<Action, string> = {
   start: 'START / PAUSE',
 };
 
-/** Rebind one key; swaps with an action of the same player that already used it. */
-export function assignKey(player: 0 | 1, action: Action, code: string): void {
+/**
+ * Rebind one key; swaps with an action of the same player that already used it, and takes the
+ * key away from the other player. Returns the other player's actions left without any key.
+ */
+export function assignKey(player: 0 | 1, action: Action, code: string): Action[] {
   const b = settings.bindings;
   const mine = player === 0 ? b.p1 : b.p2;
   const other = player === 0 ? b.p2 : b.p1;
@@ -212,9 +215,15 @@ export function assignKey(player: 0 | 1, action: Action, code: string): void {
       if (!mine[a].length && old[0] && old[0] !== code) mine[a] = [old[0]];
     }
   }
-  for (const a of ACTIONS) if (other[a].includes(code)) other[a] = other[a].filter((k) => k !== code);
+  const orphaned: Action[] = [];
+  for (const a of ACTIONS)
+    if (other[a].includes(code)) {
+      other[a] = other[a].filter((k) => k !== code);
+      if (!other[a].length) orphaned.push(a);
+    }
   mine[action] = [code];
   applySettings(true);
+  return orphaned;
 }
 
 export class KeyRemapScene implements Scene {
@@ -225,6 +234,8 @@ export class KeyRemapScene implements Scene {
   capturing: Action | null = null;
   private captureT = 0;
   private flash: { a: Action; t: number } | null = null;
+  /** Warning after a key was taken from the other player ("2P AIM UP HAS NO KEY NOW"). */
+  private notice: { text: string; t: number } | null = null;
 
   constructor(readonly player: 0 | 1) {
     const items: MenuItem[] = ACTIONS.map((a) => ({
@@ -285,7 +296,11 @@ export class KeyRemapScene implements Scene {
       input.captureKey((c) => this.onKey(c));
       return;
     }
-    assignKey(this.player, a, code);
+    const orphaned = assignKey(this.player, a, code);
+    if (orphaned.length) {
+      const who = this.player === 0 ? '2P' : '1P';
+      this.notice = { text: `${keyLabel(code)} WAS ${who}'S ${orphaned.map((x) => ACTION_LABELS[x]).join(' + ')}: ${who} NEEDS A NEW KEY`, t: 4 };
+    }
     this.capturing = null;
     this.flash = { a, t: 0.6 };
     audio.play('menu_select');
@@ -310,6 +325,7 @@ export class KeyRemapScene implements Scene {
     this.time += dt;
     tickBelow(this, dt);
     if (this.flash) this.flash.t -= dt;
+    if (this.notice && (this.notice.t -= dt) <= 0) this.notice = null;
     if (this.capturing) {
       this.captureT += dt;
       // Gamepad B cancels.
@@ -337,7 +353,8 @@ export class KeyRemapScene implements Scene {
     titleBar(g, this.player === 0 ? '1P KEYS' : '2P KEYS', cx, 10, 110, { color: this.player === 0 ? '#ffd0c0' : '#c0e8ff' });
     this.menu.render(g, cx, 34, { spacing: 14, width: pw - 40, accent: this.player === 0 ? C.gold : C.blue });
     panel(g, 14, VIEW_H - 21, VIEW_W - 28, 15, 'dark', 0.9);
-    text(g, this.menu.hint(), cx, VIEW_H - 17, { align: 'center', color: C.blue });
+    if (this.notice) text(g, fitText(this.notice.text, VIEW_W - 36), cx, VIEW_H - 17, { align: 'center', color: blink(this.time, 3, 0.8) ? C.red : C.gold });
+    else text(g, this.menu.hint(), cx, VIEW_H - 17, { align: 'center', color: C.blue });
     if (this.capturing) {
       dimScreen(g, 0.5);
       panel(g, cx - 100, 80, 200, 50, 'brass', 1);

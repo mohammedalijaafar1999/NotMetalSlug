@@ -18,6 +18,9 @@ import { installDebugApi, applyUrlParams } from './debug/api';
 import { applySettings } from './settings-apply';
 import { startupHooks } from './hooks';
 
+/** Scenes that show the FPS counter in the bottom-right corner (elsewhere: top-right). */
+const FPS_LOW_SCENES = new Set(['gameplay', 'demo', 'pause', 'briefing']);
+
 function installDefaultFlow(): void {
   let first = true;
   flow.title = () => {
@@ -47,6 +50,11 @@ function main(): void {
   app.scenes.onChange = () => input.flush();
   input.start();
   input.onFirstGesture = () => audio.unlock();
+  // Window blurred / tab hidden: held keys were released; gameplay opens its pause menu.
+  input.onFocusLost = () => {
+    const s = app.scenes.current as { autoPause?: () => boolean } | undefined;
+    s?.autoPause?.();
+  };
   installDebugApi();
   installDefaultFlow();
   // Content modules may override flow hooks / install UI; give them a chance.
@@ -63,18 +71,18 @@ function main(): void {
       r.beginFrame();
       app.scenes.render(r.g);
       if (settings.showFps) {
+        // Bottom-right is free in gameplay; menu screens keep footers / hint panels there.
         r.g.setTransform(1, 0, 0, 1, 0, 0);
-        drawText(r.g, `${app.loop.fps} FPS`, VIEW_W - 3, 205, { align: 'right', color: '#80ff80' });
+        const low = FPS_LOW_SCENES.has(app.scenes.current?.name ?? '');
+        drawText(r.g, `${app.loop.fps} FPS`, VIEW_W - 3, low ? 205 : 2, { align: 'right', color: '#80ff80', outline: '#140c1c' });
       }
       r.present();
     },
   );
   app.scenes.set(new BootScene(), { fade: false });
   app.loop.start();
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) audio.duck(true);
-    else audio.duck(false);
-  });
+  // (No ducking here: the audio engine suspends itself while the tab is hidden, and un-ducking
+  // on return would fight the pause menu's own duck.)
 }
 
 main();

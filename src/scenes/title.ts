@@ -14,7 +14,7 @@ import { app } from '../app';
 import { flow } from './flow';
 import { Menu } from './menu';
 import { backdrop } from './backdrop';
-import { C, blink, easeOutBack, enterMenu, panel, rect, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
+import { C, blink, ctl, easeOutBack, enterMenu, panel, rect, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
 import { LOGO_SHINE_FRAMES, LOGO_W, RIBBON_W } from '../content/ui/art';
 import { Particles } from '../game/effects';
 import { MissionSelectScene } from './missionselect';
@@ -220,6 +220,6 @@ export class TitleScene implements Scene {
       panel(g, 20, VIEW_H - 32, VIEW_W - 40, 15, 'dark', 0.82);
       text(g, hint, cx, VIEW_H - 28, { align: 'center', color: C.blue });
     }
-    drawText(g, 'FIRE/ENTER: OK   BOMB/ESC: BACK', cx, VIEW_H - 11, { align: 'center', color: '#8a7aa0', outline: C.out });
+    drawText(g, ctl('FIRE/ENTER: OK   BOMB/ESC: BACK', 'TAP TO CHOOSE'), cx, VIEW_H - 11, { align: 'center', color: '#8a7aa0', outline: C.out });
   }
 }

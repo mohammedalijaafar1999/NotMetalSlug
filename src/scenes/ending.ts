@@ -21,14 +21,34 @@ import { HF } from '../game/hostage';
 import { NameEntryScene } from './gameover';
 import { HighScoresScene } from './highscores';
 import { creditLines, creditsHeight, renderCredits } from './credits';
-import { C, PLAYER_COLORS, blink, enterMenu, footer, formatTime, panel, rect, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
+import { C, PLAYER_COLORS, blink, ctl, enterMenu, footer, formatTime, panel, rect, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
 
 const T_BOOM = 6.2;
 const T_CELEBRATE = 9.5;
 const T_CREDITS = 23;
+/** The credit roll scrolls in the sky above the squad's heads (they stand on the hill at ~y 120+). */
+const ROLL_BOTTOM = 112;
+/** Scroll at which THE END has settled near the top (credits + results have gone by). */
+const settleScroll = (creditsH: number) => creditsH + 24 + 74 + ROLL_BOTTOM - 36;
 
 const EPILOGUE =
   'THE RUSTCOAT LEGION IS FINISHED. MARSHAL GRISTLE WAS LAST SEEN PADDLING A RUBBER DINGHY TOWARD THE HORIZON, SHAKING HIS FIST. THE MECHANICS OF PUERTO POLVORA ARE FREE AND ALREADY FIXING EVERYTHING. THE RUCKUS SQUAD HAS EARNED A VACATION.';
+
+/**
+ * Who celebrates on the hill: the whole squad in roster order. A soldier only player 2 played
+ * wears player 2's colors; if both players picked the same soldier, player 2's twin joins too.
+ */
+export function endingSquad(session: GameSession): { id: string; p2: boolean }[] {
+  const pick = (i: number) => (session.players[i]?.joined ? session.players[i].character : null);
+  const p1 = pick(0);
+  const p2 = pick(1);
+  const out: { id: string; p2: boolean }[] = [];
+  for (const c of characters()) {
+    out.push({ id: c.id, p2: c.id === p2 && c.id !== p1 });
+    if (c.id === p2 && c.id === p1) out.push({ id: c.id, p2: true });
+  }
+  return out;
+}
 
 export class EndingScene implements Scene {
   name = 'ending';
@@ -43,14 +63,12 @@ export class EndingScene implements Scene {
   private leaving = false;
   private musicPhase = '';
   private squad: { id: string; p2: boolean }[] = [];
+  private lastPhase = 0;
   private epi: string[] = [];
 
   constructor(readonly session: GameSession) {
     this.creditsH = creditsHeight(this.credits);
-    const joined = session.players.filter((p) => p.joined);
-    for (const p of joined) this.squad.push({ id: p.character, p2: p.index === 1 });
-    for (const c of characters()) if (!this.squad.some((s) => s.id === c.id && !s.p2)) this.squad.push({ id: c.id, p2: false });
-    this.squad = this.squad.slice(0, 5);
+    this.squad = endingSquad(session);
     this.epi = wrapText(EPILOGUE, 300);
   }
 
@@ -91,7 +109,7 @@ export class EndingScene implements Scene {
 
   get creditsDone(): boolean {
     // Credits + results have scrolled by and THE END has settled.
-    return this.scroll > this.creditsH + 24 + 74 + 146 - 36;
+    return this.scroll > settleScroll(this.creditsH);
   }
 
   update(dt: number): void {
@@ -101,21 +119,27 @@ export class EndingScene implements Scene {
     const m = input.menu;
     const tap = !!uiInput.takeTap();
     const ph = this.phase;
+    // FIRE skips one phase at a time. A dedicated START skips to the credits / the end of the
+    // roll; ENTER counts as both, so it only acts as FIRE (no skipping two phases at once).
     if ((m.pressed('confirm') || tap) && this.time > 0.6) {
       if (ph === 0) this.jumpTo(T_CELEBRATE);
       else if (ph === 1) this.jumpTo(T_CREDITS);
       else if (this.creditsDone) this.next();
-    }
-    if (m.pressed('start') && this.time > 0.6) {
+    } else if (m.pressed('start') && this.time > 0.6) {
       if (ph < 2) this.jumpTo(T_CREDITS);
-      else this.scroll = Math.max(this.scroll, this.creditsH + 209);
+      else this.scroll = Math.max(this.scroll, settleScroll(this.creditsH) + 1);
+    }
+    // Leftover explosion smoke must not drift over the sunrise.
+    if (this.phase !== this.lastPhase) {
+      this.lastPhase = this.phase;
+      this.parts.clear();
     }
     if (ph === 0) this.updateDestruction(dt);
     else this.updateFireworks(dt);
     if (ph === 2) {
       const fast = m.held('confirm') || m.held('down');
       this.scroll += dt * (fast ? 70 : 18);
-      if (this.creditsDone && this.scroll > this.creditsH + 208 + 18 * 12) this.next();
+      if (this.creditsDone && this.scroll > settleScroll(this.creditsH) + 18 * 12) this.next();
     }
     if (this.bigFlash > 0) this.bigFlash -= dt;
     this.parts.update(dt, null);
@@ -204,7 +228,11 @@ export class EndingScene implements Scene {
     if (ph === 0) this.renderDestruction(g);
     else if (ph === 1) this.renderCelebration(g);
     else this.renderCredits(g);
-    if (this.bigFlash > 0) rect(g, 0, 0, VIEW_W, VIEW_H, '#ffffff', Math.min(1, this.bigFlash));
+    // The citadel's last blast: a white-out, or a soft warm glow with SCREEN FLASHES off.
+    if (this.bigFlash > 0) {
+      if (settings.flashes) rect(g, 0, 0, VIEW_W, VIEW_H, '#ffffff', Math.min(1, this.bigFlash));
+      else rect(g, 0, 0, VIEW_W, VIEW_H, '#ff9a4a', Math.min(0.3, this.bigFlash * 0.3));
+    }
   }
 
   private renderDestruction(g: CanvasRenderingContext2D): void {
@@ -227,7 +255,7 @@ export class EndingScene implements Scene {
       text(g, msg.slice(0, n), VIEW_W / 2, 10, { align: 'center', color: C.gold });
     }
     if (this.time > T_BOOM + 1) twoTone(g, 'THE LEGION IS FINISHED!', VIEW_W / 2, 24, C.white, C.gold, { scale: 2, align: 'center', split: 3 });
-    footer(g, 'FIRE: SKIP', VIEW_H - 10, C.greyD);
+    footer(g, ctl('FIRE: SKIP', 'TAP: SKIP'), VIEW_H - 10, C.greyD);
   }
 
   private hill(g: CanvasRenderingContext2D, color: string, rim: string): void {
@@ -290,7 +318,7 @@ export class EndingScene implements Scene {
         left -= l.length;
       });
     }
-    footer(g, 'FIRE: SKIP', VIEW_H - 10, C.greyD);
+    footer(g, ctl('FIRE: SKIP', 'TAP: SKIP'), VIEW_H - 10, C.greyD);
   }
 
   private renderCredits(g: CanvasRenderingContext2D): void {
@@ -309,7 +337,6 @@ export class EndingScene implements Scene {
     // Night lighting on the foreground.
     rect(g, 0, 120, VIEW_W, VIEW_H - 120, '#06041a', 0.55);
     // Roll (credits, then the final stats) in the sky above the hill.
-    const ROLL_BOTTOM = 146;
     g.save();
     g.beginPath();
     g.rect(0, 0, VIEW_W, ROLL_BOTTOM);
@@ -340,7 +367,7 @@ export class EndingScene implements Scene {
       rect(g, 0, ROLL_BOTTOM - 2 - i * 2, VIEW_W, 2, '#100c2c', 0.6 - i * 0.075);
     }
     g.restore();
-    if (this.creditsDone && blink(this.time, 1.5, 0.7)) footer(g, 'PRESS FIRE', VIEW_H - 10, C.gold);
-    else if (!this.creditsDone) footer(g, 'HOLD FIRE: FAST', VIEW_H - 10, C.greyD);
+    if (this.creditsDone && blink(this.time, 1.5, 0.7)) footer(g, ctl('PRESS FIRE', 'TAP TO CONTINUE'), VIEW_H - 10, C.gold);
+    else if (!this.creditsDone) footer(g, ctl('HOLD FIRE: FAST', ''), VIEW_H - 10, C.greyD);
   }
 }

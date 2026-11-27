@@ -5,7 +5,7 @@
 import { drawText, textWidth, FONT_H, type TextOpts } from '../engine/font';
 import { VIEW_H, VIEW_W } from '../engine/renderer';
 import { audio, type PlayOpts } from '../engine/audio';
-import { input } from '../engine/input';
+import { input, keyLabel, type Action, type Bindings } from '../engine/input';
 import { app } from '../app';
 
 /** UI palette (matches the game's art: near-black purple outline, brass/gold accents). */
@@ -231,6 +231,27 @@ class UiInput {
 }
 
 export const uiInput = new UiInput();
+
+/** Prompt for the device in use: `keys` normally, `touch` after the player last touched the screen. */
+export function ctl(keys: string, touch: string): string {
+  return input.lastDevice === 'touch' ? touch : keys;
+}
+
+/** Short key summary of a keyboard layout, e.g. "WASD + J K L" (prefers non-numpad keys). */
+export function layoutLabel(b: Bindings): string {
+  const pick = (a: Action) => {
+    const ks = b[a] ?? [];
+    return keyLabel(ks.find((k) => !k.startsWith('Numpad')) ?? ks[0] ?? '?');
+  };
+  const arrows = b.up?.[0] === 'ArrowUp' && b.left?.[0] === 'ArrowLeft' && b.down?.[0] === 'ArrowDown' && b.right?.[0] === 'ArrowRight';
+  const move = arrows ? 'ARROWS' : (['up', 'left', 'down', 'right'] as Action[]).map(pick).join('');
+  return `${move} + ${pick('fire')} ${pick('jump')} ${pick('bomb')}`;
+}
+
+/** Who uses which keys while two players share the keyboard. */
+export function sharedKeysHint(): string {
+  return `1P: ${layoutLabel(input.bindings.p1)}    2P: ${layoutLabel(input.bindings.p2)}`;
+}
 
 /** Common per-scene "enter" housekeeping for menu screens. */
 export function enterMenu(): void {

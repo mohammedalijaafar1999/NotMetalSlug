@@ -14,7 +14,7 @@ import { flow, type MissionStats } from './flow';
 import { getLevel, levelForMission } from '../game/level';
 import { getCharacter } from '../game/characters';
 import type { GameSession } from '../game/session';
-import { C, PLAYER_COLORS, blink, easeOut, easeOutBack, enterMenu, footer, formatTime, panel, rect, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
+import { C, PLAYER_COLORS, blink, ctl, easeOut, easeOutBack, enterMenu, footer, formatTime, panel, rect, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
 import { faceSprite } from '../content/ui/art';
 import { countHostages, missionInfo } from '../content/ui/missions';
 
@@ -49,6 +49,8 @@ export class TallyScene implements Scene {
   private readonly tRank: number;
   private readonly tDone: number;
   readonly rank: string | null;
+  /** Hostages placed in the level (0 = unknown). */
+  readonly hostageTotal: number;
   private rankSfx = false;
   private bonusSfx = false;
   private poppedIcons = 0;
@@ -63,7 +65,8 @@ export class TallyScene implements Scene {
     this.tRank = this.tBonus + 1.0;
     this.tDone = this.tRank + 0.5;
     const def = (stats.levelId ? getLevel(stats.levelId) : undefined) ?? levelForMission(this.missionNo);
-    this.rank = missionRank(stats.rescues, countHostages(def));
+    this.hostageTotal = countHostages(def);
+    this.rank = missionRank(stats.rescues, this.hostageTotal);
   }
 
   get missionNo(): number {
@@ -160,7 +163,7 @@ export class TallyScene implements Scene {
       Math.round(st.time * this.k(T_ROWS[0])),
       Math.round(st.kills * this.k(T_ROWS[1])),
       Math.round(st.shotsFired * this.k(T_ROWS[2])),
-      Math.round(accuracy(st.kills, st.shotsFired) * this.k(T_ROWS[3])),
+      Math.round(st.rescues * this.k(T_ROWS[3])),
       Math.round(this.k(this.tBonus, 0.8) * 100),
     ].join(',');
   }
@@ -204,12 +207,13 @@ export class TallyScene implements Scene {
     const px = 70;
     const pw = 244;
     panel(g, px, 38, pw, 62, 'steel', 0.9);
-    const acc = accuracy(st.kills, st.shotsFired);
+    // Hostages freed (out of how many) is what the rank is graded on, so it gets the last row.
+    const freed = Math.round(st.rescues * this.k(T_ROWS[3]));
     const rows: [string, string][] = [
       ['CLEAR TIME', formatTime(st.time * this.k(T_ROWS[0]))],
       ['ENEMIES DOWN', String(Math.round(st.kills * this.k(T_ROWS[1])))],
       ['SHOTS FIRED', String(Math.round(st.shotsFired * this.k(T_ROWS[2])))],
-      ['ACCURACY', `${Math.round(acc * this.k(T_ROWS[3]))}%`],
+      ['HOSTAGES FREED', this.hostageTotal > 0 ? `${freed}/${this.hostageTotal}` : String(freed)],
     ];
     rows.forEach(([label, value], r) => {
       if (this.time < T_ROWS[r] - 0.1) return;
@@ -283,7 +287,7 @@ export class TallyScene implements Scene {
       twoTone(g, pad(scoreShown, 8), x + ppw - 8, y + 64, C.white, C.gold, { align: 'right', scale: 2, split: 3 });
     });
     if (this.time >= this.tDone) {
-      if (blink(this.time, 1.5, 0.7)) footer(g, n >= LAST_MISSION ? 'PRESS FIRE' : 'PRESS FIRE TO CONTINUE', VIEW_H - 14, C.gold);
-    } else footer(g, 'FIRE: SKIP', VIEW_H - 14, C.greyD);
+      if (blink(this.time, 1.5, 0.7)) footer(g, ctl('PRESS FIRE TO CONTINUE', 'TAP TO CONTINUE'), VIEW_H - 14, C.gold);
+    } else footer(g, ctl('FIRE: SKIP', 'TAP: SKIP'), VIEW_H - 14, C.greyD);
   }
 }

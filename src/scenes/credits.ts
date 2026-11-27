@@ -9,7 +9,7 @@ import { VIEW_H, VIEW_W } from '../engine/renderer';
 import { app } from '../app';
 import { characters } from '../game/characters';
 import { backdrop } from './backdrop';
-import { C, backButton, enterMenu, footer, twoTone, uiInput, syncTouch } from './ui';
+import { C, backButton, ctl, enterMenu, footer, twoTone, uiInput, syncTouch } from './ui';
 import { LOGO_W } from '../content/ui/art';
 
 export interface CreditLine {
@@ -132,6 +132,6 @@ export class CreditsScene implements Scene {
     }
     g.globalAlpha = 1;
     backButton(g, this.time);
-    footer(g, 'HOLD FIRE: FAST   BACK: RETURN', VIEW_H - 10);
+    footer(g, ctl('HOLD FIRE: FAST   BACK: RETURN', ''), VIEW_H - 10);
   }
 }

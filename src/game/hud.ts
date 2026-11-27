@@ -4,7 +4,7 @@
 // prompts, including the full-screen CONTINUE? countdown when every joined player is out.
 
 import { drawText, textWidth } from '../engine/font';
-import { input } from '../engine/input';
+import { input, keyLabel } from '../engine/input';
 import { VIEW_H, VIEW_W } from '../engine/renderer';
 import { pad } from '../engine/math';
 import { sprites } from '../engine/sprites';
@@ -12,7 +12,7 @@ import type { World } from './world';
 import type { Player } from './player';
 import type { GameSession } from './session';
 import { getCharacter } from './characters';
-import { C, PLAYER_COLORS, blink, easeOut, easeOutBack, panel, rect, stripes, text, twoTone, uiSfx } from '../scenes/ui';
+import { C, PLAYER_COLORS, blink, ctl, easeOut, easeOutBack, panel, rect, stripes, text, twoTone, uiSfx } from '../scenes/ui';
 import { faceSprite } from '../content/ui/art';
 
 export type BannerStyle = 'drop' | 'slide' | 'small' | 'warning';
@@ -56,6 +56,14 @@ export function continueState(session: GameSession, timers: number[]): { allOut:
   let time = -1;
   for (const p of joined) if (p.out && timers[p.index] >= 0) time = Math.max(time, timers[p.index]);
   return { allOut, counting: time >= 0, time };
+}
+
+/** The button player 2 presses to drop in: START on a gamepad, their START key on the keyboard. */
+export function joinKey(): string {
+  if (input.lastDevice === 'gamepad') return 'START';
+  const ks = input.bindings.p2.start ?? [];
+  const k = ks.find((c) => !c.startsWith('Numpad')) ?? ks[0];
+  return k ? keyLabel(k) : 'START';
 }
 
 export class Hud {
@@ -272,7 +280,7 @@ export class Hud {
   private joinPrompt(g: CanvasRenderingContext2D): void {
     // Touch players can't drop in a second player (and the pause button lives there).
     if (input.lastDevice === 'touch' || !blink(this.time, 1, 0.7)) return;
-    text(g, '2P PRESS START', VIEW_W - 5, 4, { align: 'right', color: C.grey });
+    text(g, `2P PRESS ${joinKey()}`, VIEW_W - 5, 4, { align: 'right', color: C.grey });
   }
 
   // ------------------------------------------------------------------ boss bar
@@ -396,7 +404,7 @@ export class Hud {
     g.lineWidth = 1;
     const sc = frac > 0.85 ? 7 : 6;
     twoTone(g, String(digit), cx, cy - Math.round((7 * sc) / 2), C.white, digit <= 3 ? '#ff8a7a' : C.gold, { scale: sc, align: 'center', split: 3 });
-    if (blink(this.time, 1.6, 0.7)) text(g, 'PRESS START OR FIRE', cx, 134, { align: 'center', color: C.white });
+    if (blink(this.time, 1.6, 0.7)) text(g, ctl('PRESS START OR FIRE', 'TAP TO CONTINUE'), cx, 134, { align: 'center', color: C.white });
     session.players.forEach((p, i) => {
       if (!p.joined) return;
       const x = session.twoPlayer ? (i === 0 ? cx - 90 : cx + 90) : cx;

@@ -11,7 +11,7 @@ import { progress } from '../engine/storage';
 import { app } from '../app';
 import { flow } from './flow';
 import { backdrop } from './backdrop';
-import { C, backButton, blink, enterMenu, fitText, footer, panel, rect, selBar, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
+import { C, backButton, blink, ctl, enterMenu, fitText, footer, panel, rect, selBar, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
 import { MISSION_COUNT, missionInfo } from '../content/ui/missions';
 import { renderMap } from './briefing';
 
@@ -143,6 +143,6 @@ export class MissionSelectScene implements Scene {
       drawText(g, `CLEAR MISSION ${n - 1} TO UNLOCK`, 277, 174, { align: 'center', color: C.grey, outline: C.out });
     }
     backButton(g, this.time);
-    footer(g, open ? (blink(this.time, 1.2, 0.75) ? 'FIRE: DEPLOY   BACK: RETURN' : '') : 'BACK: RETURN', VIEW_H - 12, C.gold);
+    footer(g, open ? (blink(this.time, 1.2, 0.75) ? ctl('FIRE: DEPLOY   BACK: RETURN', 'TAP AGAIN TO DEPLOY') : '') : ctl('BACK: RETURN', '◀ BACK: RETURN'), VIEW_H - 12, C.gold);
   }
 }
