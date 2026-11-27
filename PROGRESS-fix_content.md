@@ -8,7 +8,7 @@ Branch fix/content (from claude/metal-slug-game-sogjdj). Dev server: port 5603.
 | 2 | m6 hangar_door/searchlight, m4 lamp/firebarrel, m5 strut perf | done (door static bake + live alarm, beam baked+rotated, m6 panel walls baked, m4 glow = 3 disc blits, m5 strut staticDecor) |
 | 3 | m5 lightning vs settings.flashes (+ audit) | done (m5 soft swell <=0.3, bolt no blink; m4 also unflickered; bosses use world.flash which is gated in gameplay.ts) |
 | 4 | m6 ladle offscreen globs | done (launch only when stream in view, targets clamped SPLASH_EDGE inside; tests) |
-| 5 | m6 crusher push-out when invulnerable | todo |
+| 5 | m6 crusher push-out when invulnerable | done (pushOut nearer side unless walled; test) |
 | 6 | m3 CABLE CAR sign under HUD | todo |
 | 7 | FROST BASTION flak shadows darker | todo |
 | 8 | HORNET KING band lower | todo |

@@ -6,6 +6,7 @@ import { flashAt, SOFT_FLASH } from '../src/content/themes/m5/sky';
 import { lightning, strikeAmount } from '../src/content/themes/m4/weather';
 import { Ladle, MoltenGlob, SPLASH_EDGE } from '../src/content/levels/m6/ladle';
 import { GroundMarker } from '../src/content/bosses/common/fx';
+import { Crusher } from '../src/content/levels/m6/crusher';
 import { VIEW_W } from '../src/engine/renderer';
 import type { LevelDef } from '../src/game/level';
 import type { World } from '../src/game/world';
@@ -100,6 +101,32 @@ function pour(w: World, la: Ladle): { markers: GroundMarker[]; globs: MoltenGlob
     globs: fresh.filter((e): e is MoltenGlob => e instanceof MoltenGlob),
   };
 }
+
+describe('m6 crusher', () => {
+  for (const [label, dx] of [
+    ['left of center', -5],
+    ['right of center', 6],
+  ] as const) {
+    it(`squeezes an invulnerable player (${label}) out of the head to the nearer side`, () => {
+      const w = makeWorld(bench(), { god: false });
+      step(w, 90);
+      const cr = w.spawn('m6_crusher', 200, 180, { cycle: 3.4 }) as Crusher;
+      const p = w.players[0];
+      p.x = 200 + dx;
+      p.y = 180;
+      p.invuln = 5; // respawn blink: the hit cannot connect
+      let inside = 0;
+      for (let i = 0; i < 60 * 4; i++) {
+        p.vx = 0;
+        step(w, 1);
+        if ((cr.state === 'slam' || cr.state === 'hold') && Math.abs(p.x - cr.x) < cr.headW / 2 + p.w / 2 - 1 && cr.headBottom > p.y - p.h + 1) inside++;
+      }
+      expect(p.state).toBe('play');
+      expect(inside).toBeLessThanOrEqual(1);
+      expect(Math.sign(p.x - cr.x)).toBe(Math.sign(dx));
+    });
+  }
+});
 
 describe('m6 ladle splashes stay in view', () => {
   it('a ladle hanging just off screen pours without lobbing globs in', () => {
