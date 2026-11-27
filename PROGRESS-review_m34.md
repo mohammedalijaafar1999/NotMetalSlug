@@ -22,6 +22,7 @@ Probes (gitignored, restored from /home/user/review-artifacts/review_m34): artif
 5. [minor, FIXED] m4 slip gauntlet: wave-3 truck from behind drove ~95 px into the screen before stopping and ran the player down (mortal bot death). stopX 5626: nose parks <= 62 px in. Test mission_m4 'a lock-wave truck from behind parks at the left edge'.
 6. [checked, OK] m4 hostages: autopilot misses the cages at 2120 (tank section) and 5086 (between containers): scripted human route drops through the catwalk, shoots the cage, climbs out -> reachable (bot limitation).
 7. [checked, OK] mortal bot runs (seeds 1-3): no off-screen-origin enemy shots, no HUD-band shots in m3/m4; deaths mostly bot artefacts (stands still vs jetpacks/gunboats). Canal A pit deaths = bot jumps 50 px early.
+8. [major, FIXED] FROST BASTION mortar: blast radius 17 but the floor cross was drawn radius 10 -> a player whose hitbox was clear of the cross died (18 px from impact). Cross now drawn at the blast radius (mortarShell helper, MORTAR_BLAST). Test boss_m3 'a mortar shell only kills a player who touches its floor cross' (failed before).
 
 ## Gotchas
 - m3 boss deaths of the probe bot are 'crush' by flak IceFrags: the side fragments fly diagonally over the gap between two shadows (the gap between marks is NOT safe). Consider larger shadow radius / steeper fragments.

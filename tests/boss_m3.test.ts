@@ -6,7 +6,8 @@ import { Bot } from '../src/debug/bot';
 import { input } from '../src/engine/input';
 import type { World } from '../src/game/world';
 import type { Player } from '../src/game/player';
-import { FrostBastion, FACE_X, LANCE_H, FLAK_BURST_H, FLAK_FLIGHT } from '../src/content/bosses/boss_m3';
+import { FrostBastion, FACE_X, LANCE_H, FLAK_BURST_H, FLAK_FLIGHT, mortarShell } from '../src/content/bosses/boss_m3';
+import { Entity } from '../src/game/entity';
 import { FrostLance, SPIKE_SPEED, SpikeWave, FlakShell, FloorMark } from '../src/content/bosses/m3/parts';
 import { Bullet } from '../src/game/projectile';
 import { getLevel, registerLevel } from '../src/game/level';
@@ -186,6 +187,23 @@ describe('boss_m3 FROST BASTION', () => {
     // The flak is still a threat (a band of the floor is deadly) and there is room around it.
     expect(deaths).toBeGreaterThan(8);
     expect(gaps).toBeGreaterThan(8);
+  });
+
+  it('a mortar shell only kills a player who touches its floor cross', () => {
+    let deaths = 0;
+    for (let d = 0; d <= 40; d += 2) {
+      const { w, p, G } = hazardWorld();
+      const tx = p.x - d;
+      mortarShell(w, w.add(new Entity()), tx + 120, G - 120, tx, G);
+      step(w, 1);
+      const mark = w.entities.find((e) => e instanceof FloorMark) as FloorMark;
+      until(w, () => mark.dead || p.state !== 'play', 3);
+      step(w, 2);
+      if (p.state === 'play') continue;
+      deaths++;
+      expect(d, `killed ${d} px from the impact, clear of its cross (radius ${mark.radius})`).toBeLessThanOrEqual(6 + mark.radius + 0.5);
+    }
+    expect(deaths).toBeGreaterThan(5);
   });
 });
 
