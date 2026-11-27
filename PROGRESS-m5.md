@@ -20,3 +20,6 @@
 - Pickups have gravity -> sky supplies need m5_supply.
 - Respawn: gyro spawns at (safeX, cam.y+60) -> may overlap solids -> m5_airspace pushes out.
 - Vehicle.clampToView squeezes a blocked gyro into solids -> m5_airspace pushes out.
+
+## Interrupted (usage limit)
+- The previous attempt was cut off; its uncommitted files were committed as 'WIP m5: salvaged after interruption'. Review them (`git show --stat HEAD`), keep what is good, delete throwaway debug tests, and continue.

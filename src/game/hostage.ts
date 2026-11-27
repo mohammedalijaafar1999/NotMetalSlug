@@ -3,7 +3,8 @@
 //   mode 'caged'  sitting in a bamboo cage - shoot the cage until it breaks apart (touch won't do)
 //   mode 'wander' loose and nervous, pacing about - touch to rescue
 // Freed hostages hop for joy, walk to their rescuer, dig an item out of a pocket and toss it over,
-// salute, and run off. Rescues are tallied at mission end.
+// salute, and run off. Rescues are tallied at mission end. A rescued hostage who runs off an edge
+// with nothing below (airship decks in the sky mission) pops a parachute and floats away.
 // props: drop (pickup spec, default 'random'), mode, look (0..2 outfit), cageHp (default 8), facing.
 
 import { sprites } from '../engine/sprites';
@@ -208,6 +209,24 @@ sprites.define({
   },
 });
 
+/** Escape parachute (orange/cream gores) for hostages leaving a sky deck: 0-1 sway. */
+sprites.define({
+  name: 'hostage_chute',
+  w: 24,
+  h: 12,
+  frames: 2,
+  draw: (p, f) => {
+    for (let x = 0; x < 24; x++) {
+      const u = (x - 11.5) / 11.5;
+      const tilt = f ? u : -u;
+      const top = Math.round(2 + (1 - Math.sqrt(Math.max(0, 1 - u * u))) * 7 + tilt);
+      const bot = Math.round(8 + Math.abs(u) * 2 + tilt);
+      const gore = Math.floor((x + 1) / 4) % 2 === 0;
+      for (let y = top; y <= bot; y++) p.px(x, y, y === top ? (gore ? '#ffb070' : '#ffffff') : y >= bot - 1 ? (gore ? '#b0501a' : '#c8bea0') : gore ? '#e8782a' : '#f0e8d8');
+    }
+  },
+});
+
 /** The stake left behind after a rescue. */
 class PostRemains extends Entity {
   constructor(x: number, y: number) {
@@ -224,7 +243,7 @@ class PostRemains extends Entity {
   }
 }
 
-export type HostageMode = 'tied' | 'caged' | 'wander' | 'freed' | 'walk' | 'give' | 'salute' | 'run';
+export type HostageMode = 'tied' | 'caged' | 'wander' | 'freed' | 'walk' | 'give' | 'salute' | 'run' | 'chute';
 
 export class Hostage extends Actor {
   mode: HostageMode = 'tied';
@@ -438,7 +457,18 @@ export class Hostage extends Actor {
         this.vx = -110;
         this.facing = -1;
         if (this.onGround && this.hitWall) this.jump(220);
+        // Ran off an edge with nothing below (a sky deck): parachute away instead of falling.
+        if (!this.onGround && this.vy > 40 && !this.world.terrain.floorAt(this.x, this.y, this.y + 200)) {
+          this.setMode('chute');
+          this.gravityScale = 0;
+          this.world.sfx('parachute', this.x, { vol: 0.5, pitch: 1.3 });
+        }
         if (!this.onScreen(24)) this.remove();
+        break;
+      case 'chute':
+        this.vx = -24 + Math.sin(this.modeTime * 1.6) * 10;
+        this.vy += (30 - this.vy) * Math.min(1, dt * 4);
+        if (!this.onScreen(40)) this.remove();
         break;
     }
     this.moveAndCollide(dt);
@@ -478,6 +508,18 @@ export class Hostage extends Actor {
       case 'run':
         f = HF.RUN + (Math.floor(this.walkPhase) % HF.RUN_N);
         break;
+      case 'chute': {
+        // Hanging from the risers, waving thanks.
+        f = HF.HOP;
+        const sway = Math.sin(this.modeTime * 1.6);
+        sprites.get('hostage_chute').draw(g, this.x, this.y - 32, sway > 0 ? 1 : 0);
+        g.fillStyle = '#d8d0b8';
+        for (let i = 0; i <= 6; i++) {
+          g.fillRect(Math.round(this.x - 11 + i * 1.2), Math.round(this.y - 32 + i * 1.6), 1, 1);
+          g.fillRect(Math.round(this.x + 11 - i * 1.2), Math.round(this.y - 32 + i * 1.6), 1, 1);
+        }
+        break;
+      }
     }
     s.draw(g, this.x, this.y, f, { flip: this.facing < 0 });
     if (this.mode === 'caged') {
