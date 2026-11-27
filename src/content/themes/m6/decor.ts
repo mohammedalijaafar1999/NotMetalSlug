@@ -1016,12 +1016,14 @@ const searchlight: DecorRenderer = (g, d, time) => {
   const c = Math.cos(a);
   const s = Math.sin(a);
   g.fillStyle = '#e8e0c0';
-  for (let i = 4; i < 230; i += 3) {
+  for (let i = 4; i < 260; i += 3) {
     const bx = x + c * i;
     const by = y - 6 + s * i;
-    const half = 1 + i * 0.07;
-    g.globalAlpha = 0.11 * (1 - i / 240);
+    const half = 1.5 + i * 0.09;
+    g.globalAlpha = 0.16 * (1 - i / 270);
     g.fillRect(Math.round(bx - half), Math.round(by - 1), Math.round(half * 2), 3);
+    g.globalAlpha *= 1.6;
+    g.fillRect(Math.round(bx - half * 0.3), Math.round(by - 1), Math.max(1, Math.round(half * 0.6)), 3);
   }
   g.globalAlpha = 1;
   sprites.get('m6d_searchlight').draw(g, x, y);
@@ -1365,6 +1367,46 @@ const crane: DecorRenderer = (g, d, time) => {
   sprites.get('m6d_hook').draw(g, tx, y + 18 + len);
 };
 
+// ------------------------------------------------------------------ roof truss (hangar)
+
+const TRUSS_W = 48;
+const TRUSS_H = 34;
+sprites.define({
+  name: 'm6d_truss',
+  w: TRUSS_W,
+  h: TRUSS_H,
+  ox: 0,
+  oy: TRUSS_H,
+  outline: null,
+  draw: (p) => {
+    const dark = M6.near;
+    const hi = M6.nearHi;
+    const rim = M6.nearRim;
+    // chords
+    p.rect(0, 0, TRUSS_W, 4, dark);
+    p.rect(0, 0, TRUSS_W, 1, hi);
+    p.rect(0, TRUSS_H - 4, TRUSS_W, 4, dark);
+    p.rect(0, TRUSS_H - 1, TRUSS_W, 1, rim);
+    // posts + diagonals (one bay)
+    p.rect(0, 0, 3, TRUSS_H, dark);
+    p.rect(0, 0, 1, TRUSS_H, hi);
+    p.line(2, 3, TRUSS_W / 2, TRUSS_H - 4, dark, 2);
+    p.line(TRUSS_W / 2, TRUSS_H - 4, TRUSS_W - 1, 3, dark, 2);
+    p.line(3, 4, TRUSS_W / 2, TRUSS_H - 3, rim, 1);
+    // gusset plates
+    p.rect(TRUSS_W / 2 - 3, TRUSS_H - 7, 6, 4, hi);
+    p.px(TRUSS_W / 2 - 2, TRUSS_H - 6, M6.steelD);
+    p.px(TRUSS_W / 2 + 1, TRUSS_H - 6, M6.steelD);
+  },
+});
+
+/** Roof truss silhouette: d.x = left edge, d.y = bottom chord y; props.w. */
+const truss: DecorRenderer = (g, d) => {
+  const w: number = d.props?.w ?? 256;
+  const s = sprites.get('m6d_truss');
+  for (let x = 0; x < w; x += TRUSS_W) s.draw(g, Math.round(d.x + x), Math.round(d.y));
+};
+
 // ------------------------------------------------------------------ molten pit interior
 
 /**
@@ -1441,4 +1483,5 @@ export const M6_DECOR: Record<string, DecorRenderer> = {
   panel,
   hangar_door: hangarDoor,
   pit,
+  truss,
 };

@@ -8,11 +8,11 @@
 //                     events: [{ at: 0..1, type, dx, dy?, props? }] } }  (dx/dy relative to the camera)
 
 import { sprites } from '../../../engine/sprites';
-import { VIEW_W } from '../../../engine/renderer';
 import { registerEntity } from '../../../game/registry';
 import { Actor, Entity } from '../../../game/entity';
 import { Z } from '../../../game/constants';
 import type { Surface } from '../../../game/terrain';
+import type { PixelArt } from '../../../engine/pixelart';
 import { ramp, shaded } from '../../vehicles/art';
 import { M6 } from '../../themes/m6/palette';
 
@@ -31,7 +31,7 @@ type LiftState = 'bottom' | 'up' | 'top' | 'down';
 
 const DECK_H = 7;
 
-function deckArt(w: number): (p: import('../../../engine/pixelart').PixelArt) => void {
+function deckArt(w: number): (p: PixelArt) => void {
   return (p) => {
     // grated deck
     for (let x = 0; x < w; x++) {
@@ -114,10 +114,6 @@ export class Lift extends Entity {
   /** Ride progress 0 (bottom) .. 1 (top). */
   get progress(): number {
     return (this.bottomY - this.deckY) / Math.max(1, this.bottomY - this.topY);
-  }
-
-  private onDeck(a: Actor): boolean {
-    return a.onGround && Math.abs(a.y - this.deckY) < 2.5 && Math.abs(a.x - this.x) <= this.w / 2 + 1;
   }
 
   /** Standing on the deck, or hopping above it (jumping while riding still counts). */
@@ -257,5 +253,3 @@ registerEntity(
     'Starts climbing when a player stands on it, sinks back when left empty with a player below. 88 px wide deck.',
 );
 
-export const LIFT_W = 88;
-void VIEW_W;

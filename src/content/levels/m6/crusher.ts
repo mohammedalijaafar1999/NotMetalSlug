@@ -10,7 +10,7 @@
 
 import { sprites } from '../../../engine/sprites';
 import { fxRng } from '../../../engine/rng';
-import { shade } from '../../../engine/pixelart';
+import { shade, type PixelArt } from '../../../engine/pixelart';
 import { rectsOverlap, type Rect } from '../../../engine/math';
 import { registerEntity } from '../../../game/registry';
 import { Actor, Entity } from '../../../game/entity';
@@ -27,7 +27,7 @@ const SLAM = 0.13;
 const HOLD = 0.42;
 const RISE = 0.9;
 
-function headArt(w: number): (p: import('../../../engine/pixelart').PixelArt, f: number) => void {
+function headArt(w: number): (p: PixelArt, f: number) => void {
   return (p) => {
     const steel = ramp(M6.steelL, 0.3, -0.34);
     // block body
@@ -52,7 +52,7 @@ function headArt(w: number): (p: import('../../../engine/pixelart').PixelArt, f:
   };
 }
 
-function housingArt(w: number): (p: import('../../../engine/pixelart').PixelArt, f: number) => void {
+function housingArt(w: number): (p: PixelArt, f: number) => void {
   return (p, f) => {
     const W = w + 16;
     const iron = ramp(M6.iron, 0.3, -0.34);
@@ -101,6 +101,8 @@ export class Crusher extends Entity {
   private hitIds = new Set<number>();
   private upTime = 1;
   private beeped = 0;
+  /** Length of the current telegraph (shorter when a scrap press catches a vehicle). */
+  private warnT = WARN;
 
   constructor() {
     super();
@@ -176,10 +178,11 @@ export class Crusher extends Entity {
           this.set('warn');
           this.beeped = 0;
           this.hitIds.clear();
+          this.warnT = this.scrap && this.vehicleUnder() ? 0.42 : WARN;
         }
         break;
       case 'warn': {
-        const warn = this.scrap && this.vehicleUnder() ? 0.42 : WARN;
+        const warn = this.warnT;
         const k = this.stateTime / warn;
         // wind-up: jerk up a little, then shudder
         this.lift = this.clearance + Math.min(3, k * 9) + (k > 0.4 && Math.floor(this.stateTime * 40) % 2 ? 1 : 0);

@@ -114,7 +114,6 @@ export class Ladle extends Entity {
   /** Current tilt angle. */
   tilt = 0;
   private idleT = 2;
-  private marker: GroundMarker | null = null;
 
   constructor() {
     super();
@@ -162,7 +161,9 @@ export class Ladle extends Entity {
         if (this.stateTime >= this.idleT) {
           this.set('tilt');
           if (vis) {
-            this.marker = this.world.add(new GroundMarker(this.x, this.y, TILT_T + 0.05, 'cross', 7));
+            // mark where the stream will land (the top-most floor under it: a catwalk over a channel)
+            const fy = this.world.terrain.floorAt(this.x, this.y - this.height + 8, this.y)?.y ?? this.y;
+            this.world.add(new GroundMarker(this.x, fy, TILT_T + 0.05, 'cross', 7));
             this.world.sfx('mortar_whistle', this.x, { vol: 0.35, pitch: 0.55 });
           }
         }

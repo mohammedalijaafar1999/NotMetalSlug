@@ -155,6 +155,9 @@ add(
   E('barrel', 1200),
   E('barrel', 1214),
 );
+// a guard post past the gate with a marksman on it
+solids.push({ x: 1440, y: 388, w: 44, h: 38 });
+add(E('sniper', 1466, 388, { facing: -1 }), E('rifleman', 1520, undefined, { behavior: 'guard', facing: -1 }));
 
 const LOCK_GATE: LockDef = {
   x: 1000,
@@ -282,7 +285,9 @@ add(
   E('m6_conveyor', 3075, GL, { w: 150, speed: 32 }, 2960),
   E('m6_crusher', 3080, GL, { cycle: 3.4, offset: 0 }, 2980),
   E('crate_prop', 3015, undefined, { drop: 'R' }),
-  E('rifleman', 3150, undefined, { behavior: 'patrol', facing: -1 }),
+  E('rifleman', 3150, undefined, { behavior: 'idle', facing: -1 }),
+  E('rifleman', 3172, undefined, { behavior: 'idle', facing: -1 }),
+  E('officer', 3192, undefined, { facing: -1 }),
   E('m6_conveyor', 3285, 394, { w: 160, speed: -34 }, 3150),
   E('m6_crusher', 3300, 394, { cycle: 3.6, offset: 1.2, clearance: 42 }, 3160),
   E('hostage', 3352, 394, { mode: 'caged', drop: 'L', look: 1 }, 3230),
@@ -427,11 +432,14 @@ add(
   ),
   E('turret', 5420, GU, { kind: 'mg', dir: -1 }),
   E('robot', 5476, GU, { behavior: 'guard', facing: -1 }),
+  // a marksman watching the shaft from the hangar floor
+  E('sniper', 5446, GU, { facing: -1 }),
 );
 
 // ================================================================== F: hangar (5390-end)
 
 wallPanels(5388, BOSS_LOCK + 270, GU, 112);
+for (let x = 5388; x < M6_W; x += 240) D('truss', x, 76, { w: Math.min(240, M6_W - x), behindTerrain: true });
 D('hangar_door', BOSS_LOCK + 270, GU, { h: 150, w: 114 });
 D('banner', 5470, 84);
 D('beacon', 5560, 132, { color: 'red' });
@@ -457,6 +465,7 @@ platforms.push({ x: 5800, y: 156, w: 84, style: 'grate' });
 add(
   E('hostage', 5500, GU, { drop: 'bomb', look: 2 }),
   E('pickup', 5590, GU, { item: 'bomb' }),
+  E('sniper', 5850, 156, { facing: -1 }),
 );
 
 const LOCK_GAUNTLET: LockDef = {
@@ -523,7 +532,7 @@ export const M6_LEVEL: LevelDef = {
   name: 'IRON CITADEL',
   subtitle: 'OPERATION IRON FIST',
   briefing:
-    "THIS IS IT: GRISTLE'S IRON CITADEL. BLOW THE GATE, CROSS THE FOUNDRY AND WATCH THE MOLTEN CHANNELS. " +
+    "THIS IS IT: GRISTLE'S IRON CITADEL. STORM THE GATE, CROSS THE FOUNDRY AND MIND THE MOLTEN CHANNELS. " +
     'THE CONVEYOR HALLS ARE FULL OF PRESSES - TIME YOUR RUNS. GRAB THE STRIDER ON THE ROBOT LINE, RIDE THE ' +
     'REACTOR LIFT TO THE HANGAR AND STOP THE JUGGERNAUT BEFORE IT WAKES. FREE THE LAST CAPTIVES. GOOD LUCK.',
   theme: 'm6',
