@@ -25,6 +25,8 @@ export const SPAN = 66;
 export const BRIDGE_DROP = 44;
 const ARM_TIME = 2.2;
 const BLAST_GAP = 0.24;
+/** Width of the far abutment strip (past the last span) that the far charge also wrecks vehicles on. */
+const ABUTMENT = 64;
 
 // ------------------------------------------------------------------ art
 
@@ -260,6 +262,7 @@ export class Bridge extends Entity {
       }
       if (this.nextBlast > this.spans && this.t > this.spans * BLAST_GAP + 0.6) this.state = 'down';
     }
+    if (this.state === 'blowing' || this.state === 'down') this.wreckStranded();
     for (let i = 0; i < this.fireT.length; i++) if (this.fireT[i] > 0) this.fireT[i] -= dt;
     // Smoke + embers from the stumps after the collapse.
     if ((this.state === 'down' || this.state === 'blowing') && fxRng.chance(dt * 3)) {
@@ -294,6 +297,24 @@ export class Bridge extends Entity {
           z: Z.FX - 2,
         }),
       );
+    }
+  }
+
+  /**
+   * The vehicle beat ends here, however the pilot jumps: a vehicle over a fallen span (in the air
+   * or down in the riverbed) or standing on the far abutment once its charge has blown is wrecked
+   * too (pilot thrown clear). Without this a STRIDER that hopped or glided through the collapse,
+   * or waited on the far abutment, carried on to the mesa and the boss.
+   */
+  private wreckStranded(): void {
+    const x2 = this.x1 + this.w;
+    for (const e of this.world.query((q) => isVehicle(q))) {
+      const v = e as any;
+      if (v.destroyed || e.dead) continue;
+      if (e.x < this.x1 - 6 || e.x > x2 + ABUTMENT || e.y < this.deckY - 220) continue;
+      const s = Math.max(0, Math.min(this.spans - 1, Math.floor((e.x - this.x1) / SPAN)));
+      const gone = e.x >= x2 ? this.blown[this.spans] : !this.deck[s];
+      if (gone) v.startDestruction();
     }
   }
 

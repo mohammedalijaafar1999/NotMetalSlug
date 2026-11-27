@@ -196,6 +196,29 @@ describe('mission 2 - rigged rail bridge', () => {
     // The walker parked on the deck was wrecked with the span.
     expect((mech as any).destroyed || mech.dead).toBe(true);
   });
+
+  it('no walker survives it: not one in the air over a falling span, nor one parked on the far abutment', () => {
+    const { w, bridge, p } = bridgeWorld(true);
+    const x2 = M2_BRIDGE.x1 + M2_BRIDGE.spans * SPAN;
+    // The pilot waits on the far abutment (where the lock screen ends) ...
+    const parked = w.spawn('mech', x2 + 30, M2_BRIDGE.y) as Vehicle;
+    p.x = x2 + 30;
+    step(w, 20);
+    p.enterVehicle(parked);
+    step(w, 20);
+    expect(p.vehicle).toBe(parked);
+    w.spawn('m2_detonator', bridge.x, M2_BRIDGE.y);
+    for (let i = 0; i < 300 && bridge.state !== 'blowing'; i++) step(w, 1);
+    // ... while an empty one is hopping over the far span as it drops.
+    const hopping = w.spawn('mech', x2 - 30, M2_BRIDGE.y - 60) as Vehicle;
+    hopping.vy = -200;
+    for (let i = 0; i < 600 && !bridge.down; i++) step(w, 1);
+    step(w, 90);
+    expect((parked as any).destroyed || parked.dead).toBe(true);
+    expect((hopping as any).destroyed || hopping.dead).toBe(true);
+    expect(p.vehicle).toBeFalsy();
+    expect(['play', 'respawn']).toContain(p.state);
+  });
 });
 
 describe('mission 2 - incoming-vehicle warning', () => {
