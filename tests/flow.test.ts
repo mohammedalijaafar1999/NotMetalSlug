@@ -187,6 +187,48 @@ describe('focus loss', () => {
   });
 });
 
+describe('pause menu with real key presses', () => {
+  /** Hold a key for a few frames like a human does (keydown latch + held), then release. */
+  const holdKey = (code: string, frames = 6) => {
+    const held: Set<string> = (input as any).keysDown;
+    const latch: Set<string> = (input as any).keyTapLatch;
+    held.add(code);
+    latch.add(code);
+    for (let i = 0; i < frames; i++) {
+      input.poll(DT);
+      app.scenes.update(DT);
+    }
+    held.delete(code);
+    for (let i = 0; i < 3; i++) {
+      input.poll(DT);
+      app.scenes.update(DT);
+    }
+  };
+  it('ESC / P / ENTER held for several frames pause and resume cleanly (no instant re-pause)', () => {
+    const s = new GameSession({ characters: ['dex', 'juno'], mission: 1 });
+    const gp = new GameplayScene(s);
+    app.scenes.set(gp, { fade: false });
+    run(1);
+    holdKey('Escape');
+    expect(app.scenes.stack.map((x) => x.name)).toEqual(['gameplay', 'pause']);
+    run(0.3);
+    holdKey('Escape');
+    expect(app.scenes.stack.map((x) => x.name)).toEqual(['gameplay']);
+    holdKey('KeyP');
+    expect(app.scenes.current?.name).toBe('pause');
+    run(0.3);
+    holdKey('KeyP');
+    expect(app.scenes.current?.name).toBe('gameplay');
+    // ENTER on RESUME (ENTER is also player 1's START).
+    holdKey('Escape');
+    run(0.3);
+    holdKey('Enter');
+    expect(app.scenes.current?.name).toBe('gameplay');
+    // A fire button held through the pause does not count as a new press afterwards.
+    expect(input.player(0).pressed('start')).toBe(false);
+  });
+});
+
 describe('drop-in co-op', () => {
   it('player 2 dropping into the gyro mission gets the respawn invulnerability', () => {
     const s = new GameSession({ characters: ['dex', 'juno'], twoPlayer: false, mission: 5 });

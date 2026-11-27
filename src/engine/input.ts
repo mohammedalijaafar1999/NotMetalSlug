@@ -93,9 +93,13 @@ export class ActionState {
     }
   }
 
+  /**
+   * Clear edge state. Everything counts as held until the next sample, so a button still held
+   * across a scene change (the ESC that closed the pause menu...) is not seen as a new press;
+   * a fresh key-down still registers through the tap latch.
+   */
   reset(): void {
-    this.down.fill(0);
-    this.prev.fill(0);
+    this.down.fill(1);
     this.press.fill(0);
   }
 }
