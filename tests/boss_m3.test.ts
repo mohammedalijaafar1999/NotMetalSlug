@@ -14,6 +14,9 @@ import { getLevel, registerLevel } from '../src/game/level';
 
 const LOCK_X = 600;
 
+/** A stand-in owner for boss projectiles fired in isolation. */
+class Gunner extends Entity {}
+
 /** Walk the autopilot into the arena until the boss exists. */
 function reachBoss(seed = 1): { w: World; boss: FrostBastion; bots: Bot[]; t: number } {
   const w = makeWorld('bosstest_m3', { seed, god: true });
@@ -194,7 +197,7 @@ describe('boss_m3 FROST BASTION', () => {
     for (let d = 0; d <= 40; d += 2) {
       const { w, p, G } = hazardWorld();
       const tx = p.x - d;
-      mortarShell(w, w.add(new Entity()), tx + 120, G - 120, tx, G);
+      mortarShell(w, w.add(new Gunner()), tx + 120, G - 120, tx, G);
       step(w, 1);
       const mark = w.entities.find((e) => e instanceof FloorMark) as FloorMark;
       until(w, () => mark.dead || p.state !== 'play', 3);
