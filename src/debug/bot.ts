@@ -104,6 +104,12 @@ export class Bot {
       const want = cam.x + VIEW_W * 0.28;
       mask.right = ctrl.x < want - 12;
       mask.left = ctrl.x > want + 12;
+      // Holding position: turn to face the nearest enemy (fire is released every few frames,
+      // which is when the strafe lock lets a flying vehicle turn).
+      if (!mask.right && !mask.left && nearest && (nearest.cx - ctrl.cx) * ctrl.facing < -10) {
+        if (nearest.cx > ctrl.cx) mask.right = true;
+        else mask.left = true;
+      }
       const ty = nearest ? nearest.cy : cam.y + 100;
       const dy = ty - ctrl.cy;
       mask.up = dy < -8 && ctrl.top > cam.y + 20;
