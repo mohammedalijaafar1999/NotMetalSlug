@@ -1,24 +1,47 @@
-// m5_airspace - invisible flight-safety helper for the sky mission (one alive at a time).
+// m5_airspace - invisible flight-control helper for the sky mission (one alive at a time).
 //
-// In STORMFRONT the gyro shares the sky with airship hulls (solids) while the camera auto-scrolls.
-// Two engine behaviours can leave a gyro overlapping a hull: Vehicle.clampToView pushes a gyro that
-// is blocked by a hull side along with the scrolling camera, and a respawned gyro is dropped in at a
-// fixed height that a hull may occupy. Neither kills (there is no crush damage), but a gyro stuck
-// in a hull looks broken. This helper checks every player-driven flying vehicle each frame and, if
-// it overlaps a solid, eases it out vertically toward the nearest free spot inside the view
-// (preferring up, i.e. onto the deck), so a blocked gyro slides over the hull instead.
+// 1. Hull safety. In STORMFRONT the gyro shares the sky with airship hulls (solids) while the camera
+//    auto-scrolls. Two engine behaviours can leave a gyro overlapping a hull: Vehicle.clampToView
+//    pushes a gyro that is blocked by a hull side along with the scrolling camera, and a respawned
+//    gyro is dropped in at a fixed height that a hull may occupy. Neither kills (there is no crush
+//    damage), but a gyro stuck in a hull looks broken. Every frame each player-driven flying vehicle
+//    that overlaps a solid is eased out vertically toward the nearest free spot inside the view
+//    (preferring up, i.e. onto the deck), so a blocked gyro slides over the hull instead.
+// 2. Spare gyros. A pilot whose DRAGONFLY is shot down over an airship deck lands on it on foot
+//    (over open sky he falls into the clouds and respawns in a new gyro as usual). Rather than leave
+//    him stranded with a pistol on a deck that is scrolling away, a spare gyro (few bombs) drops in
+//    from the top of the screen after a moment, settles over him and he climbs in.
 // Place a few along the level (x = trigger point); extras remove themselves.
 
 import { VIEW_H } from '../../../engine/renderer';
+import { rectsOverlap } from '../../../engine/math';
 import { Entity } from '../../../game/entity';
 import { registerEntity } from '../../../game/registry';
-import type { Vehicle } from '../../../game/vehicle';
+import type { Player } from '../../../game/player';
+import { isVehicle, type Vehicle } from '../../../game/vehicle';
 
 /** Max push per frame (px) - fast enough to beat the camera, slow enough to read as a nudge. */
 const PUSH = 3;
 const SEARCH = 96;
+/** Seconds on foot (on a deck) before the spare gyro is sent. */
+export const SPARE_DELAY = 1.1;
+/** Spare gyro descent speed (px/s). */
+const SPARE_SPEED = 150;
+/** Bombs in a spare gyro. */
+export const SPARE_AMMO = 6;
+
+interface Ferry {
+  gyro: Vehicle;
+  /** Seconds since it was sent. */
+  t: number;
+}
 
 export class Airspace extends Entity {
+  /** Seconds each player has been stranded on foot (by player index). */
+  private afoot = new Map<number, number>();
+  /** Spare gyros on their way (by player index). */
+  private ferries = new Map<number, Ferry>();
+
   constructor() {
     super();
     this.team = 'neutral';
@@ -49,20 +72,97 @@ export class Airspace extends Entity {
     return null;
   }
 
-  override update(_dt: number): void {
+  override update(dt: number): void {
     for (const p of this.world.players) {
-      const v = p.vehicle as Vehicle | null;
-      if (!v || !v.flying || v.destroyed || v.dead) continue;
-      const fy = Airspace.freeY(v);
-      if (fy === null || fy === v.y) continue;
-      const d = fy - v.y;
-      v.y += Math.max(-PUSH, Math.min(PUSH, d));
-      if (d < 0 && v.vy > 0) v.vy = 0;
-      if (d > 0 && v.vy < 0) v.vy = 0;
+      this.unstick(p);
+      this.spare(p, dt);
+    }
+  }
+
+  private unstick(p: Player): void {
+    const v = p.vehicle as Vehicle | null;
+    if (!v || !v.flying || v.destroyed || v.dead) return;
+    const fy = Airspace.freeY(v);
+    if (fy === null || fy === v.y) return;
+    const d = fy - v.y;
+    v.y += Math.max(-PUSH, Math.min(PUSH, d));
+    if (d < 0 && v.vy > 0) v.vy = 0;
+    if (d > 0 && v.vy < 0) v.vy = 0;
+  }
+
+  /** Stranded-pilot pickup (see header). */
+  private spare(p: Player, dt: number): void {
+    const w = this.world;
+    const type = w.level?.def.startVehicle;
+    const ferry = this.ferries.get(p.index);
+    const stranded = !!type && p.state === 'play' && !p.vehicle && !p.dead;
+    if (!stranded) {
+      this.afoot.delete(p.index);
+      if (ferry) {
+        // Not needed any more (he died, respawned or got in): climb away and vanish.
+        const g = ferry.gyro;
+        if (g.driver || g.dead) this.ferries.delete(p.index);
+        else {
+          g.y -= SPARE_SPEED * dt;
+          g.vx = g.vy = 0;
+          if (g.y < w.camera.y - 8) {
+            g.remove();
+            this.ferries.delete(p.index);
+          }
+        }
+      }
+      return;
+    }
+    if (!ferry) {
+      const t = (this.afoot.get(p.index) ?? 0) + (p.onGround ? dt : 0);
+      this.afoot.set(p.index, t);
+      if (t < SPARE_DELAY) return;
+      const g = w.spawn(type!, p.x, w.camera.y - 6, { ammo: SPARE_AMMO });
+      if (!g || !isVehicle(g)) return;
+      g.facing = p.facing;
+      this.ferries.set(p.index, { gyro: g, t: 0 });
+      w.floatText('SPARE GYRO!', p.x, p.y - 40, '#9fe8c8', 1.1);
+      w.sfx('gyro_rotor', p.x, { vol: 0.6 });
+      return;
+    }
+    const g = ferry.gyro;
+    if (g.dead || g.destroyed) {
+      this.ferries.delete(p.index);
+      return;
+    }
+    ferry.t += dt;
+    // Settle just over the pilot (he stands on a deck), then he climbs in.
+    const tx = p.x;
+    const ty = p.y + 2;
+    const dx = tx - g.x;
+    const dy = ty - g.y;
+    const d = Math.hypot(dx, dy);
+    const step = SPARE_SPEED * dt;
+    if (d > step) {
+      g.x += (dx / d) * step;
+      g.y += (dy / d) * step;
+    } else {
+      g.x = tx;
+      g.y = ty;
+    }
+    g.vx = g.vy = 0;
+    if (p.canEnterVehicle && (rectsOverlap(p.box, g.entryBox()) || ferry.t > 3)) {
+      g.x = p.x;
+      g.y = Math.min(g.y, p.y);
+      g.enter(p);
+      p.invuln = Math.max(p.invuln, 1.2);
+      g.invuln = Math.max(g.invuln, 1.2);
+      this.ferries.delete(p.index);
+      this.afoot.delete(p.index);
     }
   }
 
   override render(): void {}
 }
 
-registerEntity('m5_airspace', 'misc', () => new Airspace(), 'Mission 5 flight-safety helper (invisible, one at a time): eases player gyros out of airship hulls they were squeezed or respawned into');
+registerEntity(
+  'm5_airspace',
+  'misc',
+  () => new Airspace(),
+  'Mission 5 flight-control helper (invisible, one at a time): eases player gyros out of airship hulls they were squeezed or respawned into, and flies a spare gyro (props-free) down to a pilot stranded on a deck after being shot down',
+);
