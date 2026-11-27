@@ -123,7 +123,15 @@ const at = (type: string, x: number, props?: Record<string, any>, extra: Partial
 // ------------------------------------------------------------------ climb ledges
 
 const TIERS = [452, 416, 380, 344, 308, 272, 236, 200];
-const climbLedges: PlatformDef[] = TIERS.map((y, i) => ({ x: CLIFF - (i % 2 === 0 ? 128 : 74), y, w: i % 2 === 0 ? 128 : 74, style: 'rock' }));
+// Alternating wide / short ledges, all touching the cliff (climbable straight up at the wall, or
+// zig-zagging out on the wide ones); the ones with frozen waterfalls under them are ice shelves.
+const ICY_TIERS = [1, 4, 7];
+const climbLedges: PlatformDef[] = TIERS.map((y, i) => ({
+  x: CLIFF - (i % 2 === 0 ? 128 : 74),
+  y,
+  w: i % 2 === 0 ? 128 : 74,
+  style: ICY_TIERS.includes(i) ? 'ice' : 'rock',
+}));
 
 // ------------------------------------------------------------------ decor
 
@@ -367,6 +375,9 @@ registerLevel({
   ground: GROUND,
   platforms: [
     { x: 970, y: 436, w: 60, style: 'rock' },
+    // Frozen trucks you can stand on (their snowy tarps are the art).
+    { x: 1292, y: S - 41, w: 44, style: 'none' },
+    { x: 5262, y: G - 41, w: 44, style: 'none' },
     { x: 1862, y: S - 64, w: 36, style: 'wood' },
     { x: 2420, y: 416, w: 96, style: 'metal' },
     { x: 2882, y: S - 64, w: 36, style: 'wood' },

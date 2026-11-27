@@ -1,7 +1,7 @@
 // FROSTBITE PASS one-way platforms. Each platform is rasterized once (PixelArt, outlined) and
 // cached as a canvas, so drawing costs one drawImage per frame.
 // Styles: 'wood' (default: snow-capped planks with icicles), 'metal' (snowy steel girder),
-// 'ice' (translucent ice shelf), 'rock' (snowy rock ledge).
+// 'ice' (translucent ice shelf), 'rock' (snowy rock ledge), 'none' (invisible: standable decor).
 
 import { PixelArt } from '../../../engine/pixelart';
 import { P3 } from './palette';
@@ -83,6 +83,8 @@ export function platformArt(w: number, dy: number, style: string, seed: number):
 
 /** ThemeDef.platform implementation. */
 export function drawPlatform(g: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, style: string): void {
+  // 'none': an invisible ledge on top of standable scenery (e.g. a frozen truck's tarp) - the decor is the art.
+  if (style === 'none') return;
   const key = `${x1}|${y1}|${x2}|${y2}|${style}`;
   let c = cache.get(key);
   if (!c) {

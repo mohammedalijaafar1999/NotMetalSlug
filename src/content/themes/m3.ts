@@ -1,8 +1,9 @@
 // FROSTBITE PASS (mission 3) theme: a cold blue sky over far alpine peaks, mid ridges dotted with
 // pines, a near snowy forest edge and drifting valley mist; frozen rock ground under a snow cap,
 // Legion granite masonry, snow-capped planks / steel girders / ice shelves / rock ledges, icy
-// water, a gorge backdrop and frozen-lake ice, 25 decor kinds and parallax snowfall with gusts.
-// The art lives in ./m3/ (palette, textures, sprites, platforms, weather).
+// water, a gorge backdrop, a cliff face and frozen-lake ice, 30 decor kinds and parallax snowfall
+// with wind gusts. The art lives in ./m3/ (palette, textures, sprites, platforms, weather).
+// Platform styles: 'wood' (default, snow-capped planks), 'metal' (snowy girder), 'ice', 'rock'.
 //
 // Decor kinds (DecorDef.kind; x/y = bottom-centre on the ground unless noted; props.flip mirrors,
 // props.f picks a frame):
@@ -10,7 +11,8 @@
 //            snowman, campfire (animated), fence (props.n segments), icefall (origin at the TOP: hangs
 //            from a ledge), icebank (snow bank at a shore), drift (props.w wide snow drift)
 //   built  : scaffold (x = centre, y = ground; props.top platform y, props.w, props.style metal|wood:
-//            legs under a platform), cabin, tower (Legion watchtower), pylon (cable pylon, origin at the cable sheaves),
+//            legs under a platform), cabin, tower (Legion watchtower; its deck is TOWER_DECK = 64 px
+//            up), pylon (cable pylon, origin at the cable sheaves),
 //            terminal (cable-car station), hangar (walker hangar), hut (ice-fishing hut), fortwall,
 //            truck (frozen truck), sign (f: 0 PASS, 1 DANGER, 2 weight limit, 3 cable car, 4 HALT, 5 FORT),
 //            warnlight (props.color 'red'|'amber' blinks; props.off), skirack, banner (waving),
