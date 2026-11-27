@@ -382,6 +382,7 @@ class AudioEngine {
   volumes = { master: 0.8, music: 0.6, sfx: 0.8, voice: 0.9 };
   voiceEnabled = true;
   private ducked = false;
+  private duckCount = 0;
   private voiceDucked = false;
   muted = false;
   /** Called when a non-looping song reaches its end. */
@@ -478,10 +479,22 @@ class AudioEngine {
     this.applyVolumes();
   }
 
-  /** Lower the music (pause menus). */
+  /**
+   * Lower the music (pause menus, hidden tab). Calls nest: every duck(true) needs its own
+   * duck(false), so un-ducking for one reason (the tab becoming visible again) keeps the music
+   * low while another (the pause menu) still holds it.
+   */
   duck(on: boolean): void {
-    this.ducked = on;
+    this.duckCount = Math.max(0, this.duckCount + (on ? 1 : -1));
+    const d = this.duckCount > 0;
+    if (d === this.ducked) return;
+    this.ducked = d;
     this.applyVolumes();
+  }
+
+  /** True while the music is lowered by duck(). */
+  get isDucked(): boolean {
+    return this.ducked;
   }
 
   private setVoiceDuck(on: boolean): void {
