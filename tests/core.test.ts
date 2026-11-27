@@ -94,6 +94,8 @@ describe('the scrolling screen edge never buries anyone in the terrain', () => {
     );
     settle(w);
     const [p1, p2] = w.players;
+    // Both in view: P1 on the cliff top, P2 at its foot, about to be shoved into its face.
+    w.camera.x = w.camera.minX = 300;
     p1.x = 600;
     p1.y = 110;
     p2.x = 470;
