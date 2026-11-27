@@ -53,11 +53,33 @@ export class Renderer {
     this.display.width = Math.floor(cw * dpr);
     this.display.height = Math.floor(ch * dpr);
     this.dctx.imageSmoothingEnabled = false;
-    let s = Math.min(this.display.width / VIEW_W, this.display.height / VIEW_H);
+    // Fit the picture inside the safe area (phone notches, home indicator); the letterbox bars
+    // may run under them.
+    const ins = this.safeInsets();
+    const aw = Math.max(1, (cw - ins.l - ins.r) * dpr);
+    const ah = Math.max(1, (ch - ins.t - ins.b) * dpr);
+    let s = Math.min(aw / VIEW_W, ah / VIEW_H);
     if (this.pixelPerfect && s >= 1) s = Math.floor(s);
     this.scale = s;
-    this.offX = Math.floor((this.display.width - VIEW_W * s) / 2);
-    this.offY = Math.floor((this.display.height - VIEW_H * s) / 2);
+    this.offX = Math.floor(ins.l * dpr + (aw - VIEW_W * s) / 2);
+    this.offY = Math.floor(ins.t * dpr + (ah - VIEW_H * s) / 2);
+  }
+
+  private insetProbe: HTMLElement | null = null;
+
+  /** Safe-area insets in CSS px, read from env(safe-area-inset-*) through a hidden probe element. */
+  private safeInsets(): { l: number; t: number; r: number; b: number } {
+    if (!this.insetProbe) {
+      const p = document.createElement('div');
+      p.style.cssText =
+        'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;' +
+        'padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);';
+      document.body.appendChild(p);
+      this.insetProbe = p;
+    }
+    const cs = getComputedStyle(this.insetProbe);
+    const n = (v: string) => Math.max(0, parseFloat(v) || 0);
+    return { t: n(cs.paddingTop), r: n(cs.paddingRight), b: n(cs.paddingBottom), l: n(cs.paddingLeft) };
   }
 
   /** Start a screen shake. Magnitude in low-res pixels. */
