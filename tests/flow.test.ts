@@ -15,6 +15,7 @@ import { characters } from '../src/game/characters';
 import { missionInfo, countHostages } from '../src/content/ui/missions';
 import { getLevel } from '../src/game/level';
 import { RESPAWN_INVULN } from '../src/game/player';
+import { joinKey } from '../src/game/hud';
 import { layoutLabel, sharedKeysHint } from '../src/scenes/ui';
 import { KeyRemapScene, assignKey } from '../src/scenes/options';
 
@@ -355,5 +356,22 @@ describe('key remapping', () => {
     }
     settings.bindings = saved;
     input.bindings = settings.bindings;
+  });
+});
+
+describe('join prompt', () => {
+  it("names player 2's real START key on the keyboard, START on a gamepad", () => {
+    const savedDev = input.lastDevice;
+    const saved = input.bindings.p2.start;
+    input.lastDevice = 'keyboard';
+    expect(joinKey()).toBe('RSHIFT');
+    input.bindings.p2.start = ['KeyQ'];
+    expect(joinKey()).toBe('Q');
+    input.bindings.p2.start = [];
+    expect(joinKey()).toBe('START');
+    input.lastDevice = 'gamepad';
+    input.bindings.p2.start = saved;
+    expect(joinKey()).toBe('START');
+    input.lastDevice = savedDev;
   });
 });

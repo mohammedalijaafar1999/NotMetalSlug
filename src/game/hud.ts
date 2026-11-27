@@ -4,7 +4,7 @@
 // prompts, including the full-screen CONTINUE? countdown when every joined player is out.
 
 import { drawText, textWidth } from '../engine/font';
-import { input } from '../engine/input';
+import { input, keyLabel } from '../engine/input';
 import { VIEW_H, VIEW_W } from '../engine/renderer';
 import { pad } from '../engine/math';
 import { sprites } from '../engine/sprites';
@@ -56,6 +56,14 @@ export function continueState(session: GameSession, timers: number[]): { allOut:
   let time = -1;
   for (const p of joined) if (p.out && timers[p.index] >= 0) time = Math.max(time, timers[p.index]);
   return { allOut, counting: time >= 0, time };
+}
+
+/** The button player 2 presses to drop in: START on a gamepad, their START key on the keyboard. */
+export function joinKey(): string {
+  if (input.lastDevice === 'gamepad') return 'START';
+  const ks = input.bindings.p2.start ?? [];
+  const k = ks.find((c) => !c.startsWith('Numpad')) ?? ks[0];
+  return k ? keyLabel(k) : 'START';
 }
 
 export class Hud {
@@ -272,7 +280,7 @@ export class Hud {
   private joinPrompt(g: CanvasRenderingContext2D): void {
     // Touch players can't drop in a second player (and the pause button lives there).
     if (input.lastDevice === 'touch' || !blink(this.time, 1, 0.7)) return;
-    text(g, '2P PRESS START', VIEW_W - 5, 4, { align: 'right', color: C.grey });
+    text(g, `2P PRESS ${joinKey()}`, VIEW_W - 5, 4, { align: 'right', color: C.grey });
   }
 
   // ------------------------------------------------------------------ boss bar
