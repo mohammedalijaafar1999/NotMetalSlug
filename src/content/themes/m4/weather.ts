@@ -78,6 +78,15 @@ export function lightning(t: number): { k: number; amount: number; age: number }
   return { k: -1, amount: 0, age: 0 };
 }
 
+/**
+ * Strike brightness for drawing: the double flicker with the SCREEN FLASHES option, otherwise
+ * one soft swell (no strobing) that the callers also scale down.
+ */
+export function strikeAmount(f: { amount: number; age: number }, bright: boolean): number {
+  if (bright || f.amount <= 0) return f.amount;
+  return f.age < 0.16 ? 0.6 * Math.min(1, f.age / 0.08) : 0.6 * Math.exp(-(f.age - 0.16) * 6);
+}
+
 function drawBolt(g: CanvasRenderingContext2D, k: number, age: number): void {
   if (age > 0.24) return;
   let x = 40 + hash01(k, 11) * (VIEW_W - 80);
@@ -126,8 +135,9 @@ export function renderM4Background(g: CanvasRenderingContext2D, camX: number, ca
   const open = openHarbour(level, camX);
   const flash = lightning(time);
   const strike = flash.amount > 0;
+  const amount = strikeAmount(flash, settings.flashes);
   if (strike) {
-    g.globalAlpha = 0.14 * flash.amount * (settings.flashes ? 1 : 0.5);
+    g.globalAlpha = 0.14 * amount * (settings.flashes ? 1 : 0.5);
     g.fillStyle = '#b0a0e8';
     g.fillRect(0, 0, VIEW_W, VIEW_H);
     g.globalAlpha = 1;
@@ -140,7 +150,7 @@ export function renderM4Background(g: CanvasRenderingContext2D, camX: number, ca
   tiled(g, cloudCanvas, coff, cy);
   if (strike) {
     if (!cloudLitCanvas) cloudLitCanvas = cloudArt(true).toCanvas();
-    g.globalAlpha = flash.amount * (settings.flashes ? 0.85 : 0.4);
+    g.globalAlpha = amount * (settings.flashes ? 0.85 : 0.4);
     tiled(g, cloudLitCanvas, coff, cy);
     g.globalAlpha = 1;
   }
