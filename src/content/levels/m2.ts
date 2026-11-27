@@ -279,13 +279,15 @@ const entities: SpawnSpec[] = [
   { type: 'sandbags', x: 1846 },
   { type: 'rifleman', x: 1866, props: { behavior: 'guard', facing: -1 } },
   { type: 'shield_trooper', x: 1906, props: { behavior: 'guard', facing: -1 } },
+  // The checkpoint officer whistles the guards awake and points the charge.
+  { type: 'officer', x: 1936, props: { behavior: 'guard', facing: -1 } },
   { type: 'mech', x: 1990, props: { ammo: 20 } },
   { type: 'hostage', x: 2050, props: { drop: 'bomb', look: 1 } },
   { type: 'rifleman', x: 2074, props: { behavior: 'idle', facing: -1 } },
   { type: 'mortar', x: 2170, props: { facing: -1 } },
   // 3. canyon road
-  { type: 'jeep', x: 2460, props: { stopX: 2380, facing: -1 } },
-  { type: 'hostage', x: 2392, props: { drop: 'fuel', look: 0 } },
+  { type: 'hostage', x: 2330, props: { drop: 'fuel', look: 0 } },
+  { type: 'jeep', x: 2470, props: { facing: -1 } },
   { type: 'bazooka', x: 2484, y: B - 22, props: { behavior: 'guard', facing: -1 } },
   { type: 'bazooka', x: 2620, y: B - 40, props: { behavior: 'guard', facing: -1 } },
   { type: 'pickup', x: 2660, props: { item: 'bomb' } },
@@ -309,7 +311,9 @@ const entities: SpawnSpec[] = [
   { type: 'pickup', x: 4520, y: MESA, props: { item: 'bomb' } },
   { type: 'bunker', x: 4610, y: MESA, props: { facing: -1 } },
   // 7. descent
-  { type: 'rifleman', x: 4868, y: MESA + 70, props: { behavior: 'charge', facing: -1 } },
+  { type: 'rifleman', x: 4852, y: MESA + 70, props: { behavior: 'charge', facing: -1 } },
+  // Ridge gun on the switchback ledge, covering the way down.
+  { type: 'turret', x: 4888, y: MESA + 70, props: { kind: 'mg', dir: -1 } },
   { type: 'grenadier', x: 5060, y: B - 36, props: { behavior: 'guard', facing: -1 } },
   { type: 'hostage', x: 5170, props: { mode: 'wander', drop: 'bomb', look: 0 } },
   // 8. oil field
