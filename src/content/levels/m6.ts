@@ -230,6 +230,8 @@ add(
   E('hostage', 2350, undefined, { mode: 'wander', drop: 'R', look: 0 }),
   E('rifleman', 2385, undefined, { behavior: 'sleep' }),
   E('pickup', 2480, undefined, { item: 'bomb' }),
+  E('barrel', 2862),
+  E('barrel', 2876),
 );
 
 const LOCK_FOUNDRY: LockDef = {
@@ -361,6 +363,7 @@ add(
   E('robot', 4420, undefined, { behavior: 'sleep', facing: -1 }),
   E('robot', 4460, undefined, { behavior: 'sleep', facing: -1 }),
   E('pickup', 4540, undefined, { item: 'bomb' }),
+  E('fuel_tank', 4930),
   E('mortar', 4630, 386, { facing: -1 }),
   E('light_tank', 4700, undefined, { behavior: 'hold', facing: -1 }),
   E('rifleman', 4672, undefined, { behavior: 'guard', facing: -1 }),
@@ -469,6 +472,8 @@ add(
   E('hostage', 5500, GU, { drop: 'bomb', look: 2 }),
   E('pickup', 5590, GU, { item: 'bomb' }),
   E('sniper', 5850, 156, { facing: -1 }),
+  E('barrel', 5986, GU),
+  E('barrel', 6000, GU),
 );
 
 const LOCK_GAUNTLET: LockDef = {

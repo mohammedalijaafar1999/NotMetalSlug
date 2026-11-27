@@ -101,7 +101,6 @@ sprites.define({
   oy: FH,
   frames: 4,
   draw: (p, f) => {
-    const r = new Rng(808);
     // chimney + lip
     cylV(p, 26, 3, 12, 12, M6.iron);
     p.rect(24, 0, 16, 3, M6.ironL);
@@ -206,7 +205,6 @@ sprites.define({
     // drip of slag over the sill
     p.rect(cx + 4, by + 2, 2, 3 + (f % 2), M6.moltenD);
     p.px(cx + 4, by + 2, M6.molten);
-    void r;
   },
 });
 
@@ -875,7 +873,6 @@ const emblem: DecorRenderer = (g, d) => sprites.get('m6d_emblem').draw(g, Math.r
 
 const STONE = '#2e2834';
 function stoneWall(p: PixelArt, x0: number, y0: number, w: number, h: number, seed: number): void {
-  const r = new Rng(seed);
   for (let y = y0; y < y0 + h; y++) {
     const row = Math.floor((y - y0) / 7);
     const off = row % 2 ? 7 : 0;
@@ -889,7 +886,6 @@ function stoneWall(p: PixelArt, x0: number, y0: number, w: number, h: number, se
       p.px(x, y, c);
     }
   }
-  void r;
 }
 
 function wallArt(w: number, h: number, seed: number): (p: PixelArt) => void {
