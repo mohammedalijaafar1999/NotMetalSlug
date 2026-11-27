@@ -14,6 +14,7 @@ import { MAP_H, MAP_POINTS, MAP_W, faceSprite } from '../content/ui/art';
 import { MISSION_COUNT, missionInfo } from '../content/ui/missions';
 import { getCharacter } from '../game/characters';
 import type { GameSession } from '../game/session';
+import { PRELOAD_BOOST_MS, PRELOAD_LOADING_MS, preload } from './preload';
 
 /** Draw the tactical map with the route and markers. `current` = mission being briefed / selected. */
 export function renderMap(g: CanvasRenderingContext2D, x: number, y: number, t: number, current: number, opts: { reached?: number; showAll?: boolean } = {}): void {
@@ -76,6 +77,8 @@ export function renderMap(g: CanvasRenderingContext2D, x: number, y: number, t: 
 
 export class BriefingScene implements Scene {
   name = 'briefing';
+  /** Deploy pressed before the background sprite baking finished: a loading bar until it has. */
+  private loading = false;
   time = 0;
   private chars = 0;
   private lines: string[] = [];
@@ -108,6 +111,9 @@ export class BriefingScene implements Scene {
     return this.chars >= this.total;
   }
 
+  /** A static card right before play: the background sprite baking gets more time per frame. */
+  readonly preloadBudget = PRELOAD_BOOST_MS;
+
   private start(): void {
     if (this.started) return;
     this.started = true;
@@ -126,12 +132,30 @@ export class BriefingScene implements Scene {
         if (this.tick % 3 === 0) uiSfx('typewriter', { vol: 0.45, pitchVar: 0.08 });
       }
     }
+    if (this.loading) {
+      preload.step(PRELOAD_LOADING_MS);
+      if (preload.done) this.start();
+      return;
+    }
     const m = input.menu;
     const go = m.pressed('confirm') || m.pressed('start') || !!uiInput.takeTap();
     if (go && this.time > 0.3) {
       if (!this.typed) this.chars = this.total;
+      else if (!preload.done) this.loading = true;
       else this.start();
     }
+  }
+
+  /** DEPLOYING + a bar showing the share of the game's art baked so far. */
+  private loadingBar(g: CanvasRenderingContext2D, y: number): void {
+    const f = preload.progress;
+    const w = 90;
+    const x = Math.round(VIEW_W / 2 + 4);
+    drawText(g, `DEPLOYING ${Math.floor(f * 100)}%`, x - 6, y, { align: 'right', color: C.gold, outline: C.out });
+    rect(g, x - 1, y - 1, w + 2, 9, C.out);
+    rect(g, x, y, w, 7, '#14202c');
+    rect(g, x, y, Math.round(w * f), 7, C.gold);
+    rect(g, x, y, Math.round(w * f), 1, '#ffffff', 0.5);
   }
 
   render(g: CanvasRenderingContext2D): void {
@@ -189,7 +213,8 @@ export class BriefingScene implements Scene {
       sprites.get('ui_reticle').draw(g, rx + 6, 186, Math.floor(this.time * 4) % 2);
       drawText(g, 'TARGET:', rx + 16, 183, { color: C.grey, outline: C.out });
       text(g, fitText(info.boss, rw - 62), rx + 62, 183, { color: C.red });
-      if (blink(this.time, 1.6, 0.7)) footer(g, input.lastDevice === 'touch' ? 'TAP TO DEPLOY' : 'PRESS FIRE TO DEPLOY', VIEW_H - 12, C.gold);
+      if (this.loading) this.loadingBar(g, VIEW_H - 12);
+      else if (blink(this.time, 1.6, 0.7)) footer(g, input.lastDevice === 'touch' ? 'TAP TO DEPLOY' : 'PRESS FIRE TO DEPLOY', VIEW_H - 12, C.gold);
     } else {
       footer(g, ctl('FIRE: SKIP', 'TAP: SKIP'), VIEW_H - 12, C.greyD);
     }

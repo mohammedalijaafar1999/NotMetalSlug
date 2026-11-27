@@ -3,11 +3,12 @@
 // startupHooks, see src/content/ui/install.ts).
 
 import type { Scene } from '../engine/scene';
-import { sprites } from '../engine/sprites';
+import type { Sprite } from '../engine/sprites';
 import { drawText } from '../engine/font';
 import { VIEW_H, VIEW_W } from '../engine/renderer';
 import { flow } from './flow';
 import { C, rect, stripes, twoTone, syncTouch } from './ui';
+import { preload } from './preload';
 
 export { TitleScene } from './title';
 export { TallyScene, RESCUE_BONUS } from './tally';
@@ -23,10 +24,13 @@ const TIPS = [
   'TIP: CRATE LETTERS TELL YOU WHICH WEAPON IS INSIDE.',
 ];
 
-/** Bakes all sprites with a progress bar, then goes to the title. */
+/**
+ * Bakes the sprites the title and menus draw, with a progress bar, then goes to the title; the
+ * rest bake in the background (see preload.ts) and are all baked before gameplay starts.
+ */
 export class BootScene implements Scene {
   name = 'boot';
-  private list = sprites.all();
+  private list: Sprite[] = preload.start();
   private i = 0;
   private done = false;
   private time = 0;
@@ -49,6 +53,7 @@ export class BootScene implements Scene {
     if (this.i >= this.list.length && !this.done) {
       this.done = true;
       this.removePlaceholder();
+      preload.running = true;
       flow.title();
     }
   }

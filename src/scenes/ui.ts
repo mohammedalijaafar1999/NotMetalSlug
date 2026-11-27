@@ -237,6 +237,14 @@ export function ctl(keys: string, touch: string): string {
   return input.lastDevice === 'touch' ? touch : keys;
 }
 
+/**
+ * Touch screen with no gamepad: the touch controls drive player 1 only, so a second player needs
+ * a keyboard or a gamepad (START 2 PLAYERS then starts with player 2's slot open).
+ */
+export function touchOnly(): boolean {
+  return input.lastDevice === 'touch' && !input.hasGamepad();
+}
+
 /** Short key summary of a keyboard layout, e.g. "WASD + J K L" (prefers non-numpad keys). */
 export function layoutLabel(b: Bindings): string {
   const pick = (a: Action) => {

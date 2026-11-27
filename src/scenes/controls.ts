@@ -186,7 +186,8 @@ export class ControlsScene implements Scene {
     lbl(L + 50, T + 21, 268, 90, 'START: PAUSE', C.white, 'left');
     lbl(L + 81, T + 26, 268, 136, 'B: BOMB', '#ff7a6a', 'left');
     lbl(L + 74, T + 33, 268, 156, 'A: JUMP', '#70e070', 'left');
-    drawText(g, 'EACH PAD IS ONE PLAYER (1ST PAD = 1P). START ALSO JOINS 2P.', cx, 176, { align: 'center', color: C.grey, outline: C.out });
+    drawText(g, 'EACH PAD IS ONE PLAYER (1ST PAD = 1P). START ALSO JOINS 2P.', cx, 172, { align: 'center', color: C.grey, outline: C.out });
+    drawText(g, '1P ON THE KEYBOARD? A LONE PAD\'S START JOINS AS 2P.', cx, 181, { align: 'center', color: C.grey, outline: C.out });
   }
 
   private touch(g: CanvasRenderingContext2D): void {

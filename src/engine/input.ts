@@ -191,6 +191,9 @@ function padActions(p: PadState): boolean[] {
   });
 }
 
+/** Letterbox bar width (CSS px) from which the touch buttons move into it as one column. */
+export const TOUCH_COLUMN_MIN_BAR = 70;
+
 /** On-screen touch controls (created lazily on first touch). Drives player 1. */
 class TouchControls {
   root: HTMLDivElement | null = null;
@@ -246,13 +249,13 @@ class TouchControls {
       return b;
     };
     // Hug the screen edges (clear of notches) so the controls sit in the letterbox bars as much
-    // as possible instead of over the action.
-    const R = (px: number) => `right:calc(${px}px + env(safe-area-inset-right, 0px));`;
-    const B = (px: number) => `bottom:calc(${px}px + env(safe-area-inset-bottom, 0px));`;
-    mkBtn('FIRE', 'fire', R(12) + B(84) + 'width:78px;height:78px;');
-    mkBtn('JUMP', 'jump', R(98) + B(20) + 'width:66px;height:66px;');
-    mkBtn('BOMB', 'bomb', R(12) + B(8) + 'width:58px;height:58px;font-size:11px;');
-    mkBtn('II', 'start', R(10) + 'top:calc(10px + env(safe-area-inset-top, 0px));width:40px;height:40px;border-radius:8px;');
+    // as possible instead of over the action (see layout()).
+    this.fireBtn = mkBtn('FIRE', 'fire', '');
+    this.jumpBtn = mkBtn('JUMP', 'jump', '');
+    this.bombBtn = mkBtn('BOMB', 'bomb', 'font-size:11px;');
+    this.pauseBtn = mkBtn('II', 'start', 'top:calc(10px + env(safe-area-inset-top, 0px));width:40px;height:40px;border-radius:8px;');
+    this.layout();
+    window.addEventListener('resize', () => this.layout());
 
     const base = document.createElement('div');
     base.style.cssText =
@@ -307,6 +310,68 @@ class TouchControls {
     this.root = root;
   }
 
+  private fireBtn: HTMLDivElement | null = null;
+  private jumpBtn: HTMLDivElement | null = null;
+  private bombBtn: HTMLDivElement | null = null;
+  private pauseBtn: HTMLDivElement | null = null;
+
+  /**
+   * Place FIRE / JUMP / BOMB. Normally FIRE and BOMB hug the right edge with JUMP beside them;
+   * on very wide screens (19.5:9 phones in landscape) the letterbox bar beside the 16:9 game is
+   * wide enough for a button, so all three stack in one column inside it, off the play area.
+   */
+  layout(): void {
+    const [fire, jump, bomb] = [this.fireBtn, this.jumpBtn, this.bombBtn];
+    if (!fire || !jump || !bomb || typeof window === 'undefined') return;
+    const place = (b: HTMLDivElement, right: string, bottom: number, size: number) => {
+      b.style.right = right;
+      b.style.bottom = `calc(${bottom}px + env(safe-area-inset-bottom, 0px))`;
+      b.style.width = b.style.height = `${size}px`;
+    };
+    const R = (px: number) => `calc(${px}px + env(safe-area-inset-right, 0px))`;
+    // The bar right of the 384x216 picture, which the renderer fits inside the safe area: use
+    // its safe part when a button fits there, else the whole bar (under a rounded corner).
+    const ins = this.safeInsets();
+    const aw = Math.max(1, window.innerWidth - ins.l - ins.r);
+    const ah = Math.max(1, window.innerHeight - ins.t - ins.b);
+    const gw = 384 * Math.min(aw / 384, ah / 216);
+    const full = window.innerWidth - (ins.l + (aw + gw) / 2);
+    const safe = full - ins.r;
+    const [bar, edge] = safe >= TOUCH_COLUMN_MIN_BAR ? [safe, ins.r] : [full, 0];
+    if (bar >= TOUCH_COLUMN_MIN_BAR) {
+      // Sizes exclude the 2 px border on each side.
+      const fit = (s: number) => Math.min(s, Math.floor(bar) - 10);
+      const [fs, js, bs] = [fit(78), fit(66), fit(58)];
+      const mid = (s: number) => `${Math.round(edge) + Math.max(2, Math.floor((bar - s - 4) / 2))}px`;
+      place(bomb, mid(bs), 8, bs);
+      place(jump, mid(js), 8 + bs + 8, js);
+      place(fire, mid(fs), 8 + bs + 8 + js + 10, fs);
+      if (this.pauseBtn) this.pauseBtn.style.right = mid(40);
+    } else {
+      place(fire, R(12), 84, 78);
+      place(jump, R(98), 20, 66);
+      place(bomb, R(12), 8, 58);
+      if (this.pauseBtn) this.pauseBtn.style.right = R(10);
+    }
+  }
+
+  private insetProbe: HTMLElement | null = null;
+
+  /** Safe-area insets in CSS px (env(safe-area-inset-*) read through a hidden probe). */
+  private safeInsets(): { l: number; t: number; r: number; b: number } {
+    if (!this.insetProbe) {
+      const p = document.createElement('div');
+      p.style.cssText =
+        'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;' +
+        'padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);';
+      document.body.appendChild(p);
+      this.insetProbe = p;
+    }
+    const cs = getComputedStyle(this.insetProbe);
+    const n = (v: string) => Math.max(0, parseFloat(v) || 0);
+    return { t: n(cs.paddingTop), r: n(cs.paddingRight), b: n(cs.paddingBottom), l: n(cs.paddingLeft) };
+  }
+
   setVisible(v: boolean): void {
     if (!this.root) return;
     this.root.style.display = v ? '' : 'none';
@@ -328,8 +393,17 @@ export class InputManager {
   private captureCb: ((code: string) => void) | null = null;
   readonly touch = new TouchControls();
   lastDevice: 'keyboard' | 'gamepad' | 'touch' = 'keyboard';
-  /** Gamepad indices assigned to players (by connection order). */
+  /**
+   * Gamepad indices assigned to player slots (by connection order). -1 marks a slot with no pad
+   * (player 1 on the keyboard after a lone pad took the player 2 seat).
+   */
   private padOrder: number[] = [];
+  /** What player 1 last played with (moves / buttons; START is not counted). */
+  p1Device: 'keyboard' | 'gamepad' | 'touch' | null = null;
+  /** Set by offerPadToPlayer2() for the next poll. */
+  private p2PadOffer = false;
+  /** Each live pad's actions at the previous poll (edge detection for the player 2 seat). */
+  private padPrev = new Map<number, boolean[]>();
   /** Called on the first user gesture (used to unlock audio). */
   onFirstGesture: (() => void) | null = null;
   /** Called after the window lost focus / the tab was hidden and held input was released. */
@@ -439,13 +513,37 @@ export class InputManager {
     return this.pads().some(Boolean);
   }
 
+  /** True if a connected gamepad drives player i. */
+  hasPadFor(i: number): boolean {
+    const idx = this.padOrder[i];
+    return idx !== undefined && idx >= 0 && this.pads().some((p) => !!p && p.connected && p.index === idx);
+  }
+
+  /**
+   * Scenes where player 2 can drop in call this on every update. While player 1 plays on the
+   * keyboard (or touch), a lone gamepad's START or FIRE then takes the player 2 seat (and keeps
+   * it) instead of driving and pausing player 1, so the press joins player 2.
+   */
+  offerPadToPlayer2(): void {
+    this.p2PadOffer = true;
+  }
+
+  /** Between games: the connected pads take the player slots in order (a lone pad is player 1). */
+  resetPadSeats(): void {
+    const live = new Set(this.pads().filter((p) => !!p && p.connected).map((p) => p!.index));
+    this.padOrder = this.padOrder.filter((i) => i >= 0 && live.has(i));
+  }
+
   /**
    * Give a newly seen pad a player slot: the first slot whose pad is gone (a reconnecting pad
    * normally gets its old index back, so it returns to its own player), else a new slot.
    */
   private assignPad(index: number, live: Set<number>): void {
     if (this.padOrder.includes(index)) return;
-    const free = this.padOrder.findIndex((i) => !live.has(i));
+    // A slot whose pad dropped out first (a pad coming back with a new index), then a slot
+    // with no pad (player 1 on the keyboard), else a new slot.
+    let free = this.padOrder.findIndex((i) => i >= 0 && !live.has(i));
+    if (free < 0) free = this.padOrder.indexOf(-1);
     if (free >= 0) this.padOrder[free] = index;
     else this.padOrder.push(index);
   }
@@ -490,11 +588,23 @@ export class InputManager {
     // Maintain stable order of pads.
     const live = new Set(pads.map((p) => p.index));
     for (const p of pads) this.assignPad(p.index, live);
+    const raw = new Map(pads.map((p) => [p.index, padActions(readPad(p))] as const));
+    // Couch setup: player 1 on the keyboard, a friend picks up the only pad and presses START
+    // or FIRE while player 2 can join -> that pad becomes player 2's.
+    const offer = this.p2PadOffer;
+    this.p2PadOffer = false;
+    if (offer && pads.length === 1 && this.padOrder[0] === pads[0].index && (this.p1Device === 'keyboard' || this.p1Device === 'touch')) {
+      const now = raw.get(pads[0].index)!;
+      const before = this.padPrev.get(pads[0].index);
+      const edge = (a: Action) => now[ACTIONS.indexOf(a)] && !before?.[ACTIONS.indexOf(a)];
+      if (edge('start') || edge('fire')) {
+        this.padOrder[0] = -1;
+        this.padOrder[1] = pads[0].index;
+      }
+    }
+    this.padPrev = raw;
     // One entry per player slot; a slot whose pad is disconnected reads as all released.
-    const padStates = this.padOrder.map((i) => {
-      const p = pads.find((q) => q.index === i);
-      return p ? padActions(readPad(p)) : ACTIONS.map(() => false);
-    });
+    const padStates = this.padOrder.map((i) => raw.get(i) ?? ACTIONS.map(() => false));
     if (padStates.some((s) => s.some(Boolean))) {
       this.lastDevice = 'gamepad';
       this.gesture();
@@ -519,6 +629,13 @@ export class InputManager {
         }
       }
       const pad = padStates[pi];
+      if (pi === 0) {
+        // What player 1 plays with (START is left out: ESC to pause is not "playing").
+        const used = (d: (i: number) => boolean) => ACTIONS.some((a, i) => a !== 'start' && d(i));
+        if (used((i) => down[i] || tap[i])) this.p1Device = 'keyboard';
+        else if (pad && used((i) => pad[i])) this.p1Device = 'gamepad';
+        else if (this.touch.enabled && used((i) => this.touch.state[ACTIONS[i]] || this.touch.taps[ACTIONS[i]])) this.p1Device = 'touch';
+      }
       if (pad) for (let i = 0; i < n; i++) down[i] = down[i] || pad[i];
       if (pi === 0 && this.touch.enabled) {
         for (let i = 0; i < n; i++) {

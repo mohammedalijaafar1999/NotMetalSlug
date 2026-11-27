@@ -49,6 +49,24 @@ export function weaponShortName(id: string, name: string): string {
     .join('.') + '.';
 }
 
+/** Inner width of a player panel's second row (the panel is 126 px; the portrait takes 23). */
+export const PANEL_ROW_W = 99;
+
+/**
+ * Vehicle row of a player panel: the name at full width (DRAGONFLY is 53 px), then the armor
+ * bar, then the secondary ammo count (at most 99, right-aligned). The bar starts at a fixed
+ * column for short names and moves right for long ones; only a name that would squeeze the bar
+ * under 16 px is shortened.
+ */
+export function vehicleRow(name: string, rowW: number, hasAmmo: boolean): { name: string; barX: number; barW: number } {
+  const ammoW = hasAmmo ? textWidth('99') + 5 : 0;
+  const minBar = 16;
+  let nm = name;
+  while (nm.length > 1 && textWidth(nm) + 5 + minBar + 1 + ammoW > rowW) nm = nm.slice(0, -1);
+  const barX = Math.max(50, textWidth(nm) + 5);
+  return { name: nm, barX, barW: rowW - barX - 1 - ammoW };
+}
+
 /** Continue-countdown summary for a session. */
 export function continueState(session: GameSession, timers: number[]): { allOut: boolean; counting: boolean; time: number } {
   const joined = session.players.filter((p) => p.joined);
@@ -61,10 +79,21 @@ export function continueState(session: GameSession, timers: number[]): { allOut:
 /** The button player 2 presses to drop in: START on a gamepad, their START key on the keyboard. */
 export function joinKey(): string {
   if (input.lastDevice === 'gamepad') return 'START';
-  const ks = input.bindings.p2.start ?? [];
+  return startKeyLabel(1);
+}
+
+/** Player i's START: START on the gamepad that drives them, else their (first) START key. */
+export function startKeyLabel(i: 0 | 1): string {
+  if (input.hasPadFor(i)) return 'START';
+  // The touch controls' FIRE continues too (their II button pauses).
+  if (i === 0 && input.p1Device === 'touch') return 'FIRE';
+  const ks = (i === 0 ? input.bindings.p1 : input.bindings.p2).start ?? [];
   const k = ks.find((c) => !c.startsWith('Numpad')) ?? ks[0];
   return k ? keyLabel(k) : 'START';
 }
+
+/** Widest banner line (the screen less a margin). */
+export const BANNER_MAX_W = VIEW_W - 16;
 
 export class Hud {
   banners: Banner[] = [];
@@ -85,12 +114,23 @@ export class Hud {
   private bannerCount = 0;
 
   banner(text: string, opts: { sub?: string; color?: string; time?: number; scale?: number; style?: BannerStyle } = {}): void {
+    let scale = opts.scale ?? 3;
+    let sub = opts.sub;
+    // Fit the screen: a long "WARNING! <SUBJECT>" puts the subject on the line under the stripes
+    // (like the bosses' own WARNING! / ... APPROACHES); any other text too wide shrinks.
+    if (textWidth(text, scale) > BANNER_MAX_W) {
+      const m = /^WARNING!?\s+(.+)$/.exec(text);
+      if (m) {
+        text = 'WARNING!';
+        sub = sub ? `${m[1]} - ${sub}` : m[1];
+      }
+      while (scale > 1 && textWidth(text, scale) > BANNER_MAX_W) scale--;
+    }
     this.banners = this.banners.filter((b) => b.text !== text);
-    const scale = opts.scale ?? 3;
     const style: BannerStyle = opts.style ?? (/^WARNING/.test(text) ? 'warning' : scale >= 3 ? 'drop' : scale === 2 ? 'slide' : 'small');
     const time = opts.time ?? 2;
     this.bannerCount++;
-    this.banners.push({ text, sub: opts.sub, color: opts.color ?? C.gold, time, max: time, scale, style, dir: this.bannerCount % 2 ? 1 : -1 });
+    this.banners.push({ text, sub, color: opts.color ?? C.gold, time, max: time, scale, style, dir: this.bannerCount % 2 ? 1 : -1 });
     if (scale >= 2 || style === 'warning') uiSfx(style === 'warning' ? 'alarm' : 'banner', { vol: 0.8 });
   }
 
@@ -214,12 +254,13 @@ export class Hud {
     const y2 = 14;
     const v = p.vehicle;
     const inner = L ? px + 23 : px + 4;
-    const innerW = pw - 27;
+    const innerW = PANEL_ROW_W;
     if (v) {
       const frac = Math.max(0, v.hp / Math.max(1, v.maxHp));
-      drawText(g, v.vehicleName.slice(0, 8), inner, y2, { color: C.blue, outline: C.out });
-      const bx = inner + 50;
-      const bw = innerW - 52 - (v.secondaryAmmo >= 0 ? 22 : 0);
+      const row = vehicleRow(v.vehicleName, innerW, v.secondaryAmmo >= 0);
+      drawText(g, row.name, inner, y2, { color: C.blue, outline: C.out });
+      const bx = inner + row.barX;
+      const bw = row.barW;
       rect(g, bx - 1, y2, bw + 2, 7, C.out);
       rect(g, bx, y2 + 1, bw, 5, '#3a2030');
       const fc = frac > 0.5 ? '#40e060' : frac > 0.25 ? C.gold : blink(this.time, 6) ? C.red : '#a02020';
@@ -273,7 +314,8 @@ export class Hud {
     if (t >= 0) {
       drawText(g, `CONTINUE? ${Math.max(0, Math.floor(t))}`, cx, 14, { align: 'center', color: blink(this.time, 2) ? C.gold : C.white, outline: C.out });
     } else if (blink(this.time, 1.5, 0.7)) {
-      drawText(g, 'PRESS START', cx, 14, { align: 'center', color: C.white, outline: C.out });
+      // Name the key: player 2 on the keyboard presses RSHIFT, not "START".
+      drawText(g, `PRESS ${startKeyLabel(i as 0 | 1)}`, cx, 14, { align: 'center', color: C.white, outline: C.out });
     }
   }
 
@@ -336,7 +378,8 @@ export class Hud {
         case 'warning': {
           const a = Math.min(1, age / 0.15, b.time / 0.25);
           g.globalAlpha = a;
-          rect(g, 0, by - 8, VIEW_W, h + 16, '#200408', 0.6);
+          // Nearly opaque: the boss rolling in under it must read as behind the banner.
+          rect(g, 0, by - 8, VIEW_W, h + 16, '#200408', 0.86);
           stripes(g, 0, by - 8, VIEW_W, 4, this.time, C.red, '#200408');
           stripes(g, 0, by + h + 4, VIEW_W, 4, -this.time, C.red, '#200408');
           g.globalAlpha = 1;

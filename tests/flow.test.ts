@@ -1,23 +1,31 @@
 // Front-end / game-flow regression tests (review pass): input layouts and remaps, focus loss,
 // drop-in co-op, the ending squad, tally rows and mission presentation data.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import './helpers';
 import { app } from '../src/app';
 import { SceneManager } from '../src/engine/scene';
 import { input, InputManager, DEFAULT_BINDINGS, type ActionMask } from '../src/engine/input';
 import { settings, resetHighScores, getHighScores } from '../src/engine/storage';
 import { NameEntryScene } from '../src/scenes/gameover';
 import { installUiFlow } from '../src/scenes/install';
-import { GameplayScene } from '../src/scenes/gameplay';
+import { GameplayScene, CONTINUE_SECONDS } from '../src/scenes/gameplay';
+import { CharSelectScene } from '../src/scenes/charselect';
+import { BootScene } from '../src/scenes/core-scenes';
+import { BriefingScene } from '../src/scenes/briefing';
+import { preload } from '../src/scenes/preload';
+import { sprites } from '../src/engine/sprites';
 import { EndingScene, endingSquad } from '../src/scenes/ending';
 import { TallyScene } from '../src/scenes/tally';
 import { GameSession } from '../src/game/session';
 import { characters } from '../src/game/characters';
 import { missionInfo, countHostages } from '../src/content/ui/missions';
-import { getLevel } from '../src/game/level';
+import { getLevel, allLevels } from '../src/game/level';
 import { RESPAWN_INVULN } from '../src/game/player';
-import { joinKey } from '../src/game/hud';
-import { layoutLabel, sharedKeysHint } from '../src/scenes/ui';
+import { joinKey, startKeyLabel, vehicleRow, PANEL_ROW_W, Hud, BANNER_MAX_W } from '../src/game/hud';
+import { entityTypes } from '../src/game/registry';
+import { textWidth } from '../src/engine/font';
+import { makeWorld } from './helpers';
+import type { Vehicle } from '../src/game/vehicle';
+import { layoutLabel, sharedKeysHint, uiInput } from '../src/scenes/ui';
 import { KeyRemapScene, assignKey } from '../src/scenes/options';
 
 const DT = 1 / 60;
@@ -461,5 +469,360 @@ describe('name entry', () => {
     expect(ne.done).toBe(true);
     expect(getHighScores().map((h) => h.score)).toContain(20000);
     resetHighScores();
+  });
+});
+
+describe('HUD vehicle row', () => {
+  it('every vehicle name fits in full next to a usable armor bar and the ammo count', () => {
+    const w = makeWorld('sandbox');
+    const names: string[] = [];
+    for (const t of entityTypes('vehicle')) {
+      const v = w.spawn(t.type, 200, 100) as Vehicle | null;
+      if (!v || !(v as any).isVehicle) continue;
+      names.push(v.vehicleName);
+      for (const ammo of [true, false]) {
+        const row = vehicleRow(v.vehicleName, PANEL_ROW_W, ammo);
+        expect(row.name).toBe(v.vehicleName);
+        // A gap between the name and the bar, and between the bar and the ammo column.
+        expect(row.barX).toBeGreaterThanOrEqual(textWidth(v.vehicleName) + 4);
+        expect(row.barW).toBeGreaterThanOrEqual(16);
+        expect(row.barX + row.barW + 1 + (ammo ? textWidth('99') + 4 : 0)).toBeLessThanOrEqual(PANEL_ROW_W);
+      }
+    }
+    expect(names).toContain('DRAGONFLY');
+    // A made-up name too long for the row is shortened rather than drawn over the bar.
+    const long = vehicleRow('SUPERLONGVEHICLENAME', PANEL_ROW_W, true);
+    expect(long.barW).toBeGreaterThanOrEqual(16);
+    expect(textWidth(long.name) + 4).toBeLessThanOrEqual(long.barX);
+  });
+});
+
+describe('announcement banners', () => {
+  it('every level announcement fits the screen (a long WARNING moves its subject to the line below)', () => {
+    const hud = new Hud();
+    hud.banner('WARNING! HORNET KING APPROACHING');
+    expect(hud.banners[0].text).toBe('WARNING!');
+    expect(hud.banners[0].sub).toBe('HORNET KING APPROACHING');
+    expect(hud.banners[0].style).toBe('warning');
+    const texts = new Set<string>();
+    for (const def of allLevels()) {
+      for (const l of def.locks ?? []) if (l.announce) texts.add(l.announce);
+    }
+    expect(texts.size).toBeGreaterThan(3);
+    for (const t of texts) {
+      const h = new Hud();
+      h.banner(t, { color: '#ff4040', time: 2.2 });
+      const b = h.banners[0];
+      expect(textWidth(b.text, b.scale), t).toBeLessThanOrEqual(BANNER_MAX_W);
+      if (b.sub) expect(textWidth(b.sub), t).toBeLessThanOrEqual(BANNER_MAX_W);
+    }
+  });
+
+  it('the HUD (banners included) draws after every world entity', () => {
+    const s = new GameSession({ characters: ['dex', 'juno'], twoPlayer: false, mission: 1 });
+    const gp = new GameplayScene(s);
+    app.scenes.set(gp, { fade: false });
+    run(0.5);
+    const order: string[] = [];
+    const w = gp.world;
+    const e = w.entities[0];
+    const er = e.render.bind(e);
+    e.render = (gg) => {
+      order.push('entity');
+      er(gg);
+    };
+    const hr = gp.hud.render.bind(gp.hud);
+    gp.hud.render = (gg, ww) => {
+      order.push('hud');
+      hr(gg, ww);
+    };
+    gp.hud.banner('WARNING!');
+    gp.render(g);
+    expect(order).toEqual(['entity', 'hud']);
+  });
+});
+
+const scene = () => app.scenes.current?.name;
+
+describe('out between missions', () => {
+  it('a 2P player out when the mission ended gets the continue prompt next mission; START brings them back with full lives', () => {
+    const s = new GameSession({ characters: ['dex', 'juno'], twoPlayer: true, mission: 1 });
+    // Player 1 lost the last life in the previous mission and did not continue.
+    s.players[0].out = true;
+    s.players[0].lives = 0;
+    const gp = new GameplayScene(s, 'sandbox');
+    app.scenes.set(gp, { fade: false });
+    run(0.5);
+    expect(gp.world.players.map((p) => p.index)).toEqual([1]);
+    // The normal continue prompt: a countdown, then PRESS <their START key>.
+    expect(gp.hud.continueTimers[0]).toBeGreaterThan(CONTINUE_SECONDS - 1);
+    expect(gp.continueScreen).toBe(false);
+    run(CONTINUE_SECONDS + 0.5);
+    expect(gp.hud.continueTimers[0]).toBe(-1);
+    expect(s.players[0].out).toBe(true);
+    expect(scene()).toBe('gameplay');
+    expect(startKeyLabel(0)).toBe('ENTER');
+    expect(startKeyLabel(1)).toBe('RSHIFT');
+    press({ start: true }, 0);
+    expect(app.scenes.current).toBe(gp); // no pause menu
+    expect(s.players[0].out).toBe(false);
+    expect(s.players[0].lives).toBe(s.livesPerCredit);
+    run(0.1);
+    const p1 = gp.world.players.find((p) => p.index === 0)!;
+    const p2 = gp.world.players.find((p) => p.index === 1)!;
+    // Drops in beside the partner with the respawn invulnerability.
+    expect(p1.invuln).toBeGreaterThan(RESPAWN_INVULN - 0.5);
+    expect(Math.abs(p1.x - p2.x)).toBeLessThan(80);
+  });
+
+  it('a solo player who goes out with the winning blow keeps playing (no life lost)', () => {
+    const s = new GameSession({ characters: ['dex', 'juno'], twoPlayer: false, mission: 1 });
+    const gp = new GameplayScene(s, 'sandbox');
+    app.scenes.set(gp, { fade: false });
+    run(1.5);
+    const p = gp.world.players[0];
+    p.profile.lives = 1;
+    p.kill();
+    for (let k = 0; k < 600 && !s.players[0].out; k++) run(DT);
+    expect(s.players[0].out).toBe(true);
+    // ...and the boss went down in that same moment.
+    gp.world.level.bossDefeated();
+    expect(gp.phase).toBe('complete');
+    expect(s.players[0].out).toBe(false);
+    expect(s.players[0].lives).toBe(1);
+    expect(s.players[0].continues).toBe(0);
+    run(0.2);
+    expect(gp.continueScreen).toBe(false);
+    const next = new GameplayScene(s, 'sandbox');
+    expect(next.world.players.map((q) => q.index)).toEqual([0]);
+  });
+
+  it('a mission never starts with nobody playing', () => {
+    const s = new GameSession({ characters: ['dex', 'juno'], twoPlayer: false, mission: 1 });
+    s.players[0].out = true;
+    s.players[0].lives = 0;
+    const gp = new GameplayScene(s, 'sandbox');
+    app.scenes.set(gp, { fade: false });
+    run(1.5);
+    expect(s.players[0].out).toBe(false);
+    expect(s.players[0].lives).toBe(s.livesPerCredit);
+    expect(gp.world.players.length).toBe(1);
+    expect(scene()).toBe('gameplay');
+    expect(gp.phase).toBe('play');
+  });
+});
+
+describe('character select dead ends', () => {
+  const tapCard = (cs: CharSelectScene, i: number) => {
+    const r = (cs as any).cardRect(i);
+    uiInput.injectTap(r.x + r.w / 2, r.y + r.h / 2);
+    cs.update(DT);
+  };
+
+  it('player 2 can back out of START 2 PLAYERS; player 1 then starts alone', () => {
+    const cs = new CharSelectScene({ twoPlayer: true });
+    app.scenes.set(cs, { fade: false });
+    run(0.5);
+    expect(cs.slots[1].joined).toBe(true);
+    expect(input.twoPlayerKeyboard).toBe(true);
+    press({ bomb: true }, 1);
+    expect(cs.slots[1].joined).toBe(false);
+    expect(input.twoPlayerKeyboard).toBe(false);
+    expect(app.scenes.current).toBe(cs); // still choosing
+    press({ fire: true }, 0);
+    run(1.5);
+    expect(scene()).not.toBe('charselect');
+    const gp = app.scenes.stack.find((x) => x instanceof GameplayScene) as GameplayScene | undefined;
+    const sess = gp?.session ?? (app.scenes.current as any).session;
+    expect(sess.twoPlayer).toBe(false);
+  });
+
+  it('on a touch-only screen START 2 PLAYERS leaves the player 2 slot open, so a tap confirms and starts', () => {
+    const saved = input.lastDevice;
+    input.lastDevice = 'touch';
+    try {
+      const cs = new CharSelectScene({ twoPlayer: true });
+      app.scenes.set(cs, { fade: false });
+      run(0.5);
+      expect(cs.slots[1].joined).toBe(false);
+      expect(input.twoPlayerKeyboard).toBe(false);
+      uiInput.flush();
+      tapCard(cs, cs.slots[0].index); // tap the highlighted soldier = confirm
+      expect(cs.slots[0].confirmed).toBe(true);
+      run(1.5);
+      expect(scene()).not.toBe('charselect');
+    } finally {
+      input.lastDevice = saved;
+    }
+  });
+});
+
+describe('couch setup: player 1 on the keyboard, player 2 on a gamepad', () => {
+  const mkPad = (index: number) => ({
+    index,
+    connected: true,
+    axes: [0, 0, 0, 0],
+    buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })),
+  });
+  const START = 9;
+  const A = 0;
+  const X = 2;
+  let pads: ReturnType<typeof mkPad>[] = [];
+  const gl = globalThis as any;
+  let hadNav: PropertyDescriptor | undefined;
+  beforeAll(() => {
+    hadNav = Object.getOwnPropertyDescriptor(gl, 'navigator');
+    Object.defineProperty(gl, 'navigator', { configurable: true, value: { getGamepads: () => pads.map((p) => (p.connected ? p : null)) } });
+  });
+  afterAll(() => {
+    pads = [];
+    if (hadNav) Object.defineProperty(gl, 'navigator', hadNav);
+    else delete gl.navigator;
+  });
+  const key = (im: InputManager, code: string, down: boolean) => {
+    const k = im as any;
+    if (down) {
+      k.keysDown.add(code);
+      k.keyTapLatch.add(code);
+    } else k.keysDown.delete(code);
+  };
+
+  it('a lone pad pressing START while player 1 plays on the keyboard takes the player 2 seat and keeps it', () => {
+    pads = [mkPad(0)];
+    const im = new InputManager();
+    im.poll(DT);
+    key(im, 'ArrowRight', true); // player 1 runs on the keyboard
+    im.poll(DT);
+    key(im, 'ArrowRight', false);
+    expect(im.p1Device).toBe('keyboard');
+    im.offerPadToPlayer2();
+    pads[0].buttons[START].pressed = true;
+    im.poll(DT);
+    expect(im.player(1).pressed('start')).toBe(true);
+    expect(im.player(0).pressed('start')).toBe(false); // does not pause player 1
+    expect(im.hasPadFor(1)).toBe(true);
+    expect(im.hasPadFor(0)).toBe(false);
+    pads[0].buttons[START].pressed = false;
+    pads[0].buttons[A].pressed = true; // later: the pad still drives player 2 (no offer needed)
+    im.poll(DT);
+    expect(im.player(1).held('jump')).toBe(true);
+    expect(im.player(0).held('jump')).toBe(false);
+    // A second pad plugged in drives player 1; the seated pad stays player 2's.
+    pads[0].buttons[A].pressed = false;
+    const p2 = mkPad(1);
+    pads.push(p2);
+    p2.buttons[X].pressed = true;
+    im.poll(DT);
+    expect(im.player(0).held('fire')).toBe(true);
+    expect(im.player(1).held('fire')).toBe(false);
+    pads.pop();
+    // Back at the title: the lone pad drives player 1 again.
+    im.resetPadSeats();
+    pads[0].buttons[A].pressed = true;
+    im.poll(DT);
+    expect(im.player(0).held('jump')).toBe(true);
+    expect(im.player(1).held('jump')).toBe(false);
+  });
+
+  it('keeps the other setups: a pad player 1 plays with, two pads, and no offer (player 2 in / paused)', () => {
+    // Player 1 plays on the pad: START stays player 1's.
+    pads = [mkPad(0)];
+    let im = new InputManager();
+    im.poll(DT);
+    pads[0].buttons[A].pressed = true;
+    im.poll(DT);
+    pads[0].buttons[A].pressed = false;
+    im.poll(DT);
+    expect(im.p1Device).toBe('gamepad');
+    im.offerPadToPlayer2();
+    pads[0].buttons[START].pressed = true;
+    im.poll(DT);
+    expect(im.player(0).pressed('start')).toBe(true);
+    expect(im.player(1).pressed('start')).toBe(false);
+    // Two pads: connection order, whatever player 1 used last.
+    pads = [mkPad(0), mkPad(1)];
+    im = new InputManager();
+    im.poll(DT);
+    key(im, 'KeyD', true);
+    im.poll(DT);
+    im.offerPadToPlayer2();
+    pads[0].buttons[START].pressed = true;
+    im.poll(DT);
+    expect(im.player(0).pressed('start')).toBe(true);
+    expect(im.hasPadFor(0) && im.hasPadFor(1)).toBe(true);
+    // No offer (player 2 already in, or a menu is open): the lone pad is player 1's.
+    pads = [mkPad(0)];
+    im = new InputManager();
+    im.poll(DT);
+    key(im, 'KeyD', true);
+    im.poll(DT);
+    pads[0].buttons[START].pressed = true;
+    im.poll(DT);
+    expect(im.player(0).pressed('start')).toBe(true);
+  });
+
+  it('in a mission: player 2 drops in from the pad, player 1 keeps the solo keyboard layout and is not paused', () => {
+    pads = [mkPad(0)];
+    const s = new GameSession({ characters: ['dex', 'juno'], twoPlayer: false, mission: 1 });
+    const gp = new GameplayScene(s, 'sandbox');
+    app.scenes.set(gp, { fade: false });
+    run(1);
+    key(input, 'ArrowRight', true);
+    run(0.2);
+    key(input, 'ArrowRight', false);
+    pads[0].buttons[START].pressed = true;
+    run(0.1);
+    pads[0].buttons[START].pressed = false;
+    run(0.1);
+    expect(app.scenes.current).toBe(gp);
+    expect(s.players[1].joined).toBe(true);
+    expect(input.hasPadFor(1)).toBe(true);
+    expect(input.twoPlayerKeyboard).toBe(false);
+    expect(gp.world.players.length).toBe(2);
+    input.resetPadSeats();
+  });
+});
+
+describe('boot', () => {
+  it('bakes only the title art behind the progress bar; the rest bakes in the background and is done before play', () => {
+    const boot = new BootScene();
+    const queued = sprites.all();
+    const list = (boot as any).list as { name: string }[];
+    expect(list.length).toBeGreaterThan(5);
+    expect(list.length).toBeLessThan(queued.length / 10);
+    expect(list.map((x) => x.name)).toContain('ui_logo');
+    app.scenes.set(boot, { fade: false });
+    for (let i = 0; i < 600 && scene() === 'boot'; i++) run(DT);
+    expect(scene()).toBe('title');
+    expect(preload.remaining).toBeGreaterThan(0);
+    // Time-sliced: one step stays near its budget (one sprite frame at a time).
+    const before = preload.remaining;
+    const t0 = performance.now();
+    preload.step(2);
+    expect(performance.now() - t0).toBeLessThan(200);
+    expect(preload.remaining).toBeLessThanOrEqual(before);
+    // A player who deploys from the briefing before the baking is done sees a DEPLOYING bar
+    // until it is: gameplay then has nothing left to force.
+    const br = new BriefingScene(new GameSession({ characters: ['dex', 'juno'], mission: 1 }), { levelId: 'sandbox' });
+    app.scenes.set(br, { fade: false });
+    run(0.5);
+    press({ fire: true }); // finish typing
+    press({ fire: true }); // deploy
+    expect((br as any).loading).toBe(true);
+    expect(scene()).toBe('briefing');
+    const forced = preload.forcedFrames;
+    for (let i = 0; i < 2000 && scene() !== 'gameplay'; i++) run(DT);
+    expect(scene()).toBe('gameplay');
+    expect(preload.remaining).toBe(0);
+    expect(preload.forcedFrames).toBe(forced);
+    const unbaked = queued.filter((sp) => !(sp as any).baked.every(Boolean)).map((sp) => sp.name);
+    expect(unbaked).toEqual([]);
+    // Any other way into gameplay (debug URL, attract demo) bakes the remainder on entering.
+    preload.start();
+    expect(preload.remaining).toBeGreaterThan(0);
+    app.scenes.set(new GameplayScene(new GameSession({ characters: ['dex', 'juno'], mission: 1 }), 'sandbox'), { fade: false });
+    expect(preload.remaining).toBe(0);
+    // The HUD portraits were queued too (defined lazily elsewhere).
+    expect(queued.some((sp) => sp.name.startsWith('ui_face_'))).toBe(true);
   });
 });

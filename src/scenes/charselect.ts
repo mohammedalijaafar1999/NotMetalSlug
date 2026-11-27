@@ -15,7 +15,7 @@ import { characters, type CharacterDef } from '../game/characters';
 import { GameSession } from '../game/session';
 import { LEG, LEG_FRAMES } from '../art/humanoid';
 import { backdrop } from './backdrop';
-import { C, PLAYER_COLORS, backButton, blink, ctl, easeOutBack, enterMenu, fitText, footer, panel, rect, sharedKeysHint, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
+import { C, PLAYER_COLORS, backButton, blink, ctl, easeOutBack, enterMenu, fitText, footer, panel, rect, sharedKeysHint, text, touchOnly, twoTone, uiInput, uiSfx, syncTouch } from './ui';
 
 interface Slot {
   joined: boolean;
@@ -23,16 +23,6 @@ interface Slot {
   confirmed: boolean;
   /** Time since the last cursor move / confirm (animations). */
   t: number;
-}
-
-/** Number of connected gamepads. */
-export function gamepadCount(): number {
-  if (typeof navigator === 'undefined' || !navigator.getGamepads) return 0;
-  try {
-    return Array.from(navigator.getGamepads()).filter((p) => p && p.connected).length;
-  } catch {
-    return 0;
-  }
 }
 
 /** Remember the last picks between games (per page load). */
@@ -48,14 +38,16 @@ export class CharSelectScene implements Scene {
 
   constructor(readonly opts: { twoPlayer: boolean; mission?: number }) {
     const n = this.chars.length;
-    this.slots = [0, 1].map((i) => ({ joined: i === 0 || opts.twoPlayer, index: Math.min(n - 1, lastPick[i] ?? i), confirmed: false, t: 0 }));
+    const p2 = opts.twoPlayer && !touchOnly();
+    this.slots = [0, 1].map((i) => ({ joined: i === 0 || p2, index: Math.min(n - 1, lastPick[i] ?? i), confirmed: false, t: 0 }));
     if (this.slots[1].index === this.slots[0].index && n > 1) this.slots[1].index = (this.slots[0].index + 1) % n;
   }
 
   enter(): void {
     enterMenu();
     audio.playMusic('select');
-    input.twoPlayerKeyboard = this.opts.twoPlayer && gamepadCount() < 2;
+    // Player 2 shares the keyboard unless a gamepad drives them.
+    input.twoPlayerKeyboard = this.slots[1].joined && !input.hasPadFor(1);
   }
 
   private cardRect(i: number): { x: number; y: number; w: number; h: number } {
@@ -108,6 +100,8 @@ export class CharSelectScene implements Scene {
       this.back();
       return;
     }
+    // A lone pad picked up while player 1 uses the keyboard joins as player 2.
+    if (!this.slots[1].joined) input.offerPadToPlayer2();
     for (let i = 0; i < 2; i++) {
       const s = this.slots[i];
       const a = p[i];
@@ -116,7 +110,7 @@ export class CharSelectScene implements Scene {
           s.joined = true;
           s.t = 0;
           s.confirmed = false;
-          if (input.lastDevice !== 'gamepad') input.twoPlayerKeyboard = true;
+          if (!input.hasPadFor(1)) input.twoPlayerKeyboard = true;
           audio.play('coin');
         }
         continue;
@@ -126,8 +120,10 @@ export class CharSelectScene implements Scene {
         if (s.confirmed) {
           s.confirmed = false;
           audio.play('menu_back');
-        } else if (i === 1 && !this.opts.twoPlayer) {
+        } else if (i === 1) {
+          // Player 2 backs out (also from START 2 PLAYERS): player 1 goes on alone.
           s.joined = false;
+          input.twoPlayerKeyboard = false;
           audio.play('menu_back');
         } else if (i === 0) {
           this.back();
@@ -328,7 +324,8 @@ export class CharSelectScene implements Scene {
       if (joined.length === 1) this.statBars(g, c, px + pw - 128, py + 36);
     });
     if (!this.slots[1].joined) {
-      const msg = '2P: PRESS START TO JOIN';
+      // Touch drives player 1 only: say how a second player joins.
+      const msg = touchOnly() ? '2P: JOIN WITH A KEYBOARD OR GAMEPAD' : '2P: PRESS START TO JOIN';
       if (blink(this.time, 1.2, 0.7)) drawText(g, msg, VIEW_W - 8, VIEW_H - 19, { align: 'right', color: C.p2, outline: C.out });
     }
     if (input.twoPlayerKeyboard && this.slots[1].joined) {

@@ -17,6 +17,7 @@ import { GameSession } from './game/session';
 import { installDebugApi, applyUrlParams } from './debug/api';
 import { applySettings } from './settings-apply';
 import { startupHooks } from './hooks';
+import { preload } from './scenes/preload';
 
 /** Scenes that show the FPS counter in the bottom-right corner (elsewhere: top-right). */
 const FPS_LOW_SCENES = new Set(['gameplay', 'demo', 'pause', 'briefing']);
@@ -56,6 +57,8 @@ function main(): void {
     s?.autoPause?.();
   };
   installDebugApi();
+  // Background sprite baking status (perf checks: remaining, bakedMs, forcedFrames).
+  (window as unknown as { __preload: typeof preload }).__preload = preload;
   installDefaultFlow();
   // Content modules may override flow hooks / install UI; give them a chance.
   for (const fn of startupHooks) fn();
@@ -77,6 +80,9 @@ function main(): void {
         drawText(r.g, `${app.loop.fps} FPS`, VIEW_W - 3, low ? 205 : 2, { align: 'right', color: '#80ff80', outline: '#140c1c' });
       }
       r.present();
+      // Sprites the title did not need bake in the background, a few ms per frame (more on a
+      // static screen that asks for it, e.g. the briefing card).
+      preload.step((app.scenes.current as { preloadBudget?: number } | undefined)?.preloadBudget);
     },
   );
   app.scenes.set(new BootScene(), { fade: false });
