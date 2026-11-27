@@ -120,6 +120,42 @@ describe('BULLDOG tank', () => {
     expect(p.state).not.toBe('vehicle');
   });
 
+  /** Flat open ground (the sandbox has a platform over x 200..280). */
+  const FLAT: LevelDef = { id: 'test_flat_range', mission: 0, name: 'FLAT', theme: 'default', music: 'm1', width: 1600, height: 216, start: { x: 60 }, ground: [[[0, 180], [1600, 180]]] };
+
+  it('level vulcan fire dips into standing riflemen at 60, 120 and 170 px (the turret sits above their heads)', () => {
+    for (const d of [60, 120, 170]) {
+      const w = makeWorld(FLAT, { god: true });
+      hold(w, null, 70);
+      const p = w.players[0];
+      const tank = spawn<Tank>(w, 'tank', p.x + 4);
+      hold(w, null, 20);
+      hold(w, { down: true }, 3);
+      expect(p.vehicle).toBe(tank);
+      hold(w, null, 5);
+      const r = spawn<Entity>(w, 'rifleman', tank.x + d, undefined, { behavior: 'idle', facing: -1 });
+      expect(r.top, 'the rifleman stands below the barrel line').toBeGreaterThan(tank.pivot().y + 4);
+      hold(w, { fire: true }, 60);
+      expect((r as any).dying || r.dead, `rifleman at ${d} px`).toBe(true);
+      expect(Math.abs(tank.aim), 'the held aim stays level').toBeLessThan(0.01);
+    }
+  });
+
+  it('level fire stays level with nothing low ahead, and diagonal / up aims never dip', () => {
+    const w = ready();
+    const p = w.players[0];
+    const tank = spawn<Tank>(w, 'tank', p.x + 4);
+    hold(w, null, 20);
+    hold(w, { down: true }, 3);
+    hold(w, { fire: true }, 20);
+    expect(tank.dip).toBe(0);
+    spawn(w, 'rifleman', tank.x + 120, undefined, { behavior: 'idle', facing: -1 });
+    hold(w, { up: true, right: true }, 30);
+    expect(tank.gunAngle()).toBeCloseTo(-Math.PI / 4, 3);
+    hold(w, { up: true }, 30);
+    expect(tank.gunAngle()).toBeCloseTo(-Math.PI / 2, 3);
+  });
+
   it('hops small gaps: treads bridge a pit narrower than the hull', () => {
     const w = ready();
     const tank = spawn<Tank>(w, 'tank', 1080);

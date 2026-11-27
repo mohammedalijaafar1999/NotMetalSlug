@@ -24,6 +24,13 @@ const HOP = 320;
 const TURRET_RATE = 7.5;
 const VULCAN_CD = 0.075;
 const CANNON_CD = 0.5;
+/**
+ * Level-fire auto-depression: the vulcan sits ~35 px up, over a standing soldier's head (26 px),
+ * so when it points level it dips (at most DIP_MAX, at DIP_RATE rad/s) toward the nearest enemy
+ * ahead whose hitbox lies wholly below the barrel line. Diagonal and up aims are left alone.
+ */
+const DIP_MAX = 0.45;
+const DIP_RATE = 3.5;
 
 // Canvas shared by the tread / hull / lid layers: origin = bottom-center (feet).
 const W = 54;
@@ -283,8 +290,10 @@ export class TankShell extends Projectile {
 // ------------------------------------------------------------------ entity
 
 export class Tank extends Vehicle {
-  /** World-space vulcan angle. */
+  /** World-space vulcan angle (the held direction). */
   aim = 0;
+  /** Current level-fire auto-depression (rad, >= 0 = barrel tipped down toward the front). */
+  dip = 0;
   private fireCd = 0;
   private cannonCd = 0;
   private recoilT = 0;
@@ -343,6 +352,8 @@ export class Tank extends Vehicle {
     if (dirX !== 0) this.facing = dirX;
     this.vx = approach(this.vx, dirX * SPEED * (this.inWater ? 0.7 : 1), ACCEL * dt);
     this.aim = turnVia(this.aim, this.aimTarget(inp), TURRET_RATE * dt);
+    const level = Math.abs(angleDiff(this.aim, this.facing > 0 ? 0 : Math.PI)) < 0.02;
+    this.dip = approach(this.dip, level ? this.levelDip() : 0, DIP_RATE * dt);
     if (inp.pressed('jump') && this.onGround && !inp.held('down')) {
       this.jump(HOP);
       vsfx(this.world, 'engine', this.x, { vol: 0.5, pitch: 1.25 });
@@ -356,7 +367,33 @@ export class Tank extends Vehicle {
     this.afterMove(dt, true);
   }
 
+  /** Barrel angle actually fired along / drawn: the aim plus the level-fire dip. */
+  gunAngle(): number {
+    return this.aim + this.dip * this.facing;
+  }
+
+  /** Dip that puts a level burst into the nearest on-screen enemy ahead that sits under the barrel. */
+  levelDip(): number {
+    const pv = this.pivot();
+    let bestDx = Infinity;
+    let dip = 0;
+    for (const e of this.world.targets('player')) {
+      if (e.team !== 'enemy' || !e.onScreen()) continue;
+      for (const hb of e.hurtboxes()) {
+        const dx = (hb.x + hb.w / 2 - pv.x) * this.facing;
+        if (dx < 20 || dx >= bestDx || hb.y + hb.h < pv.y) continue;
+        // Spans the barrel line: level fire already hits it. Otherwise aim at its upper body.
+        const want = hb.y <= pv.y ? 0 : Math.atan2(hb.y + Math.min(hb.h * 0.35, 9) - pv.y, dx);
+        if (want > DIP_MAX) continue;
+        bestDx = dx;
+        dip = want;
+      }
+    }
+    return dip;
+  }
+
   override idle(dt: number): void {
+    if (this.dip > 0) this.dip = Math.max(0, this.dip - DIP_RATE * dt);
     if (this.recoilT > 0) this.recoilT -= dt;
     if (this.kickT > 0) this.kickT -= dt;
     super.idle(dt);
@@ -405,7 +442,7 @@ export class Tank extends Vehicle {
     const w = this.world;
     this.fireCd = VULCAN_CD;
     this.kickT = 0.04;
-    const a = this.aim;
+    const a = this.gunAngle();
     const pv = this.pivot();
     const side = this.shot++ % 2 === 0 ? -1.3 : 1.3;
     const mx = pv.x + Math.cos(a) * 15 - Math.sin(a) * side;
@@ -464,7 +501,8 @@ export class Tank extends Vehicle {
     sprites.get('tank_tread').draw(g, x, y, tf, { flip, flash });
     sprites.get('tank_hull').draw(g, hx, y, driven ? 1 : 0, { flip, flash });
     // Vulcan.
-    const local = this.facing > 0 ? this.aim : Math.PI - this.aim;
+    const ga = this.gunAngle();
+    const local = this.facing > 0 ? ga : Math.PI - ga;
     const k = ((Math.round(local / ((Math.PI * 2) / GUN_FRAMES)) % GUN_FRAMES) + GUN_FRAMES) % GUN_FRAMES;
     const pv = this.pivot();
     sprites.get('tank_gun').draw(g, pv.x + shakeX, pv.y, k + (this.kickT > 0 ? GUN_FRAMES : 0), { flip, flash });
