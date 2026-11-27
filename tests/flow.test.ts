@@ -403,3 +403,46 @@ describe('join prompt', () => {
     input.lastDevice = savedDev;
   });
 });
+
+describe('gamepads', () => {
+  const mkPad = (index: number) => ({
+    index,
+    connected: true,
+    axes: [0, 0, 0, 0],
+    buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })),
+  });
+  it('a pad that drops out keeps its player slot (the other pad does not take over player 1)', () => {
+    const pads = [mkPad(0), mkPad(1)];
+    const gl = globalThis as any;
+    const hadNav = Object.getOwnPropertyDescriptor(gl, 'navigator');
+    Object.defineProperty(gl, 'navigator', { configurable: true, value: { getGamepads: () => pads.map((p) => (p.connected ? p : null)) } });
+    try {
+      const im = new InputManager();
+      im.poll(DT);
+      pads[1].buttons[0].pressed = true; // player 2 holds JUMP (A)
+      im.poll(DT);
+      expect(im.player(1).held('jump')).toBe(true);
+      expect(im.player(0).held('jump')).toBe(false);
+      pads[0].connected = false; // player 1's pad drops out
+      im.poll(DT);
+      expect(im.player(0).held('jump')).toBe(false);
+      expect(im.player(1).held('jump')).toBe(true);
+      pads[0].connected = true; // ...and comes back as player 1
+      pads[0].buttons[2].pressed = true; // X = FIRE
+      im.poll(DT);
+      expect(im.player(0).held('fire')).toBe(true);
+      expect(im.player(1).held('fire')).toBe(false);
+      // A different pad plugged in while player 1's is gone takes over the free slot.
+      pads[0].connected = false;
+      const p3 = mkPad(2);
+      pads.push(p3);
+      p3.buttons[2].pressed = true;
+      im.poll(DT);
+      expect(im.player(0).held('fire')).toBe(true);
+      expect(im.player(1).held('fire')).toBe(false);
+    } finally {
+      if (hadNav) Object.defineProperty(gl, 'navigator', hadNav);
+      else delete gl.navigator;
+    }
+  });
+});

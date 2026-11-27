@@ -383,12 +383,11 @@ export class InputManager {
     });
     window.addEventListener('gamepadconnected', (e) => {
       const ge = e as GamepadEvent;
-      if (!this.padOrder.includes(ge.gamepad.index)) this.padOrder.push(ge.gamepad.index);
+      this.assignPad(ge.gamepad.index, new Set(this.pads().filter((p) => p?.connected).map((p) => p!.index)));
     });
-    window.addEventListener('gamepaddisconnected', (e) => {
-      const ge = e as GamepadEvent;
-      this.padOrder = this.padOrder.filter((i) => i !== ge.gamepad.index);
-    });
+    // A pad that drops out keeps its player slot (so the other pad does not take over its player)
+    // and the game pauses until it is back.
+    window.addEventListener('gamepaddisconnected', () => this.focusLost());
   }
 
   /** Forget every held key and touch control (e.g. the window lost focus). */
@@ -440,6 +439,17 @@ export class InputManager {
     return this.pads().some(Boolean);
   }
 
+  /**
+   * Give a newly seen pad a player slot: the first slot whose pad is gone (a reconnecting pad
+   * normally gets its old index back, so it returns to its own player), else a new slot.
+   */
+  private assignPad(index: number, live: Set<number>): void {
+    if (this.padOrder.includes(index)) return;
+    const free = this.padOrder.findIndex((i) => !live.has(i));
+    if (free >= 0) this.padOrder[free] = index;
+    else this.padOrder.push(index);
+  }
+
   private pads(): (Gamepad | null)[] {
     if (typeof navigator === 'undefined' || !navigator.getGamepads) return [];
     try {
@@ -478,9 +488,13 @@ export class InputManager {
   poll(dt: number): void {
     const pads = this.pads().filter((p): p is Gamepad => !!p && p.connected);
     // Maintain stable order of pads.
-    for (const p of pads) if (!this.padOrder.includes(p.index)) this.padOrder.push(p.index);
-    const orderedPads = this.padOrder.map((i) => pads.find((p) => p.index === i)).filter((p): p is Gamepad => !!p);
-    const padStates = orderedPads.map((p) => padActions(readPad(p)));
+    const live = new Set(pads.map((p) => p.index));
+    for (const p of pads) this.assignPad(p.index, live);
+    // One entry per player slot; a slot whose pad is disconnected reads as all released.
+    const padStates = this.padOrder.map((i) => {
+      const p = pads.find((q) => q.index === i);
+      return p ? padActions(readPad(p)) : ACTIONS.map(() => false);
+    });
     if (padStates.some((s) => s.some(Boolean))) {
       this.lastDevice = 'gamepad';
       this.gesture();
