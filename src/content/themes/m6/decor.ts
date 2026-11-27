@@ -28,6 +28,7 @@ import { Rng } from '../../../engine/rng';
 import type { DecorRenderer } from '../../../game/theme';
 import { ramp, shaded, type Ramp } from '../../vehicles/art';
 import { M6, hash01 } from './palette';
+import { BakeCache, staticDecor } from '../bake';
 
 const O = M6.outline;
 
@@ -1004,17 +1005,12 @@ sprites.define({
   },
 });
 
-const searchlight: DecorRenderer = (g, d, time) => {
-  const x = Math.round(d.x);
-  const y = Math.round(d.y);
-  // beam: a long thin wedge sweeping back and forth across the sky
-  const a = -Math.PI / 2 + Math.sin(time * 0.45 + d.x * 0.013) * 0.62;
-  const c = Math.cos(a);
-  const s = Math.sin(a);
+/** Draw the beam's stacked translucent segments for direction (c, s) from (x, y). */
+function beamSegments(g: CanvasRenderingContext2D, x: number, y: number, c: number, s: number): void {
   g.fillStyle = '#e8e0c0';
   for (let i = 4; i < 260; i += 3) {
     const bx = x + c * i;
-    const by = y - 6 + s * i;
+    const by = y + s * i;
     const half = 1.5 + i * 0.09;
     g.globalAlpha = 0.16 * (1 - i / 270);
     g.fillRect(Math.round(bx - half), Math.round(by - 1), Math.round(half * 2), 3);
@@ -1022,6 +1018,41 @@ const searchlight: DecorRenderer = (g, d, time) => {
     g.fillRect(Math.round(bx - half * 0.3), Math.round(by - 1), Math.max(1, Math.round(half * 0.6)), 3);
   }
   g.globalAlpha = 1;
+}
+
+// The beam (170 translucent fillRects a frame) is baked once pointing straight up and blitted
+// rotated about the lamp: the same stepped wedge, at one drawImage.
+const BEAM_W = 52;
+const BEAM_H = 264;
+let beamImg: HTMLCanvasElement | null | undefined;
+
+function beamImage(): HTMLCanvasElement | null {
+  if (beamImg !== undefined) return beamImg;
+  beamImg = null;
+  if (typeof document === 'undefined') return null;
+  const c = document.createElement('canvas');
+  c.width = BEAM_W;
+  c.height = BEAM_H;
+  const x = c.getContext('2d');
+  if (!x) return null;
+  beamSegments(x, BEAM_W / 2, BEAM_H, 0, -1);
+  beamImg = c;
+  return c;
+}
+
+const searchlight: DecorRenderer = (g, d, time) => {
+  const x = Math.round(d.x);
+  const y = Math.round(d.y);
+  // beam: a long thin wedge sweeping back and forth across the sky
+  const a = -Math.PI / 2 + Math.sin(time * 0.45 + d.x * 0.013) * 0.62;
+  const img = beamImage();
+  if (img) {
+    g.save();
+    g.translate(x, y - 6);
+    g.rotate(a + Math.PI / 2);
+    g.drawImage(img, -BEAM_W / 2, -BEAM_H);
+    g.restore();
+  } else beamSegments(g, x, y - 6, Math.cos(a), Math.sin(a));
   sprites.get('m6d_searchlight').draw(g, x, y);
 };
 
@@ -1245,6 +1276,27 @@ const hangarDoor: DecorRenderer = (g, d, time) => {
   const yb = Math.round(d.y);
   const h: number = d.props?.h ?? 150;
   const w: number = d.props?.w ?? 120;
+  // The door itself is static (~2000 one-pixel fillRects): baked once, only the alarm is live.
+  doorCache.draw(
+    g,
+    d,
+    (b) => hangarDoorStatic(b, x0, yb, w, h),
+    () => [x0 - 8, yb - h - 32, w + 16, h + 40],
+  );
+  // rotating alarm light on the lintel
+  const on = Math.floor(time * 3) % 2 === 0;
+  g.fillStyle = on ? M6.red : M6.redD;
+  g.fillRect(x0 + 18, yb - h - 16, 6, 4);
+  if (on) {
+    g.globalAlpha = 0.2;
+    g.fillRect(x0 + 8, yb - h - 24, 26, 18);
+    g.globalAlpha = 1;
+  }
+};
+
+const doorCache = new BakeCache<object>();
+
+function hangarDoorStatic(g: CanvasRenderingContext2D, x0: number, yb: number, w: number, h: number): void {
   // dark opening with a faint red glow deep inside
   g.fillStyle = '#0c090e';
   g.fillRect(x0 + 10, yb - h, w - 10, h);
@@ -1271,16 +1323,7 @@ const hangarDoor: DecorRenderer = (g, d, time) => {
   g.fillRect(x0 + 1, yb - h - 11, w - 1, 4);
   g.fillStyle = M6.ironL;
   g.fillRect(x0 + 1, yb - h - 11, w - 1, 1);
-  // rotating alarm light on the lintel
-  const on = Math.floor(time * 3) % 2 === 0;
-  g.fillStyle = on ? M6.red : M6.redD;
-  g.fillRect(x0 + 18, yb - h - 16, 6, 4);
-  if (on) {
-    g.globalAlpha = 0.2;
-    g.fillRect(x0 + 8, yb - h - 24, 26, 18);
-    g.globalAlpha = 1;
-  }
-};
+}
 
 // ------------------------------------------------------------------ fan vent
 
@@ -1476,7 +1519,8 @@ export const M6_DECOR: Record<string, DecorRenderer> = {
   reactor,
   vent,
   crane,
-  panel,
+  // Static plate walls: baked once per entry (a 32 px tile per drawImage, ~60 a frame).
+  panel: staticDecor(panel, (d) => [d.x - 8, d.y - (d.props?.h ?? 120) - 8, (d.props?.w ?? 256) + 16, (d.props?.h ?? 120) + 16]),
   hangar_door: hangarDoor,
   pit,
   truss,
