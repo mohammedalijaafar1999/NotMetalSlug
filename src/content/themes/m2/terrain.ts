@@ -330,7 +330,8 @@ export function levelFloorBelow(level: LevelDef, x: number, y: number): number {
 // ------------------------------------------------------------------ platforms
 
 /** The level being rendered (set by the backdrop each frame; platforms use it to find their footing). */
-export const renderCtx: { level: LevelDef | null } = { level: null };
+/** Set by the backdrop every frame: the level being drawn and the camera's left edge. */
+export const renderCtx: { level: LevelDef | null; camX: number } = { level: null, camX: 0 };
 
 function px(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, c: string): void {
   g.fillStyle = c;
