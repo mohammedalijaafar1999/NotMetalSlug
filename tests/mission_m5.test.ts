@@ -286,6 +286,20 @@ describe('mission 5 mechanics', () => {
     expect(v.hp).toBeGreaterThan(20);
   });
 
+  it('pilots stay aboard their gyros for the mission-complete celebration (no fall, no life lost)', () => {
+    const w = worldAt(6400, { god: false });
+    const p = w.players[0];
+    const v = gyroOf(w);
+    const lives = p.profile.lives;
+    let died = 0;
+    w.on('playerDied', () => died++);
+    p.celebrate();
+    step(w, Math.round(4 / DT));
+    expect(p.vehicle).toBe(v);
+    expect(p.profile.lives).toBe(lives);
+    expect(died).toBe(0);
+  });
+
   it('a pickup tossed off a deck into the open sky pops a parachute and can still be caught', () => {
     const w = worldAt(6340);
     const v = gyroOf(w);

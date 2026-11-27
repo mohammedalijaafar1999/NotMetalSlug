@@ -647,6 +647,8 @@ export class Player extends Actor {
 
   /** Mission complete pose. */
   celebrate(): void {
+    // Stay aboard a vehicle that may not be left here (a gyro over a bottomless sky).
+    if (this.state === 'vehicle' && this.vehicle && !this.vehicle.canEject()) return;
     if (this.state === 'vehicle') this.exitVehicle(false);
     if (this.state === 'play' || this.state === 'respawn') {
       this.setState('victory');
