@@ -214,11 +214,12 @@ sprites.define({
       p.px(wx + 2, G - 74, '#ffffff');
       snowCap(p, wx - 1, wx + 19, G - 60, 1, 40 + k, false);
     }
-    // Sign board.
+    // Sign board on two short posts above the roof line.
     const txt = 'CABLE CAR';
     const tw = textWidth(txt);
-    shadedBox(p, 75 - tw / 2 - 5, G - 96, tw + 10, 11, P3.redD, P3.red, '#5a1420');
-    pxText(p, 75 - tw / 2, G - 93, txt, '#f4e8d0');
+    for (const sx of [75 - tw / 2, 75 + tw / 2 - 2]) p.rect(sx, G - 97, 2, 8, P3.steelD);
+    shadedBox(p, 75 - tw / 2 - 5, G - 108, tw + 10, 11, P3.red, P3.redHi, P3.redD);
+    pxText(p, 75 - tw / 2, G - 105, txt, '#f4e8d0');
     // Flat roof with snow + overhang.
     p.rect(4, G - 88, 142, 4, P3.steelD);
     p.rect(4, G - 88, 142, 1, P3.steel);
@@ -414,7 +415,7 @@ sprites.define({
       p.poly([2, 4, 28, 4, 34, 10, 28, 16, 2, 16], P3.woodM);
       p.poly([3, 5, 28, 5, 32, 10, 28, 15, 3, 15], P3.woodHi);
       pxText(p, 6, 8, txt, P3.woodDD);
-      snowCap(p, 3, 28, 4, 2, 90 + f, true);
+      snowCap(p, 3, 28, 4, 2, 90 + f, false);
     } else if (f === 1) {
       p.poly([18, 0, 34, 18, 18, 34 - 12, 2, 18], '#2a2430');
       p.poly([18, 2, 32, 18, 18, 20, 4, 18], P3.gold);
@@ -438,7 +439,7 @@ sprites.define({
     } else {
       shadedBox(p, 3, 2, 30, 14, P3.red, P3.redHi, P3.redD);
       pxText(p, 9, 7, 'HALT', '#f4f0e8');
-      snowCap(p, 3, 33, 2, 2, 95, true);
+      snowCap(p, 3, 33, 2, 2, 95, false);
     }
   },
 });

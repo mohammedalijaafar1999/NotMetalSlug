@@ -225,7 +225,8 @@ const decor: DecorDef[] = [
   dec('rock', 5840, { f: 0 }),
   dec('pine', 5870, { f: 3 }),
   // Climb.
-  dec('cliff', CLIFF, { w: 420, h: H - P - 12 }, 'back', P + 12),
+  // The cliff face starts just below the plateau view (camera top 0 sees down to y 216) so no texture seam shows up there.
+  dec('cliff', CLIFF, { w: 420, h: H - 216 }, 'back', 216),
   dec('pine_far', 5960, { f: 2 }),
   dec('rock', 6020, { f: 2 }),
   dec('icefall', CLIFF - 40, {}, 'back', TIERS[1] + 6),
@@ -362,7 +363,7 @@ registerLevel({
   width: W,
   height: H,
   start: { x: 60 },
-  timeLimit: 90,
+  timeLimit: 99,
   ground: GROUND,
   platforms: [
     { x: 970, y: 436, w: 60, style: 'rock' },
