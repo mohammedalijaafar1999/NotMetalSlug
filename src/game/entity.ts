@@ -261,6 +261,10 @@ export abstract class Actor extends Entity {
           this.y = s.y;
           this.groundSolid = s;
           this.groundSurface = null;
+        } else if ((this.x < s.x + s.w / 2 ? -1 : 1) === dir) {
+          // Already past the middle of the box, moving away from it (walking or falling off its far
+          // edge clips the top corner): slide out on that side instead of being thrown back across.
+          nx = dir > 0 ? Math.max(nx, s.x + s.w + hw + 0.01) : Math.min(nx, s.x - hw - 0.01);
         } else {
           nx = dir > 0 ? s.x - hw - 0.01 : s.x + s.w + hw + 0.01;
           // Never get pushed backwards through other geometry because of the clamp.
