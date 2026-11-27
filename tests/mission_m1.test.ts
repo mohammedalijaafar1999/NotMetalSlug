@@ -99,12 +99,34 @@ describe('mission m1 - level data', () => {
     expect(paraLocks.length).toBe(1);
   });
 
-  it('never spawns wave infantry off the left edge of an arena (they would never walk in)', () => {
+  it('wave enemies walk in from the right, drop from above, or (sabers) sneak in at the left edge', () => {
     for (const l of def().locks ?? []) {
+      if (l.boss) continue;
       for (const wv of l.waves) {
         for (const s of wv.spawns) {
           if (getEntityType(s.type)?.category !== 'enemy') continue;
-          expect(s.x, `${s.type} in lock ${l.x}`).toBeGreaterThanOrEqual(l.x + 8);
+          const where = `${s.type}@${s.x} in lock ${l.x}`;
+          if (s.type === 'saber') expect(s.x, where).toBeGreaterThanOrEqual(l.x + 8);
+          else if (s.type === 'paratrooper' || s.type === 'mortar') {
+            // From above / set up at the far end: inside the locked view.
+            expect(s.x, where).toBeGreaterThanOrEqual(l.x + 40);
+            expect(s.x, where).toBeLessThanOrEqual(l.x + VIEW_W - 24);
+          } else expect(s.x, where).toBeGreaterThanOrEqual(l.x + VIEW_W + 8);
+        }
+      }
+    }
+  });
+
+  it('wave infantry spawns on ground the AI can walk (no steep slopes: floorAhead would pin them)', () => {
+    const w = makeWorld(def());
+    const T = w.terrain;
+    for (const l of def().locks ?? []) {
+      for (const wv of l.waves) {
+        for (const s of wv.spawns) {
+          if (getEntityType(s.type)?.category !== 'enemy' || s.type === 'paratrooper' || s.y !== undefined) continue;
+          const here = T.topFloorAt(s.x)!;
+          const toward = T.topFloorAt(s.x + (s.x > l.x + VIEW_W / 2 ? -16 : 16))!;
+          expect(Math.abs(here - toward), `${s.type}@${s.x}`).toBeLessThanOrEqual(6);
         }
       }
     }

@@ -99,7 +99,7 @@ export const DECOR: DecorDef[] = [
   // ---- Down the slope to the jungle floor.
   d('jtree', 5150, 241),
   d('banana', 5270, G, { v: 1 }),
-  d('fern', 5318, G, { v: 2 }, 'front'),
+  d('sign', 5300, G, { v: 1 }), // MINES warning before the minefield
   d('jtree', 5390, G),
   d('banana', 5470, G, { v: 0 }),
   // ---- Stockade outskirts (gauntlet arena) and the calm approach.
