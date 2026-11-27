@@ -200,8 +200,9 @@ describe('mission 4 mechanics', () => {
     const harbor = w.spawn('m4_harbor', 0) as HarborWater;
     step(w, 60);
     const p = w.players[0];
-    w.camera.x = 450;
-    w.camera.minX = 450;
+    // Camera placed so the default drop-in point (camera x + 64) is over the canal.
+    w.camera.x = 560;
+    w.camera.minX = 560;
     const lives = p.profile.lives;
     p.x = 700;
     p.y = 120;
@@ -214,10 +215,14 @@ describe('mission 4 mechanics', () => {
     }
     expect(harbor.splashes).toBeGreaterThanOrEqual(1);
     expect(fell).toBe(true);
+    // The respawn is steered onto solid quay with room to land, not a pontoon or the water.
+    w.spawn('m4_pontoon', 624, undefined, { w: 48 });
     step(w, 180);
     expect(p.state).toBe('play');
     expect(p.onGround).toBe(true);
+    expect(p.groundSurface?.ground ?? false).toBe(true);
     expect(w.terrain.waterAt(p.x, p.y - 2)?.deadly ?? false).toBe(false);
+    expect(p.x < 600 || p.x > 800).toBe(true);
   });
 
   it('the gantry magnet snatches a piloted tank and throws the pilot clear (once)', () => {

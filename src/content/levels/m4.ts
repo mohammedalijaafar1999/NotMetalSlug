@@ -14,7 +14,7 @@
 //         blocks; LOCK 3 inside (troops down the steps, jetpacks, sabers); climb out up the steps.
 //   4560  Canal C (pontoons, frogmen), then the container yard: climb container stacks, MG turret,
 //         sniper on a catwalk, sleepers, a caged hostage, mines.
-//   5600  LOCK 4 "the slip" (gauntlet): gunboats in the slip, a heli, jetpacks, a tank from behind;
+//   5600  LOCK 4 "the slip" (gauntlet): gunboats in the slip, a heli, jetpacks, a truck from behind;
 //         the lift bridge (m4_bridge) comes down for the final wave - and you cross it.
 //   6040  Far quay, a last squad, then a full screen of calm along the harbour front (bombs, laser).
 //   6960  BOSS LOCK: the dock (y 180, L..L+148) over the open basin (water y 190): LEVIATHAN.
@@ -163,7 +163,7 @@ locks.push({
         at('rifleman', 1534, { behavior: 'guard', facing: -1 }),
         at('rifleman', 1556, { behavior: 'guard', facing: -1 }),
         at('officer', 1576, { facing: -1 }),
-        at('jetpack', 1460, {}, 70),
+        at('jetpack', 1604, {}, 70),
       ],
     },
     {
@@ -264,7 +264,7 @@ locks.push({
     },
     {
       delay: 1,
-      spawns: [at('light_tank', 3070, { behavior: 'advance', facing: -1 }), at('jetpack', 2760, {}, 60), at('jetpack', 2960, {}, 50)],
+      spawns: [at('light_tank', 3070, { behavior: 'advance', facing: -1 }), at('jetpack', 2620, {}, 60), at('jetpack', 3044, {}, 50)],
     },
     {
       delay: 1,
@@ -315,7 +315,7 @@ locks.push({
     },
     {
       delay: 1,
-      spawns: [at('jetpack', 3980, {}, 200), at('jetpack', 4220, {}, 190), at('saber', 4270, { behavior: 'charge' }), at('saber', 4282, { behavior: 'charge' })],
+      spawns: [at('jetpack', 3880, {}, 200), at('jetpack', 4304, {}, 190), at('saber', 4270, { behavior: 'charge' }), at('saber', 4282, { behavior: 'charge' })],
     },
     {
       delay: 1,
@@ -323,7 +323,7 @@ locks.push({
         at('grenadier', 4276, { behavior: 'guard', facing: -1 }),
         at('shield_trooper', 4262, { behavior: 'charge' }),
         at('rifleman', 3912, { behavior: 'charge' }),
-        at('officer', 4240, { facing: -1 }),
+        at('officer', 4268, { facing: -1 }),
         at('paratrooper', 4010, {}),
         at('paratrooper', 4150, {}),
       ],
@@ -390,7 +390,7 @@ locks.push({
     },
     {
       delay: 1,
-      spawns: [at('heli', 6060, { facing: -1 }), at('jetpack', 5700, {}, 60), at('grenadier', 5610, { behavior: 'charge' })],
+      spawns: [at('heli', 6060, { facing: -1 }), at('jetpack', 6004, {}, 60), at('grenadier', 5610, { behavior: 'charge' })],
     },
     {
       delay: 1,
@@ -402,7 +402,7 @@ locks.push({
         at('rifleman', 6070, { behavior: 'charge' }),
         at('rifleman', 6100, { behavior: 'charge' }),
         at('flametrooper', 6130, { behavior: 'charge' }),
-                at('jetpack', 5900, {}, 50),
+                at('jetpack', 5580, {}, 50),
       ],
     },
   ],
