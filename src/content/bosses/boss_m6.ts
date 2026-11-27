@@ -71,7 +71,7 @@ import './m6/fxart';
 import { EscapePod, JugOverlay, JugShockwave, LaunchTrail, RainMissile } from './m6/parts';
 
 export const JUG_NAME = 'JUGGERNAUT';
-export const JUG_HP = 300;
+export const JUG_HP = 520;
 
 /** Damage multipliers per zone. */
 export const JUG_MUL = { legs: 0.8, hull: 1, armor: 0.75, chest: 1, core: 2.2, dome: 1.4 } as const;
