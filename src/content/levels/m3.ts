@@ -216,10 +216,10 @@ const decor: DecorDef[] = [
   // Arrival station.
   dec('warnlight', 4566, { color: 'amber' }),
   dec('terminal', 4630),
-  dec('lamp', 4776),
-  dec('sign', 4790, { f: 5 }),
-  dec('pine', 4846, { f: 2 }),
-  dec('pine_far', 4800, { f: 2 }),
+  dec('lamp', 4764),
+  dec('sign', 4842, { f: 5 }),
+  dec('pine', 4862, { f: 2 }),
+  dec('pine_far', 4740, { f: 1 }),
   // Frozen lake.
   dec('lake', 4900, { w: 900 }),
   dec('icebank', 4904),
@@ -248,11 +248,12 @@ const decor: DecorDef[] = [
   dec('drums', 6760),
   dec('rock', 6880, { f: 1 }),
   dec('tower', 7010),
-  dec('fortwall', 7120),
+  // Fortress walls stand behind the terrain so the masonry outworks (solids) read in front of them.
+  dec('fortwall', 7120, { behindTerrain: true }),
   dec('banner', 7120),
-  dec('fortwall', 7248),
+  dec('fortwall', 7248, { behindTerrain: true }),
   dec('lamp', 7300),
-  dec('fortwall', 7376),
+  dec('fortwall', 7376, { behindTerrain: true }),
   dec('banner', 7400),
   dec('warnlight', 7470, { color: 'red' }),
   dec('banner', 7560),
@@ -321,7 +322,7 @@ const entities: SpawnSpec[] = [
   at('shield_trooper', 4650, { behavior: 'guard', facing: -1 }),
   at('hostage', 4686, { mode: 'caged', drop: 'H', look: 2 }),
   at('turret', 4800, { kind: 'flak', dir: -1 }),
-  at('rifleman', 4776, { behavior: 'patrol' }),
+  at('rifleman', 4748, { behavior: 'guard', facing: -1 }),
   at('grenadier', 4830, { behavior: 'guard', facing: -1 }),
   // Frozen lake.
   at('snowmobile', 5010, { facing: -1 }),
@@ -382,6 +383,13 @@ registerLevel({
     { x: 2420, y: 416, w: 96, style: 'metal' },
     { x: 2882, y: S - 64, w: 36, style: 'wood' },
     ...climbLedges,
+  ],
+  // Legion masonry: the flak emplacement at the arrival yard and outworks before the fortress gate
+  // (cover and stepping stones; snow-capped granite blocks).
+  solids: [
+    { x: 4778, y: S - 24, w: 44, h: 24 },
+    { x: 7056, y: P - 24, w: 34, h: 24 },
+    { x: 7232, y: P - 16, w: 30, h: 16 },
   ],
   water: [{ x: 3090, y: 498, w: 104, h: 22 }],
   camera: [
