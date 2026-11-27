@@ -142,16 +142,16 @@ locks.push({
       spawns: [
         at('frogman', 1420, { range: 28 }),
         at('frogman', 1490, { range: 28 }),
-        at('rifleman', 1176, { behavior: 'charge' }),
-        at('rifleman', 1150, { behavior: 'charge' }),
+        at('rifleman', 1206, { behavior: 'charge' }),
+        at('rifleman', 1226, { behavior: 'charge' }),
       ],
     },
     {
       delay: 1,
       spawns: [
-        at('rifleman', 1548, { behavior: 'guard', facing: -1 }),
-        at('rifleman', 1574, { behavior: 'guard', facing: -1 }),
-        at('officer', 1604, { facing: -1 }),
+        at('rifleman', 1534, { behavior: 'guard', facing: -1 }),
+        at('rifleman', 1556, { behavior: 'guard', facing: -1 }),
+        at('officer', 1576, { facing: -1 }),
         at('jetpack', 1460, {}, 70),
       ],
     },
@@ -248,7 +248,7 @@ locks.push({
   trigger: 2610,
   waves: [
     {
-      spawns: [at('truck', 3060, { troops: 3, facing: -1 }), at('rifleman', 2612, { behavior: 'charge' }), at('rifleman', 2590, { behavior: 'charge' })],
+      spawns: [at('truck', 3060, { troops: 3, facing: -1 }), at('rifleman', 2646, { behavior: 'charge' }), at('rifleman', 2664, { behavior: 'charge' })],
     },
     {
       delay: 1,
@@ -259,8 +259,8 @@ locks.push({
       spawns: [
         at('flametrooper', 3050, { behavior: 'charge' }),
         at('shield_trooper', 3080, { behavior: 'charge' }),
-        at('flametrooper', 2600, { behavior: 'charge' }),
-        at('officer', 3110, { facing: -1 }),
+        at('flametrooper', 2648, { behavior: 'charge' }),
+        at('officer', 2996, { facing: -1 }),
         at('paratrooper', 2720, {}),
         at('paratrooper', 2880, {}),
       ],
@@ -278,14 +278,14 @@ back('sign', 3530, G, { v: 'warn' });
 // ------------------------------------------------------------------ S3 dry dock (3800-4560)
 
 far('drydock', 3800, G, { w: 634, depth: 140 });
-// The Legion hull on its blocks (solid; climb the keel block, then the deck).
-solids.push({ x: 4016, y: 296, w: 24, h: 24 });
-solids.push({ x: 4040, y: 272, w: 140, h: 48 });
-back('ship', 4040, 320, { w: 140, h: 48, name: 'LGN-9', seed: 11 });
-back('keelblocks', 3990, 320, { w: 50 });
-back('keelblocks', 4232, 320, { w: 80 });
-water.push({ x: 3950, y: 314, w: 66, h: 6 });
-water.push({ x: 4180, y: 314, w: 110, h: 6 });
+// The Legion hull on its keel blocks (backdrop) with scaffold catwalks along its side.
+far('ship', 3986, 306, { w: 230, h: 66, name: 'LGN-9', seed: 11 });
+far('keelblocks', 4040, 320, { w: 120 });
+far('keelblocks', 4170, 320, { w: 80 });
+platforms.push({ x: 3984, y: 290, w: 60, style: 'catwalk' });
+platforms.push({ x: 4070, y: 258, w: 104, style: 'catwalk' });
+platforms.push({ x: 4196, y: 290, w: 50, style: 'catwalk' });
+water.push({ x: 3950, y: 314, w: 340, h: 6 });
 back('lamp', 3720);
 back('crates', 3760);
 back('tires', 4470);
@@ -299,23 +299,26 @@ locks.push({
   trigger: 3860,
   waves: [
     {
-      spawns: [at('rifleman', 3874, { behavior: 'charge' }), at('rifleman', 3846, { behavior: 'charge' }), at('flametrooper', 4300, { behavior: 'charge' })],
+      spawns: [at('rifleman', 3908, { behavior: 'charge' }), at('rifleman', 3928, { behavior: 'charge' }), at('flametrooper', 4278, { behavior: 'charge' })],
     },
     {
       delay: 1,
-      spawns: [at('jetpack', 3980, {}, 200), at('jetpack', 4220, {}, 190), at('saber', 4310, { behavior: 'charge' }), at('saber', 4340, { behavior: 'charge' })],
+      spawns: [at('jetpack', 3980, {}, 200), at('jetpack', 4220, {}, 190), at('saber', 4270, { behavior: 'charge' }), at('saber', 4282, { behavior: 'charge' })],
     },
     {
       delay: 1,
       spawns: [
-        at('grenadier', 4300, { behavior: 'guard', facing: -1 }),
-        at('shield_trooper', 4330, { behavior: 'charge' }),
-        at('rifleman', 3860, { behavior: 'charge' }),
-        at('officer', 4370, { facing: -1 }),
+        at('grenadier', 4276, { behavior: 'guard', facing: -1 }),
+        at('shield_trooper', 4262, { behavior: 'charge' }),
+        at('rifleman', 3912, { behavior: 'charge' }),
+        at('officer', 4240, { facing: -1 }),
+        at('paratrooper', 4010, {}),
+        at('paratrooper', 4150, {}),
       ],
     },
   ],
 });
+spawn('pickup', 4120, { item: 'bomb' }, 258);
 spawn('sniper', 4480, { behavior: 'guard', facing: -1 });
 spawn('mortar', 4540, { facing: -1 });
 
@@ -371,15 +374,15 @@ locks.push({
   announce: 'BATTLE STATIONS!',
   waves: [
     {
-      spawns: [at('gunboat', 5950, { facing: -1 }), at('rifleman', 5576, { behavior: 'charge' }), at('shield_trooper', 5550, { behavior: 'charge' })],
+      spawns: [at('gunboat', 5950, { facing: -1 }), at('rifleman', 5606, { behavior: 'charge' }), at('shield_trooper', 5624, { behavior: 'charge' })],
     },
     {
       delay: 1,
-      spawns: [at('heli', 6060, { facing: -1 }), at('jetpack', 5700, {}, 60), at('grenadier', 5560, { behavior: 'charge' })],
+      spawns: [at('heli', 6060, { facing: -1 }), at('jetpack', 5700, {}, 60), at('grenadier', 5610, { behavior: 'charge' })],
     },
     {
       delay: 1,
-      spawns: [at('light_tank', 5540, { behavior: 'advance', facing: 1 }), at('gunboat', 5900, { facing: -1 }), at('gunboat', 6000, { facing: -1 }), at('paratrooper', 5680, {})],
+      spawns: [at('truck', 5540, { troops: 3, facing: 1 }), at('gunboat', 5900, { facing: -1 }), at('gunboat', 6000, { facing: -1 }), at('paratrooper', 5680, {})],
     },
     {
       delay: 1.5,
@@ -387,8 +390,7 @@ locks.push({
         at('rifleman', 6070, { behavior: 'charge' }),
         at('rifleman', 6100, { behavior: 'charge' }),
         at('flametrooper', 6130, { behavior: 'charge' }),
-        at('officer', 6160, { facing: -1 }),
-        at('jetpack', 5900, {}, 50),
+                at('jetpack', 5900, {}, 50),
       ],
     },
   ],
