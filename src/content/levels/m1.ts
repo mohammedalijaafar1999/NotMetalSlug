@@ -5,8 +5,7 @@ import { registerLevel } from '../../game/level';
 import { M1 } from '../themes/m1/layout';
 import { CAMERA, GROUND, PLATFORMS, SOLIDS, WATER } from './m1/geometry';
 import { DECOR } from './m1/decor';
-
-const L = M1.bossL;
+import { ENTITIES, LOCKS } from './m1/encounters';
 
 registerLevel({
   id: 'm1',
@@ -28,7 +27,7 @@ registerLevel({
   camera: CAMERA,
   timeLimit: 99,
   checkpoints: [1000, 2150, 3100, 4150, 5100, 6000],
-  entities: [],
-  locks: [{ x: L, boss: true, waves: [{ spawns: [{ type: 'boss_m1', x: L + 282 }] }] }],
+  entities: ENTITIES,
+  locks: LOCKS,
   decor: DECOR,
 });

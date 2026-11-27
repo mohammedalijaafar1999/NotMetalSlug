@@ -13,3 +13,6 @@
 
 ## Gotchas
 - content/index.ts globs every .ts under src/content, so helper files are imported in Node tests: no DOM at import.
+
+## Interrupted (usage limit)
+- The previous attempt was cut off; its uncommitted files were committed as 'WIP m1: salvaged after interruption'. Review them (`git show --stat HEAD`), keep what is good, delete throwaway debug tests, and continue.
