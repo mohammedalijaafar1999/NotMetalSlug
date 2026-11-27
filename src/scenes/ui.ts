@@ -232,6 +232,11 @@ class UiInput {
 
 export const uiInput = new UiInput();
 
+/** Prompt for the device in use: `keys` normally, `touch` after the player last touched the screen. */
+export function ctl(keys: string, touch: string): string {
+  return input.lastDevice === 'touch' ? touch : keys;
+}
+
 /** Short key summary of a keyboard layout, e.g. "WASD + J K L" (prefers non-numpad keys). */
 export function layoutLabel(b: Bindings): string {
   const pick = (a: Action) => {

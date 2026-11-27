@@ -12,7 +12,7 @@ import type { World } from './world';
 import type { Player } from './player';
 import type { GameSession } from './session';
 import { getCharacter } from './characters';
-import { C, PLAYER_COLORS, blink, easeOut, easeOutBack, panel, rect, stripes, text, twoTone, uiSfx } from '../scenes/ui';
+import { C, PLAYER_COLORS, blink, ctl, easeOut, easeOutBack, panel, rect, stripes, text, twoTone, uiSfx } from '../scenes/ui';
 import { faceSprite } from '../content/ui/art';
 
 export type BannerStyle = 'drop' | 'slide' | 'small' | 'warning';
@@ -396,7 +396,7 @@ export class Hud {
     g.lineWidth = 1;
     const sc = frac > 0.85 ? 7 : 6;
     twoTone(g, String(digit), cx, cy - Math.round((7 * sc) / 2), C.white, digit <= 3 ? '#ff8a7a' : C.gold, { scale: sc, align: 'center', split: 3 });
-    if (blink(this.time, 1.6, 0.7)) text(g, 'PRESS START OR FIRE', cx, 134, { align: 'center', color: C.white });
+    if (blink(this.time, 1.6, 0.7)) text(g, ctl('PRESS START OR FIRE', 'TAP TO CONTINUE'), cx, 134, { align: 'center', color: C.white });
     session.players.forEach((p, i) => {
       if (!p.joined) return;
       const x = session.twoPlayer ? (i === 0 ? cx - 90 : cx + 90) : cx;

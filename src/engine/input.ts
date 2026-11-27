@@ -195,6 +195,8 @@ function padActions(p: PadState): boolean[] {
 class TouchControls {
   root: HTMLDivElement | null = null;
   state: Record<Action, boolean> = { left: false, right: false, up: false, down: false, fire: false, jump: false, bomb: false, start: false };
+  /** Buttons touched since the last sample (a tap shorter than one frame still counts). */
+  taps: Record<Action, boolean> = { left: false, right: false, up: false, down: false, fire: false, jump: false, bomb: false, start: false };
   private stickId: number | null = null;
   private stickCenter = { x: 0, y: 0 };
   private knob: HTMLDivElement | null = null;
@@ -204,7 +206,7 @@ class TouchControls {
 
   /** Let go of every button and centre the stick (focus loss, overlay hidden). */
   releaseAll(): void {
-    for (const a of ACTIONS) this.state[a] = false;
+    for (const a of ACTIONS) this.state[a] = this.taps[a] = false;
     this.stickId = null;
     if (this.knob) this.knob.style.transform = '';
     for (const b of this.buttons) b.style.background = 'rgba(255,255,255,0.14)';
@@ -226,6 +228,7 @@ class TouchControls {
       const on = (e: PointerEvent) => {
         e.preventDefault();
         this.state[action] = true;
+        this.taps[action] = true;
         b.style.background = 'rgba(255,220,80,0.35)';
         b.setPointerCapture?.(e.pointerId);
       };
@@ -242,14 +245,19 @@ class TouchControls {
       this.buttons.push(b);
       return b;
     };
-    mkBtn('FIRE', 'fire', 'right:24px;bottom:90px;width:78px;height:78px;');
-    mkBtn('JUMP', 'jump', 'right:112px;bottom:28px;width:66px;height:66px;');
-    mkBtn('BOMB', 'bomb', 'right:22px;bottom:12px;width:58px;height:58px;font-size:11px;');
-    mkBtn('II', 'start', 'right:16px;top:12px;width:40px;height:40px;border-radius:8px;');
+    // Hug the screen edges (clear of notches) so the controls sit in the letterbox bars as much
+    // as possible instead of over the action.
+    const R = (px: number) => `right:calc(${px}px + env(safe-area-inset-right, 0px));`;
+    const B = (px: number) => `bottom:calc(${px}px + env(safe-area-inset-bottom, 0px));`;
+    mkBtn('FIRE', 'fire', R(12) + B(84) + 'width:78px;height:78px;');
+    mkBtn('JUMP', 'jump', R(98) + B(20) + 'width:66px;height:66px;');
+    mkBtn('BOMB', 'bomb', R(12) + B(8) + 'width:58px;height:58px;font-size:11px;');
+    mkBtn('II', 'start', R(10) + 'top:calc(10px + env(safe-area-inset-top, 0px));width:40px;height:40px;border-radius:8px;');
 
     const base = document.createElement('div');
     base.style.cssText =
-      'position:absolute;left:28px;bottom:28px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,0.08);' +
+      'position:absolute;left:calc(10px + env(safe-area-inset-left, 0px));bottom:calc(16px + env(safe-area-inset-bottom, 0px));' +
+      'width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,0.08);' +
       'border:2px solid rgba(255,255,255,0.25);pointer-events:auto;touch-action:none;';
     const knob = document.createElement('div');
     knob.style.cssText =
@@ -499,7 +507,10 @@ export class InputManager {
       const pad = padStates[pi];
       if (pad) for (let i = 0; i < n; i++) down[i] = down[i] || pad[i];
       if (pi === 0 && this.touch.enabled) {
-        for (let i = 0; i < n; i++) down[i] = down[i] || this.touch.state[ACTIONS[i]];
+        for (let i = 0; i < n; i++) {
+          down[i] = down[i] || this.touch.state[ACTIONS[i]];
+          tap[i] = tap[i] || this.touch.taps[ACTIONS[i]];
+        }
       }
       const v = this.virtual[pi];
       if (v) for (let i = 0; i < n; i++) down[i] = down[i] || !!v[ACTIONS[i]];
@@ -533,6 +544,7 @@ export class InputManager {
     this.menu._step(menuDown, dt);
     this.anyPressedThisStep = anyRaw || this.keyTapLatch.size > 0;
     this.keyTapLatch.clear();
+    for (const a of ACTIONS) this.touch.taps[a] = false;
   }
 
   /** Clear all edge state (e.g. when switching scenes so a held button doesn't re-trigger). */

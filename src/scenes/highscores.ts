@@ -11,7 +11,7 @@ import { getHighScores, type HighScore } from '../engine/storage';
 import { app } from '../app';
 import { characters } from '../game/characters';
 import { backdrop } from './backdrop';
-import { C, backButton, blink, easeOut, enterMenu, footer, ordinal, panel, rect, text, twoTone, uiInput, syncTouch } from './ui';
+import { C, backButton, blink, ctl, easeOut, enterMenu, footer, ordinal, panel, rect, text, twoTone, uiInput, syncTouch } from './ui';
 
 export interface HighScoresOpts {
   /** Entries to highlight (object identity or name+score match). */
@@ -103,6 +103,6 @@ export class HighScoresScene implements Scene {
       drawText(g, charName(h.character), cols.chr + ox, y, { color: charColor(h.character), outline: C.out });
     });
     if (!this.opts.attract) backButton(g, this.time);
-    footer(g, this.opts.attract ? 'PRESS START' : 'FIRE / BACK: RETURN', VIEW_H - 14, this.opts.attract && blink(this.time, 1.5) ? C.gold : C.grey);
+    footer(g, this.opts.attract ? ctl('PRESS START', 'TAP TO PLAY') : ctl('FIRE / BACK: RETURN', 'TAP TO RETURN'), VIEW_H - 14, this.opts.attract && blink(this.time, 1.5) ? C.gold : C.grey);
   }
 }

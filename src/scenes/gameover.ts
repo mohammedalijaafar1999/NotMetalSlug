@@ -16,7 +16,7 @@ import { getCharacter } from '../game/characters';
 import type { GameSession } from '../game/session';
 import { Particles } from '../game/effects';
 import { HighScoresScene } from './highscores';
-import { C, PLAYER_COLORS, blink, easeOutBack, enterMenu, fitText, footer, ordinal, panel, rect, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
+import { C, PLAYER_COLORS, blink, ctl, easeOutBack, enterMenu, fitText, footer, ordinal, panel, rect, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
 import { faceSprite } from '../content/ui/art';
 import { missionInfo } from '../content/ui/missions';
 
@@ -149,7 +149,7 @@ export class GameOverScene implements Scene {
       });
       if (!this.cleared) drawText(g, `CONTINUES USED: ${this.session.players.reduce((a, p) => a + (p.joined ? p.continues : 0), 0)}`, cx, 160, { align: 'center', color: C.greyD, outline: C.out });
     }
-    if (this.time > 2.2 && blink(this.time, 1.5, 0.7)) footer(g, 'PRESS FIRE', VIEW_H - 16, C.gold);
+    if (this.time > 2.2 && blink(this.time, 1.5, 0.7)) footer(g, ctl('PRESS FIRE', 'TAP TO CONTINUE'), VIEW_H - 16, C.gold);
   }
 }
 
@@ -330,7 +330,7 @@ export class NameEntryScene implements Scene {
     // Timer.
     const tl = Math.ceil(this.timeLeft);
     drawText(g, `TIME ${pad(tl, 2)}`, VIEW_W - 44, 186, { align: 'right', color: tl <= 5 && blink(this.time, 4) ? C.red : C.grey, outline: C.out });
-    footer(g, 'FIRE: PICK   BOMB: DELETE   START: DONE', VIEW_H - 12);
+    footer(g, ctl('FIRE: PICK   BOMB: DELETE   START: DONE', 'TAP THE LETTERS, THEN END'), VIEW_H - 12);
     if (this.flash > 0) rect(g, 0, 0, VIEW_W, VIEW_H, '#ffffff', this.flash * 0.5);
   }
 }

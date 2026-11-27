@@ -17,3 +17,6 @@ Baseline: typecheck clean, 618 tests green.
 ## Next steps
 - chain run results (artifacts/chain.log), then fixes + tests/flow.test.ts
 - touch (iPhone 13), gamepad stub, storage throwing, dist file://, options persistence
+
+## Interrupted (usage limit)
+- The previous attempt was cut off; its uncommitted files were committed as 'WIP review_flow: salvaged after interruption'. Review them (git show --stat HEAD), keep what is good, delete throwaway files, and continue.

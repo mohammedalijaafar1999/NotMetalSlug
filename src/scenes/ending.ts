@@ -21,7 +21,7 @@ import { HF } from '../game/hostage';
 import { NameEntryScene } from './gameover';
 import { HighScoresScene } from './highscores';
 import { creditLines, creditsHeight, renderCredits } from './credits';
-import { C, PLAYER_COLORS, blink, enterMenu, footer, formatTime, panel, rect, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
+import { C, PLAYER_COLORS, blink, ctl, enterMenu, footer, formatTime, panel, rect, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
 
 const T_BOOM = 6.2;
 const T_CELEBRATE = 9.5;
@@ -255,7 +255,7 @@ export class EndingScene implements Scene {
       text(g, msg.slice(0, n), VIEW_W / 2, 10, { align: 'center', color: C.gold });
     }
     if (this.time > T_BOOM + 1) twoTone(g, 'THE LEGION IS FINISHED!', VIEW_W / 2, 24, C.white, C.gold, { scale: 2, align: 'center', split: 3 });
-    footer(g, 'FIRE: SKIP', VIEW_H - 10, C.greyD);
+    footer(g, ctl('FIRE: SKIP', 'TAP: SKIP'), VIEW_H - 10, C.greyD);
   }
 
   private hill(g: CanvasRenderingContext2D, color: string, rim: string): void {
@@ -318,7 +318,7 @@ export class EndingScene implements Scene {
         left -= l.length;
       });
     }
-    footer(g, 'FIRE: SKIP', VIEW_H - 10, C.greyD);
+    footer(g, ctl('FIRE: SKIP', 'TAP: SKIP'), VIEW_H - 10, C.greyD);
   }
 
   private renderCredits(g: CanvasRenderingContext2D): void {
@@ -367,7 +367,7 @@ export class EndingScene implements Scene {
       rect(g, 0, ROLL_BOTTOM - 2 - i * 2, VIEW_W, 2, '#100c2c', 0.6 - i * 0.075);
     }
     g.restore();
-    if (this.creditsDone && blink(this.time, 1.5, 0.7)) footer(g, 'PRESS FIRE', VIEW_H - 10, C.gold);
-    else if (!this.creditsDone) footer(g, 'HOLD FIRE: FAST', VIEW_H - 10, C.greyD);
+    if (this.creditsDone && blink(this.time, 1.5, 0.7)) footer(g, ctl('PRESS FIRE', 'TAP TO CONTINUE'), VIEW_H - 10, C.gold);
+    else if (!this.creditsDone) footer(g, ctl('HOLD FIRE: FAST', ''), VIEW_H - 10, C.greyD);
   }
 }

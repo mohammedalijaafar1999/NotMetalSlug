@@ -11,7 +11,7 @@ import { settings } from '../engine/storage';
 import { app } from '../app';
 import { allWeapons } from '../game/weapons';
 import { backdrop } from './backdrop';
-import { C, backButton, blink, dimScreen, enterMenu, footer, keycap, panel, rect, text, twoTone, uiInput, syncTouch } from './ui';
+import { C, backButton, blink, ctl, dimScreen, enterMenu, footer, keycap, panel, rect, text, twoTone, uiInput, syncTouch } from './ui';
 
 const PAGES = ['HOW TO PLAY', 'KEYBOARD', 'GAMEPAD', 'TOUCH'] as const;
 
@@ -93,7 +93,7 @@ export class ControlsScene implements Scene {
     drawText(g, '◀', 3 - bob, 112, { color: C.gold, outline: C.out });
     drawText(g, '▶', VIEW_W - 8 + bob, 112, { color: C.gold, outline: C.out });
     backButton(g, this.time);
-    footer(g, '◀ ▶ PAGE   BACK: RETURN', VIEW_H - 12);
+    footer(g, ctl('◀ ▶ PAGE   BACK: RETURN', 'TAP LEFT / RIGHT SIDE: PAGE'), VIEW_H - 12);
   }
 
   private bullet(g: CanvasRenderingContext2D, y: number, s: string, icon?: (x: number, y: number) => void, color: string = C.white): number {

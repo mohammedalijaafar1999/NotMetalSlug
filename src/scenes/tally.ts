@@ -14,7 +14,7 @@ import { flow, type MissionStats } from './flow';
 import { getLevel, levelForMission } from '../game/level';
 import { getCharacter } from '../game/characters';
 import type { GameSession } from '../game/session';
-import { C, PLAYER_COLORS, blink, easeOut, easeOutBack, enterMenu, footer, formatTime, panel, rect, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
+import { C, PLAYER_COLORS, blink, ctl, easeOut, easeOutBack, enterMenu, footer, formatTime, panel, rect, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
 import { faceSprite } from '../content/ui/art';
 import { countHostages, missionInfo } from '../content/ui/missions';
 
@@ -287,7 +287,7 @@ export class TallyScene implements Scene {
       twoTone(g, pad(scoreShown, 8), x + ppw - 8, y + 64, C.white, C.gold, { align: 'right', scale: 2, split: 3 });
     });
     if (this.time >= this.tDone) {
-      if (blink(this.time, 1.5, 0.7)) footer(g, n >= LAST_MISSION ? 'PRESS FIRE' : 'PRESS FIRE TO CONTINUE', VIEW_H - 14, C.gold);
-    } else footer(g, 'FIRE: SKIP', VIEW_H - 14, C.greyD);
+      if (blink(this.time, 1.5, 0.7)) footer(g, ctl('PRESS FIRE TO CONTINUE', 'TAP TO CONTINUE'), VIEW_H - 14, C.gold);
+    } else footer(g, ctl('FIRE: SKIP', 'TAP: SKIP'), VIEW_H - 14, C.greyD);
   }
 }

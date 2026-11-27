@@ -15,7 +15,7 @@ import { characters, type CharacterDef } from '../game/characters';
 import { GameSession } from '../game/session';
 import { LEG, LEG_FRAMES } from '../art/humanoid';
 import { backdrop } from './backdrop';
-import { C, PLAYER_COLORS, backButton, blink, easeOutBack, enterMenu, fitText, footer, panel, rect, sharedKeysHint, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
+import { C, PLAYER_COLORS, backButton, blink, ctl, easeOutBack, enterMenu, fitText, footer, panel, rect, sharedKeysHint, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
 
 interface Slot {
   joined: boolean;
@@ -337,6 +337,6 @@ export class CharSelectScene implements Scene {
     backButton(g, this.time);
     if (this.startTimer >= 0) {
       if (blink(this.time, 6)) footer(g, 'GET READY!', VIEW_H - 9, C.gold);
-    } else footer(g, '◀ ▶ CHOOSE   FIRE: CONFIRM   BOMB: BACK', VIEW_H - 9);
+    } else footer(g, ctl('◀ ▶ CHOOSE   FIRE: CONFIRM   BOMB: BACK', 'TAP A SOLDIER, THEN TAP AGAIN TO CONFIRM'), VIEW_H - 9);
   }
 }

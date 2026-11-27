@@ -9,7 +9,7 @@ import { drawText, textWidth, wrapText } from '../engine/font';
 import { VIEW_H, VIEW_W } from '../engine/renderer';
 import { app } from '../app';
 import { GameplayScene } from './gameplay';
-import { C, PLAYER_COLORS, blink, divider, enterMenu, fitText, footer, panel, rect, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
+import { C, PLAYER_COLORS, blink, ctl, divider, enterMenu, fitText, footer, panel, rect, text, twoTone, uiInput, uiSfx, syncTouch } from './ui';
 import { MAP_H, MAP_POINTS, MAP_W, faceSprite } from '../content/ui/art';
 import { MISSION_COUNT, missionInfo } from '../content/ui/missions';
 import { getCharacter } from '../game/characters';
@@ -191,7 +191,7 @@ export class BriefingScene implements Scene {
       text(g, fitText(info.boss, rw - 62), rx + 62, 183, { color: C.red });
       if (blink(this.time, 1.6, 0.7)) footer(g, input.lastDevice === 'touch' ? 'TAP TO DEPLOY' : 'PRESS FIRE TO DEPLOY', VIEW_H - 12, C.gold);
     } else {
-      footer(g, 'FIRE: SKIP', VIEW_H - 12, C.greyD);
+      footer(g, ctl('FIRE: SKIP', 'TAP: SKIP'), VIEW_H - 12, C.greyD);
     }
     // Power-on flash.
     if (this.time < 0.25) {
