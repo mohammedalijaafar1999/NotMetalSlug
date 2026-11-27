@@ -12,6 +12,9 @@ import { VIEW_W } from '../src/engine/renderer';
 import type { LevelDef } from '../src/game/level';
 import type { World } from '../src/game/world';
 import { makeWorld, step } from './helpers';
+import { Bot } from '../src/debug/bot';
+import { input } from '../src/engine/input';
+import type { Entity } from '../src/game/entity';
 
 /** Brightness samples of every flash event in [0, seconds) at 1/240 s. */
 function events(sample: (t: number) => number, seconds: number): number[][] {
@@ -134,6 +137,33 @@ describe('FROST BASTION floor shadows read on snow', () => {
     mark.render(b.g);
     expect(Math.max(...b.alphas)).toBeGreaterThan(0.7);
   });
+});
+
+describe('HORNET KING keeps its rotors under the boss HP bar', () => {
+  it('never climbs above the top of its flight band after the entrance (phase 2 wobble included)', () => {
+    const w = makeWorld('bosstest_m2', { god: true, seed: 4 });
+    const bots = w.players.map((p) => new Bot(p.index));
+    let maxAlt = 0;
+    let fought = 0;
+    let hurt = false;
+    for (let i = 0; i < 60 * 80; i++) {
+      step(w, 1, bots);
+      const b = w.boss as (Entity & { groundY: number; state: string; introDone: boolean; dying: boolean }) | null;
+      if (!b || b.dying || !b.introDone || b.state === 'intro') continue;
+      fought++;
+      if (!hurt && fought > 60 * 15) {
+        hurt = true;
+        b.damage({ amount: b.hp - b.maxHp * 0.4, kind: 'explosion', owner: w.players[0], x: b.x, y: b.y });
+      }
+      maxAlt = Math.max(maxAlt, b.groundY - b.y);
+    }
+    for (let k = 0; k < 2; k++) input.setVirtual(k, null);
+    expect(hurt).toBe(true);
+    expect(fought).toBeGreaterThan(60 * 18);
+    // Pivot <= 88 px above the floor: the rotor discs (~57 px above it) stay under y ~43.
+    expect(maxAlt).toBeLessThanOrEqual(88);
+    expect(maxAlt).toBeGreaterThan(70);
+  }, 60_000);
 });
 
 describe('m6 crusher', () => {

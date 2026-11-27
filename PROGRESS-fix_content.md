@@ -11,7 +11,7 @@ Branch fix/content (from claude/metal-slug-game-sogjdj). Dev server: port 5603.
 | 5 | m6 crusher push-out when invulnerable | done (pushOut nearer side unless walled; test) |
 | 6 | m3 CABLE CAR sign under HUD | done (terminal frame 1: sign on the facade; arrival uses f:1; screenshot artifacts/m3arr1.png) |
 | 7 | FROST BASTION flak shadows darker | done (FloorMark shadow override 0.4->0.75 alpha; screenshot artifacts/flak1_zoom.png; test) |
-| 8 | HORNET KING band lower | todo |
+| 8 | HORNET KING band lower | done (ALT_HIGH 94->84, ALT_MID 86->82, salvo/rain +2, phase-2 wobble capped at ALT_HIGH+2; bar-overlap samples 27%->4%; tilted carpet run still touches bar bottom ~y30-34; test) |
 | 9 | m6 lift jetpack below HUD band | todo |
 | 10 | HUD screenshot pass per mission | todo |
 
