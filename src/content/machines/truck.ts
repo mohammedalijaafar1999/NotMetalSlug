@@ -148,6 +148,7 @@ export class Truck extends Machine {
 
   constructor(props: Record<string, any> = {}) {
     super();
+    this.rearWarn = true;
     this.w = 26;
     this.h = 38;
     this.bodyW = 70;

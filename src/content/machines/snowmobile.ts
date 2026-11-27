@@ -80,6 +80,7 @@ export class Snowmobile extends Machine {
 
   constructor(props: Record<string, any> = {}) {
     super();
+    this.rearWarn = true;
     this.w = 20;
     this.h = 24;
     this.bodyW = 40;

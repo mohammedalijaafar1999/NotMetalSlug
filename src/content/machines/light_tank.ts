@@ -9,6 +9,7 @@
 
 import { sprites } from '../../engine/sprites';
 import { fxRng } from '../../engine/rng';
+import { VIEW_W } from '../../engine/renderer';
 import { registerEntity } from '../../game/registry';
 import { Shell } from '../../game/projectile';
 import { MC, Machine, Pen, FlyingPart, plate, rivetRow, cog, treads, charr, ballistic, angleFrame, cycleFrame, msfx, drawHumanClip, CREW_DRIVER } from './common';
@@ -204,6 +205,7 @@ export class LightTank extends Machine {
 
   constructor(props: Record<string, any> = {}) {
     super();
+    this.rearWarn = true;
     this.w = 26;
     this.h = 32;
     this.bodyW = 50;
@@ -255,12 +257,14 @@ export class LightTank extends Machine {
 
     // Movement: keep a comfortable range (and inside the view while on screen).
     let want = 0;
-    if (t && this.behavior !== 'hold' && this.state !== 'charge') {
+    if (this.behavior !== 'hold' && this.state !== 'charge' && !this.onScreen(-20)) {
+      // Off-screen (arriving, or coming up from behind): roll into view first, whatever the range,
+      // instead of parking just outside it (where it can't attack yet still holds up the wave).
+      want = this.x < this.world.camera.x + VIEW_W / 2 ? 1 : -1;
+    } else if (t && this.behavior !== 'hold' && this.state !== 'charge') {
       if (adx > 200) want = Math.sign(dx);
       else if (adx < 110) want = -Math.sign(dx);
       if (want !== 0 && Math.sign(dx) !== this.facing && want === Math.sign(dx)) want = 0;
-    } else if (!t && this.behavior !== 'hold' && !this.onScreen(-20)) {
-      want = this.facing;
     }
     if (want !== 0 && (this.ledgeAhead(want) || this.wallAhead(want))) want = 0;
     if (want !== 0 && this.onScreen(0)) {
