@@ -676,15 +676,17 @@ export class Pickup extends Actor {
       case 'weapon': {
         const def = getWeapon(this.weaponId ?? 'hmg');
         if (v) {
-          // Vehicles convert weapon cases into points (and a little repair).
+          // Vehicles convert weapon cases into points (and a little repair): no weapon callout,
+          // the pilot does not get it.
           v.repair(5);
           w.addScore(p, 500, { x: this.x, y: ty });
+          isfx(w, 'pickup');
         } else {
           p.giveWeapon(def.id);
           w.floatText(def.letter, this.x, ty, letterColor(def.letter));
+          isfx(w, 'pickup_weapon');
+          audio.say(def.name.toLowerCase());
         }
-        isfx(w, 'pickup_weapon');
-        audio.say(def.name.toLowerCase());
         break;
       }
       case 'bomb':

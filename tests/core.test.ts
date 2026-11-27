@@ -258,6 +258,51 @@ describe('collision feel', () => {
   });
 });
 
+describe('low ceilings', () => {
+  it('ejecting from a mech under a low ceiling never puts the pilot inside it', () => {
+    const w = makeWorld(level('core_eject_ceiling', { solids: [{ x: 230, y: 96, w: 200, h: 24 }], entities: [{ type: 'mech', x: 300, y: 180, trigger: 0 }] }), { god: false });
+    settle(w);
+    const p = w.players[0];
+    const mech = w.query((e) => e.type === 'mech')[0] as unknown as Vehicle;
+    p.x = mech.x;
+    input.setVirtual(0, { down: true });
+    step(w, 3);
+    input.setVirtual(0, null);
+    step(w, 30);
+    expect(p.state).toBe('vehicle');
+    input.setVirtual(0, { down: true, jump: true });
+    let worst = 0;
+    for (let i = 0; i < 90; i++) {
+      step(w, 1);
+      if (i === 2) input.setVirtual(0, null);
+      if (p.state === 'play' && p.bodyBlocked()) worst++;
+    }
+    expect(p.state).toBe('play');
+    expect(worst).toBe(0);
+    expect(p.y).toBe(180);
+  });
+
+  it('a crawl space keeps the player crouched: no standing up or jumping into the solid above', () => {
+    const w = makeWorld(level('core_crawl', { solids: [{ x: 300, y: 130, w: 100, h: 30 }] }), { god: false });
+    settle(w);
+    const p = w.players[0];
+    p.x = 280;
+    for (let i = 0; i < 60; i++) {
+      input.setVirtual(0, { down: true, right: true });
+      step(w, 1);
+    }
+    expect(p.x).toBeGreaterThan(310);
+    for (let i = 0; i < 60; i++) {
+      input.setVirtual(0, i % 10 < 3 ? { jump: true } : {});
+      step(w, 1);
+      expect(p.bodyBlocked(), `frame ${i}`).toBe(false);
+    }
+    input.setVirtual(0, null);
+    expect(p.y).toBe(180);
+    expect(p.crouching).toBe(true);
+  });
+});
+
 describe('TIME UP', () => {
   it('kills a player who is driving a vehicle (the vehicle is wrecked, the pilot dies)', () => {
     const w = makeWorld(level('core_timeup_vehicle', { entities: [{ type: 'tank', x: 260, trigger: 0 }] }), { god: false });
@@ -279,6 +324,38 @@ describe('TIME UP', () => {
     step(w, 60 * 3);
     expect(died).toBe(1);
     expect(p.profile.lives).toBe(lives - 1);
+  });
+});
+
+describe('MISSION COMPLETE', () => {
+  it('a player going down as the boss falls loses no life (the last one would end the game)', () => {
+    const w = makeWorld(level('core_trade_kill', {}), { god: false });
+    settle(w);
+    const p = w.players[0];
+    p.profile.lives = 1;
+    p.invuln = 0;
+    expect(p.damage({ amount: 1, kind: 'bullet' })).toBe(true);
+    expect(p.state).toBe('dying');
+    w.level.bossDefeated();
+    expect(w.state).toBe('complete');
+    step(w, 60 * 4);
+    expect(p.profile.lives).toBe(1);
+    expect(p.profile.out).toBe(false);
+    expect(p.state).toBe('victory');
+  });
+
+  it('falling into a pit as the mission is won costs no life either', () => {
+    const w = makeWorld(level('core_trade_pit', { ground: [[[0, 180], [300, 180]], [[360, 180], [3000, 180]]] }), { god: false });
+    settle(w);
+    const p = w.players[0];
+    p.profile.lives = 1;
+    p.x = 330;
+    p.y = 170;
+    p.onGround = false;
+    w.level.bossDefeated();
+    for (let i = 0; i < 60 * 4 && p.state !== 'victory'; i++) step(w, 1);
+    expect(p.profile.lives).toBe(1);
+    expect(p.state).toBe('victory');
   });
 });
 

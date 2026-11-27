@@ -299,10 +299,16 @@ export class Player extends Actor {
     // Fell into a pit: lose a life and come back on solid ground.
     this.world.emit({ type: 'playerDied', player: this });
     this.world.sfx('player_die', this.x);
-    this.loseLife();
+    this.finishDeath();
   }
 
   private finishDeath(): void {
+    // Went down in the same moment the mission was won (traded the final blow with the boss):
+    // no life lost - losing the last one here would end the game after the tally.
+    if (this.world.state === 'complete') {
+      this.respawn();
+      return;
+    }
     this.loseLife();
   }
 
@@ -343,6 +349,10 @@ export class Player extends Actor {
     v.onDriverExit?.(this);
     this.x = v.x;
     this.y = v.top + 2;
+    this.crouching = false;
+    this.h = 26;
+    // Under a low ceiling the body would start inside it: come out lower, in front of the hull.
+    for (let i = 0; i < 40 && this.y < v.y && this.bodyBlocked(); i++) this.y = Math.min(v.y, this.y + 2);
     this.exitCooldown = 0.8;
     if (this.state === 'vehicle') {
       this.setState('play');
@@ -351,6 +361,12 @@ export class Player extends Actor {
       if (jump) this.jump(260);
     }
     this.world.invalidateTargets();
+  }
+
+  /** Room above a crouching body to stand up (no solid in the band up to standing height)? */
+  private headroom(): boolean {
+    const hw = this.w / 2;
+    return !this.world.terrain.solidOverlap({ x: this.x - hw + 0.5, y: this.y - 26 + 0.5, w: this.w - 1, h: 26 - 17 - 1 }, this);
   }
 
   get canEnterVehicle(): boolean {
@@ -398,6 +414,8 @@ export class Player extends Actor {
       this.landT = 0.12;
       this.world.particles.dust(this.x, this.y, 6, this.dustColor());
       wsfx(this.world, 'land', this.x, { vol: 0.5 });
+      // Dropped back in after the mission was won: join the victory pose.
+      if (this.world.state === 'complete') this.celebrate();
     }
   }
 
@@ -471,7 +489,10 @@ export class Player extends Actor {
     }
 
     // Crouch & aim. Heavy weapons rotate slowly while firing so the bullets fan out.
-    this.crouching = inp.held('down') && this.onGround;
+    // No headroom to stand up under a low ceiling: stay down (standing up would put the head
+    // inside the solid, and a jump from there would pass right through it).
+    const cramped = this.onGround && !this.headroom();
+    this.crouching = (inp.held('down') && this.onGround) || (this.crouching && cramped);
     let aimTarget = 0;
     if (inp.held('up')) aimTarget = -Math.PI / 2;
     else if (inp.held('down') && !this.onGround) aimTarget = Math.PI / 2;
@@ -487,7 +508,9 @@ export class Player extends Actor {
 
     // Jump / drop-through.
     if (inp.pressed('jump') && this.onGround) {
-      if (inp.held('down') && this.onPlatform) {
+      if (this.crouching && cramped) {
+        // Crawl space: no room to jump.
+      } else if (inp.held('down') && this.onPlatform) {
         this.dropThrough();
       } else {
         this.jump(JUMP_SPEED * this.char.jumpMul * (this.inWater ? 0.85 : 1));
