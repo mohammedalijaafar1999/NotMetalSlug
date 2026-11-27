@@ -55,7 +55,7 @@ export const FACE_X = 248;
 /** Height of the frost lance above the floor (crouch under it: crouched players are 17 px tall). */
 export const LANCE_H = 25;
 
-const HP = 260;
+const HP = 230;
 const TURRET_HP = { mg: 20, flak: 26, mortar: 26 } as const;
 /** Share of turret damage that also drains the boss bar. */
 const TURRET_MUL = 0.6;
@@ -63,7 +63,7 @@ const TURRET_MUL = 0.6;
 const INTRO_RISE = 2.15;
 const INTRO_END = 2.7;
 const CLOSED = [5.0, 4.1];
-const OPEN = [4.4, 4.6];
+const OPEN = [4.8, 5.0];
 const OPENING = 0.75;
 const CLOSING = 0.6;
 const WARN = 1.15;
