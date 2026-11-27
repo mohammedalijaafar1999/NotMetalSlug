@@ -9,18 +9,20 @@
 //   nature : pine (f 0..5 = 44/58/72/88/100/32 px), pine_far (f 0..2, muted, for depth), rock (f 0..2),
 //            snowman, campfire (animated), fence (props.n segments), icefall (origin at the TOP: hangs
 //            from a ledge), icebank (snow bank at a shore), drift (props.w wide snow drift)
-//   built  : cabin, tower (Legion watchtower), pylon (cable pylon, origin at the cable sheaves),
+//   built  : scaffold (x = centre, y = ground; props.top platform y, props.w, props.style metal|wood:
+//            legs under a platform), cabin, tower (Legion watchtower), pylon (cable pylon, origin at the cable sheaves),
 //            terminal (cable-car station), hangar (walker hangar), hut (ice-fishing hut), fortwall,
 //            truck (frozen truck), sign (f: 0 PASS, 1 DANGER, 2 weight limit, 3 cable car, 4 HALT, 5 FORT),
 //            warnlight (props.color 'red'|'amber' blinks; props.off), skirack, banner (waving),
 //            drums, crates, lamp (flickers), gate (boom gate), mast (radio mast, blinking light)
-//   spans  : cliff (x = left edge, y = top, props.w/h: sheer rock face painted over the ground mass),
+//   spans  : cliff (x = left edge, y = top, props.w/h: sheer rock face painted over the ground mass;
+//            props.pillar = free-standing outcrop with both edges),
 //            gorge (x = left edge, props.w; the far gorge wall sinking into the abyss - give it
 //            props.behindTerrain so the cliff edges overlap it), lake (x = left edge, props.w;
 //            glossy ice crust + dark frozen water from y down, drawn over the ground fill)
 
 import { sprites } from '../../engine/sprites';
-import { mixColor } from '../../engine/pixelart';
+import { PixelArt, mixColor } from '../../engine/pixelart';
 import { registerTheme, type DecorRenderer } from '../../game/theme';
 import type { DecorDef } from '../../game/level';
 import { P3 } from './m3/palette';
@@ -69,6 +71,39 @@ function band(g: CanvasRenderingContext2D, name: string, x: number, y: number, w
   g.fillRect(x0, y0 + th, x1 - x0, depth);
 }
 
+const scaffoldCache = new Map<string, HTMLCanvasElement>();
+
+/** Platform legs (w wide, h tall from the platform underside to the ground), outlined. */
+function scaffoldArt(w: number, h: number, style: string): PixelArt {
+  const p = new PixelArt(w + 2, h + 2);
+  const metal = style !== 'wood';
+  const lit = metal ? P3.steel : P3.wood;
+  const mid = metal ? P3.steelM : P3.woodM;
+  const dark = metal ? P3.steelD : P3.woodD;
+  const legs: number[] = [3, w - 6];
+  for (let x = 48; x < w - 24; x += 48) legs.push(x);
+  for (const lx of legs) {
+    p.rect(lx + 1, 5, 3, h - 5, mid);
+    p.rect(lx + 1, 5, 1, h - 5, lit);
+    p.rect(lx + 3, 5, 1, h - 5, dark);
+    p.rect(lx, h - 2, 5, 2, dark);
+  }
+  // Cross braces between neighbouring legs.
+  const sorted = legs.slice().sort((a, b) => a - b);
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = sorted[i] + 4;
+    const b = sorted[i + 1] + 1;
+    for (let y = 8; y + 12 < h; y += 16) {
+      p.line(a, y, b, y + 12, dark);
+      p.line(b, y, a, y + 12, mid);
+    }
+  }
+  // A dusting of snow on the feet.
+  for (const lx of legs) p.rect(lx - 1, h - 1, 7, 1, P3.snow);
+  p.outline(P3.outline);
+  return p;
+}
+
 const DECOR: Record<string, DecorRenderer> = {
   // ---------------------------------------------------------------- nature
   pine: spr('m3_pine'),
@@ -103,6 +138,20 @@ const DECOR: Record<string, DecorRenderer> = {
   },
 
   // ---------------------------------------------------------------- built
+  scaffold: (g, d) => {
+    // Legs + cross braces holding up a platform: x = centre, y = ground, props.top (platform y),
+    // props.w (platform width), props.style 'metal' (default) | 'wood'.
+    const w = Math.round((d.props?.w as number) ?? 64);
+    const top = Math.round((d.props?.top as number) ?? d.y - 40);
+    const style = (d.props?.style as string) ?? 'metal';
+    const key = `${w}|${Math.round(d.y) - top}|${style}`;
+    let c = scaffoldCache.get(key);
+    if (!c) {
+      c = scaffoldArt(w, Math.round(d.y) - top, style).toCanvas();
+      scaffoldCache.set(key, c);
+    }
+    g.drawImage(c, Math.round(d.x - w / 2) - 1, top - 1);
+  },
   cabin: spr('m3_cabin', (d, t) => (Math.floor(t * 3 + phase(d) * 7) % 7 === 0 ? 1 : 0)),
   tower: spr('m3_tower'),
   pylon: spr('m3_pylon'),
@@ -160,11 +209,17 @@ const DECOR: Record<string, DecorRenderer> = {
         const ch = Math.min(c.height, h - ty);
         g.drawImage(c, 0, 0, cw, ch, x0 + tx, y0 + ty, cw, ch);
       }
-    // Lit outer edge + dark outline where the face meets the air.
+    // Lit outer edge + dark outline where the face meets the air (props.pillar: both sides + a cap).
     g.fillStyle = P3.outline;
     g.fillRect(x0 - 1, y0, 1, h);
     g.fillStyle = '#a8b8cc';
     g.fillRect(x0, y0, 1, h);
+    if (d.props?.pillar) {
+      g.fillStyle = '#4a5872';
+      g.fillRect(x0 + w - 2, y0, 2, h);
+      g.fillStyle = P3.outline;
+      g.fillRect(x0 + w, y0, 1, h);
+    }
   },
   lake: (g, d) => {
     const w = (d.props?.w as number) ?? 256;

@@ -39,6 +39,9 @@ const JAM_TRIGGER = PYLON - 214;
 const CLIFF = 6200;
 const BOSS_X = 7520;
 
+/** Key positions (tests / tools). */
+export const M3 = { W, H, G, S, D, P, DOCK_A, PYLON, DOCK_B, JAM_LOCK, CLIFF, BOSS_X } as const;
+
 const GROUND: Array<Array<[number, number]>> = [
   [
     // Pine forest (a little hummock).
@@ -62,15 +65,15 @@ const GROUND: Array<Array<[number, number]>> = [
     [3176, 512],
     [3250, S],
     // Terminal: ramp up to the boarding deck.
-    [3292, S],
-    [3330, D],
+    [3280, S],
+    [3336, D],
     [3472, D],
   ],
   // Gorge: no ground from 3472 to 4560.
   [
     [4560, D],
     [4700, D],
-    [4738, S],
+    [4756, S],
     [4820, S],
     [4880, G],
     // Frozen lake + the foot of the cliff.
@@ -156,6 +159,7 @@ const decor: DecorDef[] = [
   dec('pine', 1004, { f: 1 }),
   dec('pine', 1104, { f: 3 }),
   dec('rock', 905, { f: 0 }),
+  dec('cliff', 974, { w: 52, h: 37, pillar: true }, 'back', 443),
   dec('skirack', 1046),
   dec('sign', 1128, { f: 1 }),
   // Clearing (LOCK 1).
@@ -181,7 +185,8 @@ const decor: DecorDef[] = [
   dec('cabin', 2280),
   dec('skirack', 2336),
   dec('banner', 2380),
-  dec('lamp', 2470),
+  dec('scaffold', 2468, { top: 425, w: 96 }),
+  dec('lamp', 2530),
   dec('mast', 2620),
   dec('hut', 2700),
   dec('drums', 2770),
@@ -194,7 +199,7 @@ const decor: DecorDef[] = [
   dec('sign', 3076, { f: 2 }),
   dec('icefall', 3093, {}, 'back', S + 1),
   dec('sign', 3268, { f: 3 }),
-  dec('terminal', 3400),
+  dec('terminal', 3404),
   dec('lamp', 3346),
   dec('warnlight', 3466, { color: 'amber' }),
   // Gorge.
@@ -203,7 +208,7 @@ const decor: DecorDef[] = [
   // Arrival station.
   dec('warnlight', 4566, { color: 'amber' }),
   dec('terminal', 4630),
-  dec('lamp', 4718),
+  dec('lamp', 4776),
   dec('sign', 4790, { f: 5 }),
   dec('pine', 4846, { f: 2 }),
   dec('pine_far', 4800, { f: 2 }),

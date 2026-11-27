@@ -138,6 +138,11 @@ export class CableCar extends Entity {
     return this.cableY(x) + HANG;
   }
 
+  /** Seconds spent in the current mode. */
+  get modeTime(): number {
+    return this.modeT;
+  }
+
   get moving(): boolean {
     return this.mode === 'ride';
   }
