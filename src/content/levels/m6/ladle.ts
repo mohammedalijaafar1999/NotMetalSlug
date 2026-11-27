@@ -42,9 +42,11 @@ sprites.define({
   draw: (p, f) => {
     const a = TILTS[f];
     const R = (pts: number[]) => rotPts(pts, PX, PY, a);
-    // bail (handle) arc - stays vertical from the hook
-    p.line(PX, PY - 5, PX - 13, PY + 6, M6.ironD, 2);
-    p.line(PX, PY - 5, PX + 13, PY + 6, M6.ironD, 2);
+    // bail (handle): from the hook eye down to the trunnion pins on both sides
+    const [blx, bly] = R([PX - 13, PY + 7]);
+    const [brx, bry] = R([PX + 13, PY + 7]);
+    p.line(PX, PY - 5, blx, bly, M6.ironD, 2);
+    p.line(PX, PY - 5, brx, bry, M6.ironD, 2);
     p.rect(PX - 2, PY - 6, 4, 3, M6.ironL);
     // bucket: tapered crucible with brass bands and a spout on the right
     const body = R([PX - 14, PY + 8, PX + 14, PY + 8, PX + 11, PY + 34, PX - 11, PY + 34]);

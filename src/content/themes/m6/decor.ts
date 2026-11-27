@@ -677,17 +677,17 @@ sprites.define({
   outline: null,
   draw: (p) => {
     p.rect(0, 0, 12, 16, O);
-    p.rect(1, 0, 2, 16, M6.ironL);
-    p.rect(3, 0, 6, 16, M6.ironD);
-    p.rect(9, 0, 2, 16, M6.iron);
+    p.rect(1, 0, 2, 16, M6.iron);
+    p.rect(3, 0, 6, 16, M6.steelDD);
+    p.rect(9, 0, 2, 16, M6.ironD);
     // lightening hole in the web
-    p.ellipse(6, 8, 1.6, 3.6, M6.steelDD);
-    p.px(5, 5, M6.iron);
+    p.ellipse(6, 8, 1.6, 3.6, '#120e14');
+    p.px(5, 5, M6.ironD);
     // rivets on the flanges
-    p.px(2, 3, M6.steelLL);
-    p.px(2, 11, M6.steelLL);
-    p.px(10, 3, M6.ironL);
-    p.px(10, 11, M6.ironL);
+    p.px(2, 3, M6.ironL);
+    p.px(2, 11, M6.ironL);
+    p.px(10, 3, M6.iron);
+    p.px(10, 11, M6.iron);
   },
 });
 
@@ -873,7 +873,7 @@ const emblem: DecorRenderer = (g, d) => sprites.get('m6d_emblem').draw(g, Math.r
 
 // ------------------------------------------------------------------ outer wall + gatehouse
 
-const STONE = '#3a3340';
+const STONE = '#2e2834';
 function stoneWall(p: PixelArt, x0: number, y0: number, w: number, h: number, seed: number): void {
   const r = new Rng(seed);
   for (let y = y0; y < y0 + h; y++) {
@@ -1041,30 +1041,31 @@ sprites.define({
     // iron cage posts
     for (const x of [4, REACT_W - 10]) {
       p.rect(x, 0, 6, 24, O);
-      cylV(p, x + 1, 0, 4, 24, M6.iron);
+      cylV(p, x + 1, 0, 4, 24, M6.ironD);
     }
-    // glass tube with the glowing core
+    // smoked glass tube: dark at the rim, a narrow glowing core in the middle
     for (let x = 12; x < REACT_W - 12; x++) {
       const u = (x - 12) / (REACT_W - 25);
       const k = Math.abs(u - 0.5) * 2; // 0 centre .. 1 edge
-      let c = '#2a1620';
-      if (k < 0.25) c = f % 2 ? '#fff6d0' : '#ffe8a0';
-      else if (k < 0.45) c = '#ffb43a';
-      else if (k < 0.7) c = '#e0601a';
-      else if (k < 0.9) c = '#7a2a18';
+      let c = '#1c1018';
+      if (k < 0.12) c = f % 2 ? '#ffd890' : '#ffc070';
+      else if (k < 0.26) c = '#e07a2a';
+      else if (k < 0.42) c = '#a8401c';
+      else if (k < 0.62) c = '#5a2016';
+      else if (k < 0.85) c = '#341418';
       for (let y = 0; y < 24; y++) {
         let cc = c;
-        // energy ripple travelling up
-        if (k < 0.7 && (y + f * 6) % 24 < 3) cc = shade(c, 0.25);
+        // energy ripple travelling up the core
+        if (k < 0.42 && (y + f * 6) % 24 < 2) cc = shade(c, 0.22);
         p.px(x, y, cc);
       }
     }
     // glass highlight
-    p.rect(15, 0, 1, 24, '#ffd8a0');
+    p.rect(15, 0, 1, 24, '#4a2a2a');
     // clamp ring
     p.rect(8, 10, REACT_W - 16, 4, O);
-    cylH(p, 9, 10, REACT_W - 18, 3, M6.steelL);
-    p.rect(cx - 2, 11, 4, 1, M6.red);
+    cylH(p, 9, 10, REACT_W - 18, 3, M6.steel);
+    p.rect(cx - 2, 11, 4, 1, M6.redD);
   },
 });
 
@@ -1075,14 +1076,212 @@ const reactor: DecorRenderer = (g, d, time) => {
   const f = Math.floor(time * 8) % 4;
   const seg = sprites.get('m6d_reactor_seg');
   for (let yy = y; yy > y - h; yy -= 24) seg.draw(g, x, yy, f);
-  // pulse halo
-  const pulse = 0.08 + 0.06 * Math.sin(time * 3.1);
-  g.fillStyle = '#ff8a2a';
+  // faint pulse halo
+  const pulse = 0.05 + 0.03 * Math.sin(time * 3.1);
+  g.fillStyle = '#ff7a2a';
   g.globalAlpha = pulse;
-  g.fillRect(x - REACT_W / 2 - 10, y - h, REACT_W + 20, h);
-  g.globalAlpha = pulse * 0.6;
-  g.fillRect(x - REACT_W / 2 - 22, y - h, REACT_W + 44, h);
+  g.fillRect(x - REACT_W / 2 - 8, y - h, REACT_W + 16, h);
   g.globalAlpha = 1;
+};
+
+// ------------------------------------------------------------------ back-wall panels (interiors)
+
+const PANEL = { base: '#1e1a23', hi: '#29242f', lo: '#141118', rivet: '#3a3442', seam: '#100d13' };
+sprites.define({
+  name: 'm6d_panel',
+  w: 32,
+  h: 32,
+  ox: 0,
+  oy: 0,
+  outline: null,
+  frames: 4,
+  draw: (p, f) => {
+    p.rect(0, 0, 32, 32, PANEL.base);
+    p.rect(0, 0, 32, 1, PANEL.hi);
+    p.rect(0, 0, 1, 32, PANEL.hi);
+    p.rect(0, 31, 32, 1, PANEL.seam);
+    p.rect(31, 0, 1, 32, PANEL.seam);
+    for (const [x, y] of [
+      [2, 2],
+      [28, 2],
+      [2, 28],
+      [28, 28],
+    ]) {
+      p.px(x, y, PANEL.rivet);
+      p.px(x + 1, y + 1, PANEL.seam);
+    }
+    const r = new Rng(90 + f);
+    // grime streaks
+    for (let i = 0; i < 3; i++) {
+      const x = r.int(4, 27);
+      const y0 = r.int(2, 18);
+      for (let k = 0; k < r.int(5, 12); k += 1) if ((k + x) % 2 === 0) p.px(x, y0 + k, PANEL.lo);
+    }
+    if (f === 1) {
+      // louvre grille
+      for (let y = 9; y < 23; y += 3) {
+        p.rect(7, y, 18, 1, PANEL.seam);
+        p.rect(7, y + 1, 18, 1, PANEL.hi);
+      }
+    } else if (f === 2) {
+      // stencilled number plate
+      p.rect(9, 11, 14, 9, PANEL.lo);
+      p.rect(11, 13, 2, 5, '#4a4250');
+      p.rect(15, 13, 3, 1, '#4a4250');
+      p.rect(17, 13, 1, 5, '#4a4250');
+      p.rect(19, 13, 2, 5, '#4a4250');
+    } else if (f === 3) {
+      // horizontal seam with a bolt line
+      p.rect(1, 15, 30, 1, PANEL.seam);
+      for (let x = 4; x < 30; x += 6) p.px(x, 14, PANEL.rivet);
+    }
+  },
+});
+
+sprites.define({
+  name: 'm6d_panel_window',
+  w: 32,
+  h: 32,
+  ox: 0,
+  oy: 0,
+  outline: null,
+  draw: (p) => {
+    p.rect(0, 0, 32, 32, PANEL.base);
+    p.rect(0, 0, 32, 1, PANEL.hi);
+    p.rect(0, 31, 32, 1, PANEL.seam);
+    p.rect(5, 6, 22, 18, PANEL.seam);
+    for (let y = 7; y < 23; y++) {
+      for (let x = 6; x < 26; x++) {
+        const t = (y - 7) / 16;
+        let c = '#120e16';
+        if (t > 0.55) c = (x + y) % 2 ? '#2a1414' : '#120e16';
+        if (t > 0.8) c = '#3a1a14';
+        p.px(x, y, c);
+      }
+    }
+    p.rect(15, 7, 2, 16, PANEL.hi);
+    p.rect(6, 14, 20, 1, PANEL.hi);
+    p.rect(5, 24, 22, 2, PANEL.hi);
+    p.rect(5, 26, 22, 1, PANEL.seam);
+  },
+});
+
+sprites.define({
+  name: 'm6d_panel_top',
+  w: 32,
+  h: 12,
+  ox: 0,
+  oy: 0,
+  outline: null,
+  draw: (p) => {
+    p.rect(0, 0, 32, 12, O);
+    p.rect(0, 1, 32, 2, M6.iron);
+    p.rect(0, 1, 32, 1, M6.ironL);
+    p.rect(0, 3, 32, 5, M6.ironD);
+    p.rect(0, 8, 32, 2, M6.iron);
+    for (let x = 3; x < 32; x += 8) {
+      p.px(x, 5, M6.ironL);
+      p.px(x + 1, 6, O);
+    }
+  },
+});
+
+sprites.define({
+  name: 'm6d_panel_rib',
+  w: 10,
+  h: 32,
+  ox: 5,
+  oy: 0,
+  outline: null,
+  draw: (p) => {
+    p.rect(0, 0, 10, 32, O);
+    p.rect(1, 0, 2, 32, M6.iron);
+    p.rect(3, 0, 4, 32, M6.ironD);
+    p.rect(7, 0, 2, 32, '#262229');
+    p.px(2, 6, M6.ironL);
+    p.px(2, 22, M6.ironL);
+    p.px(8, 6, M6.iron);
+    p.px(8, 22, M6.iron);
+  },
+});
+
+/** Back wall of riveted dark plates: d.x = left edge, d.y = floor, props.w (<= ~256), h, windows, rib (x offset). */
+const panel: DecorRenderer = (g, d) => {
+  const w: number = d.props?.w ?? 256;
+  const h: number = d.props?.h ?? 120;
+  const x0 = Math.round(d.x);
+  const yb = Math.round(d.y);
+  const top = yb - h;
+  const tile = sprites.get('m6d_panel');
+  const win = sprites.get('m6d_panel_window');
+  const windows = d.props?.windows !== false;
+  g.save();
+  g.beginPath();
+  g.rect(x0, top, w, h);
+  g.clip();
+  for (let x = 0; x < w; x += 32) {
+    for (let y = top, row = 0; y < yb; y += 32, row++) {
+      const wx = x0 + x;
+      if (windows && row === 1 && Math.floor(wx / 32) % 3 === 0) win.draw(g, wx, y);
+      else tile.draw(g, wx, y, Math.floor(hash01(Math.floor(wx / 32), row, 41) * 4));
+    }
+  }
+  g.restore();
+  const rib = sprites.get('m6d_panel_rib');
+  const ribOff: number = d.props?.rib ?? 48;
+  for (let x = ribOff; x < w; x += 96) for (let y = top + 8; y < yb; y += 32) rib.draw(g, x0 + x, y);
+  // shadow line along the floor
+  g.fillStyle = '#0c0a0e';
+  g.globalAlpha = 0.6;
+  g.fillRect(x0, yb - 2, w, 2);
+  g.globalAlpha = 1;
+  const topS = sprites.get('m6d_panel_top');
+  for (let x = 0; x < w; x += 32) topS.draw(g, x0 + x, top - 2);
+};
+
+// ------------------------------------------------------------------ hangar door (boss entrance)
+
+/** Huge open hangar door: d.x = left edge of the frame, d.y = floor; props.h (opening height). */
+const hangarDoor: DecorRenderer = (g, d, time) => {
+  const x0 = Math.round(d.x);
+  const yb = Math.round(d.y);
+  const h: number = d.props?.h ?? 150;
+  const w: number = d.props?.w ?? 120;
+  // dark opening with a faint red glow deep inside
+  g.fillStyle = '#0c090e';
+  g.fillRect(x0 + 10, yb - h, w - 10, h);
+  g.fillStyle = '#2a0e10';
+  for (let y = yb - 40; y < yb; y += 2) for (let x = x0 + 12 + ((y >> 1) % 2); x < x0 + w; x += 2) g.fillRect(x, y, 1, 1);
+  // retracted door slats at the top
+  for (let i = 0; i < 4; i++) {
+    g.fillStyle = i % 2 ? M6.steelD : M6.steel;
+    g.fillRect(x0 + 10, yb - h + i * 4, w - 10, 4);
+  }
+  g.fillStyle = O;
+  g.fillRect(x0 + 10, yb - h + 16, w - 10, 1);
+  // hazard-striped frame post
+  for (let y = yb - h - 8; y < yb; y++) {
+    for (let x = 0; x < 10; x++) {
+      g.fillStyle = x === 0 || x === 9 ? O : ((x + y) % 10 < 5 ? M6.hazard : M6.hazardD);
+      g.fillRect(x0 + x, y, 1, 1);
+    }
+  }
+  // lintel
+  g.fillStyle = O;
+  g.fillRect(x0, yb - h - 12, w, 6);
+  g.fillStyle = M6.iron;
+  g.fillRect(x0 + 1, yb - h - 11, w - 1, 4);
+  g.fillStyle = M6.ironL;
+  g.fillRect(x0 + 1, yb - h - 11, w - 1, 1);
+  // rotating alarm light on the lintel
+  const on = Math.floor(time * 3) % 2 === 0;
+  g.fillStyle = on ? M6.red : M6.redD;
+  g.fillRect(x0 + 18, yb - h - 16, 6, 4);
+  if (on) {
+    g.globalAlpha = 0.2;
+    g.fillRect(x0 + 8, yb - h - 24, 26, 18);
+    g.globalAlpha = 1;
+  }
 };
 
 // ------------------------------------------------------------------ fan vent
@@ -1192,4 +1391,6 @@ export const M6_DECOR: Record<string, DecorRenderer> = {
   reactor,
   vent,
   crane,
+  panel,
+  hangar_door: hangarDoor,
 };

@@ -61,6 +61,11 @@ function D(kind: string, x: number, y: number, props?: Record<string, any>, laye
   decor.push(d);
 }
 
+/** A back wall of riveted plates from x0 to x1 standing on floor y (split into <= 256 px decor pieces). */
+function wallPanels(x0: number, x1: number, y: number, h: number, windows = true): void {
+  for (let x = x0; x < x1; x += 256) D('panel', x, y, { w: Math.min(256, x1 - x), h, windows, behindTerrain: true, rib: 48 - ((x - x0) % 96) + 96 });
+}
+
 /** Lower floor profile (without pits). */
 const LOWER: Array<[number, number]> = [
   [0, GL],
@@ -125,7 +130,7 @@ D('sign', 240, GL, { icon: 'skull', post: 18 });
 D('beacon', 330, 420, { post: 30 });
 D('ammo', 520, 412);
 // outer wall with searchlights, the gatehouse
-D('wall', 700, GL, { w: 480, behindTerrain: true });
+D('wall', 700, GL, { w: 560, behindTerrain: true });
 D('searchlight', 800, GL - 120);
 D('searchlight', 1080, GL - 120);
 D('gate', 1300, GL, { behindTerrain: true, w: 200 });
@@ -189,10 +194,10 @@ D('sign', 1690, GL, { icon: 'molten', post: 14 });
 D('chain', 1780, 236, { len: 56, load: 'ingot' });
 D('furnace', 1880, GL);
 D('banner', 1930, 300);
-D('pipes', 2010, 396);
+D('pipes', 2072, 396);
 D('girder', 2120, GL, { h: 230 });
 D('sign', 2136, GL, { icon: 'molten', post: 14 });
-D('crane', 2120, 250, { w: 192, len: 30 });
+D('crane', 2120, 282, { w: 192, len: 22 });
 D('furnace', 2340, GL);
 D('chain', 2400, 236, { len: 70 });
 D('girder', 2470, GL, { h: 230 });
@@ -255,21 +260,20 @@ const LOCK_FOUNDRY: LockDef = {
 
 // ================================================================== C: conveyor halls (2960-4090)
 
-D('girder', 2990, GL, { h: 230 });
-D('vent', 3040, 330);
+wallPanels(2968, 4096, GL, 112);
+D('vent', 3040, 360);
 D('sign', 3010, GL, { icon: 'crush', post: 16 });
 D('chain', 3130, 236, { len: 64, load: 'ingot' });
-D('beacon', 3180, 380, { color: 'amber' });
-D('girder', 3390, GL, { h: 230 });
-D('emblem', 3480, 318);
-D('banner', 3410, 290);
-D('banner', 3550, 290);
+D('beacon', 3180, 340, { color: 'amber' });
+D('banner', 3412, 312);
+D('banner', 3612, 312);
 D('sign', 3416, GL, { icon: 'crush', post: 16 });
-D('pipes', 3640, GL);
-D('vent', 3760, 320);
-D('chain', 3850, 236, { len: 52 });
-D('beacon', 3940, 380, { color: 'red' });
-D('girder', 4060, GL, { h: 230 });
+D('pipes', 3650, GL);
+D('vent', 3760, 356);
+D('emblem', 3900, 352);
+D('chain', 3990, 236, { len: 40 });
+D('beacon', 3820, 340, { color: 'red' });
+D('beacon', 4040, 340, { color: 'red' });
 
 solids.push({ x: 3200, y: 394, w: 170, h: 32 });
 
@@ -321,17 +325,20 @@ const LOCK_CONVEYOR: LockDef = {
 
 // ================================================================== D: assembly line + STRIDER (4090-5290)
 
+wallPanels(4096, 5240, GL, 136);
 D('scrap', 4130, GL);
 D('arm', 4290, GL);
 D('arm', 4370, GL, { flip: true });
-D('chain', 4330, 236, { len: 60, load: 'robot' });
+D('chain', 4330, 290, { len: 36, load: 'robot' });
 D('walker', 4470, GL);
 D('arm', 4560, GL);
-D('chain', 4640, 236, { len: 44, load: 'robot' });
-D('crane', 4660, 250, { w: 224, len: 36 });
+D('banner', 4600, 290);
+D('chain', 4700, 290, { len: 28, load: 'robot' });
+D('crane', 4660, 292, { w: 224, len: 30 });
 D('walker', 4820, GL);
 D('arm', 4930, GL, { flip: true });
 D('banner', 4990, 290);
+D('beacon', 5050, 330, { color: 'red' });
 D('scrap', 5060, GL);
 D('sign', 5086, GL, { icon: 'crush', post: 20 });
 D('beacon', 5236, 362, { color: 'red' });
@@ -422,25 +429,26 @@ add(
 
 // ================================================================== F: hangar (5390-end)
 
-D('girder', 5520, GU, { h: 200 });
-D('banner', 5580, 60);
-D('emblem', 5830, 82);
-D('beacon', 5700, 120, { color: 'red' });
-D('beacon', 5960, 120, { color: 'red' });
-D('girder', 6040, GU, { h: 200 });
+wallPanels(5388, BOSS_LOCK + 270, GU, 112);
+D('hangar_door', BOSS_LOCK + 270, GU, { h: 150, w: 114 });
+D('banner', 5470, 84);
+D('beacon', 5560, 132, { color: 'red' });
+D('banner', 5700, 84);
+D('emblem', 5832, 128);
+D('banner', 5964, 84);
+D('beacon', 6020, 132, { color: 'red' });
 D('walker', 6160, GU);
 D('ammo', 6260, GU);
-D('banner', 6330, 60);
-D('chain', 6390, 0, { len: 76, load: 'robot' });
+D('banner', 6330, 84);
+D('chain', 6390, 84, { len: 28, load: 'robot' });
 D('walker', 6480, GU);
-D('crane', 6520, 22, { w: 160, len: 50 });
-D('girder', 6700, GU, { h: 200 });
-// boss arena backdrop: kept sparse so the walker reads
-D('banner', 6820, 44);
-D('emblem', 6912, 70);
-D('banner', 7004, 44);
-D('beacon', 6760, 150, { color: 'red' });
-D('beacon', 7060, 150, { color: 'red' });
+D('crane', 6520, 92, { w: 160, len: 18 });
+D('vent', 6650, 140);
+// boss arena backdrop: sparse so the walker reads
+D('banner', 6790, 84);
+D('beacon', 6740, 132, { color: 'red' });
+D('banner', 6900, 84);
+D('beacon', 6950, 132, { color: 'red' });
 
 platforms.push({ x: 5800, y: 156, w: 84, style: 'grate' });
 
