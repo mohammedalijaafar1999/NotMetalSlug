@@ -16,7 +16,7 @@ import { Bubble, Infantry } from '../src/content/enemies/infantry';
 import { ShieldTrooper } from '../src/content/enemies/shield_trooper';
 import { Sniper } from '../src/content/enemies/sniper';
 import { MortarCrew, MortarMan } from '../src/content/enemies/mortar';
-import { FlameJet, Harpoon, LegionRocket, MortarShell, SniperRound, EnergyBolt } from '../src/content/enemies/projectiles';
+import { FlameJet, Harpoon, LegionRocket, MortarShell, SniperRound, EnergyBolt, MORTAR_RADIUS } from '../src/content/enemies/projectiles';
 import { Paratrooper } from '../src/content/enemies/paratrooper';
 import { Frogman } from '../src/content/enemies/frogman';
 import { Officer } from '../src/content/enemies/officer';
@@ -241,6 +241,29 @@ describe('telegraphed attacks', () => {
     expect(w.time - launch).toBeGreaterThanOrEqual(1.2);
     const boom = w.query((e) => e instanceof ExplosionEffect && Math.abs(e.x - tx) < 3);
     expect(boom.length).toBeGreaterThan(0);
+  });
+
+  it('mortar: the landing marker ring is as wide as the real blast (body touching the ring = hit, clear of it = safe)', () => {
+    const marker = sprites.get('mortar_marker');
+    expect(marker.ox).toBe(MORTAR_RADIUS);
+    expect(marker.w).toBe(MORTAR_RADIUS * 2 + 1);
+    expect(marker.pixelArt(0).opaqueCount()).toBeGreaterThan(60);
+    for (const [gap, hit] of [
+      [-2, true],
+      [3, false],
+    ] as const) {
+      const w = arena(false);
+      const p = w.players[0];
+      p.invuln = 0;
+      // Shell landing so the near edge of the player's body sits `gap` px outside the ring.
+      const tx = p.x - p.w / 2 - MORTAR_RADIUS - gap;
+      const crew = w.spawn('mortar', p.x + 200) as MortarCrew;
+      step(w, 1);
+      const s = w.add(new MortarShell(crew, crew.x, crew.y - 20, tx, p.y, 1.4));
+      expect(s.radius).toBe(MORTAR_RADIUS);
+      until(w, () => s.dead, 200);
+      expect(p.state === 'dying', `gap ${gap}`).toBe(hit);
+    }
   });
 
   it('mortar crew: two separate crewmen; the survivor keeps firing alone; the crew stops blocking when both are down', () => {
