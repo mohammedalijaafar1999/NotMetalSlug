@@ -554,6 +554,68 @@ export function nearArt(): LayerArt {
   return { art: p, lights };
 }
 
+/**
+ * Open-harbour replacement for the near layer (same size/position): open water with glints, a long
+ * breakwater with a striped lighthouse, an anchored freighter and navigation buoys.
+ */
+export function openArt(): LayerArt {
+  const W = 512;
+  const H = 100;
+  const p = new PixelArt(W, H);
+  const lights: LightSpot[] = [];
+  const r = new Rng(4404);
+  const SEA = 78;
+  // Open water down to the bottom (covers anything under the layer).
+  p.rect(0, SEA, W, H - SEA, P4.sea);
+  for (let i = 0; i < 90; i++) {
+    const y = SEA + 1 + Math.floor(Math.pow(r.next(), 1.4) * (H - SEA - 2));
+    wrapRect(p, r.int(0, W - 1), y, r.int(2, 10), 1, r.chance(0.3) ? P4.seaGlint2 : P4.seaGlint);
+  }
+  for (let i = 0; i < 50; i++) wrapRect(p, r.int(0, W - 1), SEA + r.int(1, H - SEA - 2), r.int(3, 9), 1, shade(P4.sea, 0.1));
+  // Anchored freighter far out (low, hazy).
+  const fx = 300;
+  const C = shade(P4.harb, 0.06);
+  p.poly([fx, SEA - 9, fx + 120, SEA - 11, fx + 112, SEA + 1, fx + 6, SEA + 1], C);
+  p.rect(fx + 8, SEA - 21, 20, 12, C);
+  p.rect(fx + 14, SEA - 28, 6, 7, C);
+  for (let cx = fx + 34; cx < fx + 104; cx += 9) p.rect(cx, SEA - 9 - r.int(3, 9), 8, 9, shade(C, r.range(-0.05, 0.08)));
+  for (let wx = fx + 10; wx < fx + 26; wx += 4) p.px(wx, SEA - 17, P4.winD);
+  lights.push({ x: fx + 118, y: SEA - 13, phase: 0.4, period: 2.6, color: P4.red });
+  // Breakwater: a long low mole of tumbled blocks from the left, ending in the lighthouse.
+  const bw0 = 20;
+  const bw1 = 210;
+  for (let x = bw0; x < bw1; x++) {
+    const h = 6 + Math.round(Math.sin(x * 0.7) * 1 + hash01(x >> 2, 9) * 2);
+    p.rect(x, SEA - h + 2, 1, h, P4.harbD);
+    if (hash01(x, 13) < 0.3) p.px(x, SEA - h + 2, P4.harbL);
+  }
+  const lx = bw1 - 10;
+  p.rect(lx - 6, SEA - 10, 13, 6, P4.harbD);
+  // Lighthouse: white/red bands (dusk-dimmed), gallery, lamp room.
+  for (let y = 0; y < 30; y++) {
+    const half = 4 - Math.floor(y / 12);
+    const band = Math.floor(y / 6) % 2 === 0;
+    p.rect(lx - half, SEA - 10 - y, half * 2 + 1, 1, band ? '#8a7e90' : '#7a3a44');
+    p.px(lx - half, SEA - 10 - y, band ? '#a69aac' : '#94505a');
+  }
+  p.rect(lx - 4, SEA - 41, 9, 1, P4.harbD);
+  p.rect(lx - 2, SEA - 45, 5, 4, '#ffe0a0');
+  p.rect(lx - 2, SEA - 46, 5, 1, P4.harbD);
+  p.px(lx, SEA - 47, P4.harbD);
+  lights.push({ x: lx, y: SEA - 44, phase: 0, period: 0, color: '#fff0c0' });
+  // Navigation buoys.
+  for (const [bx, col] of [
+    [250, '#40d060'],
+    [460, P4.red],
+    [120, P4.red],
+  ] as [number, string][]) {
+    p.rect(bx - 1, SEA + 4, 3, 4, P4.harbL);
+    p.px(bx, SEA + 3, P4.harbL);
+    lights.push({ x: bx, y: SEA + 2, phase: bx * 0.01, period: 2.0, color: col });
+  }
+  return { art: p, lights };
+}
+
 // ------------------------------------------------------------------ platforms
 
 function columnY(x: number, xa: number, xb: number, y1: number, y2: number): number {

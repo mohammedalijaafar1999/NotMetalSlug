@@ -11,7 +11,7 @@ import { PixelArt } from '../../../engine/pixelart';
 import { settings } from '../../../engine/storage';
 import type { LevelDef } from '../../../game/level';
 import { bandedGradient } from '../../../art/textures';
-import { P4, cloudArt, skylineArt, harbourArt, nearArt, hash01, type LightSpot } from './art';
+import { P4, cloudArt, skylineArt, harbourArt, nearArt, openArt, hash01, type LightSpot } from './art';
 
 interface BgLayer {
   make: () => { art: PixelArt; lights: LightSpot[] };
@@ -23,10 +23,33 @@ interface BgLayer {
 }
 
 const layers: BgLayer[] = [
-  { make: () => ({ art: skylineArt().art, lights: skylineArt().lights }), factor: 0.07, y: 70 },
+  { make: () => skylineArt(), factor: 0.07, y: 70 },
   { make: () => harbourArt(), factor: 0.17, y: 66 },
   { make: () => nearArt(), factor: 0.4, y: 98 },
 ];
+/** Replaces the near rooftops inside 'openharbour' zones (breakwater, lighthouse, buoys). */
+const openLayer: BgLayer = { make: () => openArt(), factor: 0.4, y: 98 };
+
+/**
+ * Camera top-y the layer offsets refer to: the street level of the m4 level (camera top 0). The dry
+ * dock dips the camera below it, which slides the layers up (parallax) - the near layer is then
+ * extended down with its base colour so the sky never shows under it.
+ */
+const BASE_CAM_Y = 0;
+
+const zoneCache = new WeakMap<LevelDef, [number, number][]>();
+/** 0..1: how far the view centre is inside an 'openharbour' decor zone (props.w), 160 px fades. */
+export function openHarbour(level: LevelDef, camX: number): number {
+  let zones = zoneCache.get(level);
+  if (!zones) {
+    zones = (level.decor ?? []).filter((d) => d.kind === 'openharbour').map((d) => [d.x, d.x + (Number(d.props?.w) || 0)] as [number, number]);
+    zoneCache.set(level, zones);
+  }
+  const c = camX + VIEW_W / 2;
+  let a = 0;
+  for (const [x1, x2] of zones) a = Math.max(a, Math.min(1, Math.max(0, Math.min((c - x1) / 160, (x2 - c) / 160))));
+  return a;
+}
 
 let skyCanvas: HTMLCanvasElement | null = null;
 let cloudCanvas: HTMLCanvasElement | null = null;
@@ -99,8 +122,8 @@ function tiled(g: CanvasRenderingContext2D, c: HTMLCanvasElement, off: number, y
 export function renderM4Background(g: CanvasRenderingContext2D, camX: number, camY: number, time: number, level: LevelDef): void {
   if (!skyCanvas) skyCanvas = bandedGradient(4, VIEW_H, [...P4.sky], 26).toCanvas();
   g.drawImage(skyCanvas, 0, 0, VIEW_W, VIEW_H);
-  const baseY = Math.max(0, level.height - VIEW_H);
-  const dy = camY - baseY;
+  const dy = camY - BASE_CAM_Y;
+  const open = openHarbour(level, camX);
   const flash = lightning(time);
   const strike = flash.amount > 0;
   if (strike) {
@@ -121,15 +144,28 @@ export function renderM4Background(g: CanvasRenderingContext2D, camX: number, ca
     tiled(g, cloudLitCanvas, coff, cy);
     g.globalAlpha = 1;
   }
-  // Skyline, harbour, near rooftops (+ their blinking lights).
-  for (const L of layers) {
+  // Skyline, harbour, near rooftops (+ their blinking lights); the near rooftops give way to the
+  // open harbour (breakwater + lighthouse) inside 'openharbour' zones.
+  for (let i = 0; i < layers.length + 1; i++) {
+    const L = i < layers.length ? layers[i] : openLayer;
+    const near = i >= layers.length - 1;
+    const alpha = i === layers.length - 1 ? 1 - open : i === layers.length ? open : 1;
+    if (alpha <= 0.01) continue;
     if (!L.canvas) {
       const made = L.make();
       L.canvas = made.art.toCanvas();
       L.lights = made.lights;
     }
     const y = Math.round(L.y - dy * L.factor * 0.6);
+    g.globalAlpha = alpha;
     const o = tiled(g, L.canvas, -camX * L.factor, y);
+    // Below the near layer (camera dipped into the dry dock): extend its base colour.
+    const bottom = y + L.canvas.height;
+    if (near && bottom < VIEW_H) {
+      g.fillStyle = P4.near;
+      g.fillRect(0, bottom, VIEW_W, VIEW_H - bottom);
+    }
+    g.globalAlpha = 1;
     for (const s of L.lights ?? []) {
       let a: number;
       if (s.period > 0) {
@@ -143,10 +179,10 @@ export function renderM4Background(g: CanvasRenderingContext2D, camX: number, ca
       if (a <= 0) continue;
       for (let x = Math.round(o) + s.x; x < VIEW_W + 4; x += L.canvas.width) {
         if (x < -4) continue;
-        g.globalAlpha = 0.3 * a;
+        g.globalAlpha = 0.3 * a * alpha;
         g.fillStyle = s.color;
         g.fillRect(x - 1, y + s.y - 1, 3, 3);
-        g.globalAlpha = a;
+        g.globalAlpha = a * alpha;
         g.fillRect(x, y + s.y, 1, 1);
       }
       g.globalAlpha = 1;
