@@ -110,6 +110,8 @@ export class Hud {
    * throws a bomb). Mission 1 shows it at the start: menus only ever say "FIRE" and "BOMB".
    */
   controlsHint = 0;
+  /** An overlay (the pause menu) is drawn over the gameplay: hide the controls strip. */
+  covered = false;
   time = 0;
   private panels: PanelState[] = [0, 1].map(() => ({ shown: 0, weapon: '', weaponPop: 0, bombs: -1, bombPop: 0, lives: -1, livesPop: 0 }));
   private rescueShown = 0;
@@ -220,7 +222,7 @@ export class Hud {
     }
     if (world.boss && !world.boss.dead && this.boss) this.bossBar(g, world);
     this.hostages(g);
-    if (this.controlsHint > 0 && !this.demo && !cs.allOut) this.controlsStrip(g);
+    if (this.controlsHint > 0 && !this.demo && !cs.allOut && !this.covered) this.controlsStrip(g);
     // GO arrow.
     if (lvl && lvl.goTimer > 0) {
       const k = Math.floor(this.time * 3) % 2 === 0;

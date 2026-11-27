@@ -425,6 +425,8 @@ export class GameplayScene implements Scene {
     const r = app.renderer;
     this.world.render(g, r?.shakeX ?? 0, r?.shakeY ?? 0);
     if (app.debug.showHitboxes) this.renderHitboxes(g);
+    // Under the pause menu (or its options / controls pages) the HUD keeps its prompts to itself.
+    this.hud.covered = app.scenes?.current !== this;
     this.hud.render(g, this.world);
     if (this.phase === 'gameover') {
       g.fillStyle = `rgba(0,0,0,${Math.min(0.6, this.phaseTime)})`;

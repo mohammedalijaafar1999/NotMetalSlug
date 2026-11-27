@@ -7,6 +7,7 @@ import { SceneManager } from '../src/engine/scene';
 import { app } from '../src/app';
 import { installUiFlow } from '../src/scenes/install';
 import { GameplayScene } from '../src/scenes/gameplay';
+import { PauseScene } from '../src/scenes/pause';
 import { GameSession } from '../src/game/session';
 import { CONTROLS_HINT_SECONDS, Hud } from '../src/game/hud';
 import type { LevelDef } from '../src/game/level';
@@ -138,6 +139,19 @@ describe('mission 1 shows which key does what', () => {
     const gp = new GameplayScene(new GameSession({ characters: ['dex', 'juno'], twoPlayer: false, mission: 1 }));
     app.scenes.set(gp, { fade: false });
     expect(gp.hud.controlsHint).toBe(CONTROLS_HINT_SECONDS);
+    // Drawn while playing, not under the pause menu (its footer sits on the same line).
+    let drawn = 0;
+    (gp.hud as any).controlsStrip = () => drawn++;
+    const g = fakeCtx() as CanvasRenderingContext2D;
+    app.scenes.render(g);
+    expect(drawn).toBe(1);
+    app.scenes.push(new PauseScene(gp));
+    app.scenes.render(g);
+    expect(gp.hud.covered).toBe(true);
+    expect(drawn).toBe(1);
+    app.scenes.pop();
+    app.scenes.render(g);
+    expect(drawn).toBe(2);
     for (let i = 0; i < Math.round((CONTROLS_HINT_SECONDS + 0.5) / DT); i++) {
       input.poll(DT);
       app.scenes.update(DT);
