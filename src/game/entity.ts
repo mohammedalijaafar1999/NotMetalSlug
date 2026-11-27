@@ -155,6 +155,8 @@ export abstract class Actor extends Entity {
   stepUp = 6;
   /** Max height it sticks to when walking down. */
   stepDown = 8;
+  /** A fall that meets a ledge at most this far above the feet lands on it (see hopOnto). */
+  ledgeAssist = 6;
   collideTerrain = true;
   /** Set to true to stop at ledges (AI helper reads this). */
   hitWall: -1 | 0 | 1 = 0;
@@ -196,6 +198,65 @@ export abstract class Actor extends Entity {
   /** Called when falling below the level. Default: remove. */
   onFallOut(): void {
     this.remove();
+  }
+
+  /**
+   * Does the body standing at feet (x, y) overlap solid terrain: a solid box (other than its own)
+   * or the ground mass (with slope tolerance at the edges)?
+   */
+  bodyBlocked(x = this.x, y = this.y): boolean {
+    const T = this.world.terrain;
+    const hw = this.w / 2;
+    if (T.solidOverlap({ x: x - hw + 0.5, y: y - this.h + 0.5, w: this.w - 1, h: this.h - 1.5 }, this)) return true;
+    if (T.groundTopAt(x) < y - this.stepUp) return true;
+    const edgeTol = Math.max(this.stepUp, hw + 2);
+    return T.groundTopAt(x - hw + 0.5) < y - edgeTol || T.groundTopAt(x + hw - 0.5) < y - edgeTol;
+  }
+
+  /**
+   * Shoved sideways (direction `dir`) into terrain by something that ignores walls, e.g. the
+   * scrolling screen edge: step up onto the obstacle when its top is at most `maxUp` px above the
+   * feet and there is room on it. Returns false when it is too high or there is no room.
+   */
+  climbOnto(dir: number, maxUp: number): boolean {
+    const T = this.world.terrain;
+    const hw = this.w / 2;
+    for (let dx = 0; dx <= hw + 2; dx++) {
+      const nx = this.x + dir * dx;
+      const f = T.floorAt(nx, this.y - maxUp, this.y - 1, { noOneWay: true });
+      if (!f || this.bodyBlocked(nx, f.y)) continue;
+      this.x = nx;
+      this.y = f.y;
+      this.vy = 0;
+      this.onGround = true;
+      this.groundSurface = f.surface;
+      this.groundSolid = f.solid;
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Ledge assist: falling against the side of a ledge (cliff top or box) whose top is at most
+   * `ledgeAssist` px above the feet lands on it instead, the centre nudged just onto it.
+   */
+  private hopOnto(dir: number, nx: number, top: number): boolean {
+    const T = this.world.terrain;
+    for (let i = 0; i <= this.w / 2 + 1; i++) {
+      const cx = nx + dir * i;
+      const f = T.floorAt(cx, top - 0.5, top + 2, { noOneWay: true });
+      if (!f || this.bodyBlocked(cx, f.y)) continue;
+      this.x = cx;
+      this.y = f.y;
+      this.landVy = this.vy;
+      this.vy = 0;
+      this.onGround = true;
+      this.landed = true;
+      this.groundSurface = f.surface;
+      this.groundSolid = f.solid;
+      return true;
+    }
+    return false;
   }
 
   /** Is there floor ahead at distance `ahead` in direction dir (for ledge-aware AI)? */
@@ -240,7 +301,10 @@ export abstract class Actor extends Entity {
       const lead = nx + dir * hw;
       const gy = T.groundTopAt(lead);
       const tol = this.onGround ? this.stepUp : 2;
-      if (gy < this.y - tol) {
+      if (gy < this.y - tol && !this.onGround && this.vy >= 0 && gy >= this.y - this.ledgeAssist && this.hopOnto(dir, nx, gy)) {
+        // Ledge assist: a jump that comes down with the feet just below the far ledge lands on it.
+        nx = this.x;
+      } else if (gy < this.y - tol) {
         // Slide up to the cliff face instead of stopping short.
         let ok = this.x;
         const steps = Math.ceil(Math.abs(nx - this.x));
@@ -261,6 +325,8 @@ export abstract class Actor extends Entity {
           this.y = s.y;
           this.groundSolid = s;
           this.groundSurface = null;
+        } else if (!this.onGround && this.vy >= 0 && s.y >= this.y - this.ledgeAssist && this.hopOnto(dir, nx, s.y)) {
+          nx = this.x;
         } else if ((this.x < s.x + s.w / 2 ? -1 : 1) === dir) {
           // Already past the middle of the box, moving away from it (walking or falling off its far
           // edge clips the top corner): slide out on that side instead of being thrown back across.
@@ -325,7 +391,44 @@ export abstract class Actor extends Entity {
         }
       }
     }
+    this.unstickSides();
     this.inWater = T.waterAt(this.x, this.y - 2);
     if (this.y - this.h > T.killY) this.onFallOut();
+  }
+
+  /**
+   * Stepping off the edge of a box (or of a cliff top) and stopping, or dropping in right beside
+   * one, leaves the body hanging into its side by up to half its width: the horizontal pass only
+   * resolves walls while moving. Slide out to the side the centre is on.
+   */
+  private unstickSides(): void {
+    const T = this.world.terrain;
+    const hw = this.w / 2;
+    const s = T.solidOverlap({ x: this.x - hw + 0.5, y: this.y - this.h + 0.5, w: this.w - 1, h: this.h - 1.5 }, this);
+    if (s) {
+      const inside = this.x >= s.x && this.x < s.x + s.w;
+      // A centre inside a static box is level geometry we cannot judge; a moving one (press head,
+      // cable car) that ran into us shoves us out to its nearer side.
+      if (inside && !(s.dynamic && (s.dx !== 0 || s.dy !== 0))) return;
+      const left = inside ? this.x - s.x < s.x + s.w - this.x : this.x < s.x;
+      const nx = left ? s.x - hw : s.x + s.w + hw;
+      if (!this.bodyBlocked(nx, this.y)) this.x = nx;
+      return;
+    }
+    // Ground mass: stepping off a cliff top leaves an infantry-sized body hanging into the cliff
+    // face (vehicles are wide enough to straddle slopes, leave them be).
+    if (hw > 8 || T.groundTopAt(this.x) < this.y - this.stepUp) return;
+    const tol = 2 * hw;
+    const lBuried = T.groundTopAt(this.x - hw + 0.5) < this.y - tol;
+    const rBuried = T.groundTopAt(this.x + hw - 0.5) < this.y - tol;
+    if (lBuried === rBuried) return;
+    const dir = lBuried ? 1 : -1;
+    for (let d = 1; d <= hw; d++) {
+      const nx = this.x + dir * d;
+      if (!this.bodyBlocked(nx, this.y)) {
+        this.x = nx;
+        return;
+      }
+    }
   }
 }

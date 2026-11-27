@@ -239,7 +239,8 @@ export class Fighter extends FlyingMachine {
 
   private attack(dt: number, dir: number): void {
     const t = this.target();
-    if (!t || !this.canAttack()) return;
+    // Fire only once at least half of the plane is in view (never from off-screen).
+    if (!t || !this.canAttack(-this.w / 2)) return;
     const ahead = (t.x - this.x) * dir;
     // Nose gun: up to two aimed 3-round bursts per pass.
     if (this.burst > 0) {
@@ -249,6 +250,8 @@ export class Fighter extends FlyingMachine {
         this.burstT = 0.09;
         const mx = this.x + dir * 22;
         const my = this.y + 1;
+        // Leaving the screen: the nose is already past the edge, hold the rest of the burst.
+        if (!this.world.isVisible(mx, my, 0)) return;
         const a = Math.atan2(t.cy - my, t.cx - mx);
         const lim = 0.9;
         const rel = dir > 0 ? Math.max(-0.2, Math.min(lim, a)) : Math.PI - Math.max(-0.2, Math.min(lim, Math.PI - a));

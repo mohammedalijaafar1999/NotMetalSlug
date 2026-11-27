@@ -25,6 +25,10 @@ export const CROUCH_SPEED = 38;
 export const JUMP_SPEED = 300;
 export const RESPAWN_INVULN = 2.6;
 export const MAX_GRENADES_OUT = 2;
+/** Highest ledge (px) the scrolling screen edge lifts a player onto instead of burying them in it. */
+export const SCREEN_PUSH_CLIMB = 48;
+/** Floor wanted on both sides of a respawn drop point (px): the drop is steerable. */
+export const SAFE_DROP_MARGIN = 24;
 /** Aim rotation speed (rad/s) when not sweeping a heavy weapon. */
 export const AIM_RATE = 15;
 /** Knife animation length (s) and damage per slash (x CharacterDef.meleeMul). */
@@ -165,8 +169,8 @@ export class Player extends Actor {
     this.bombs = Math.min(99, this.bombs + n);
   }
 
-  /** Place the player at the top of the screen to drop in. */
-  respawn(x?: number): void {
+  /** Put the player above the top of the screen (over safe floor near x) in the drop-in pose. */
+  private dropIn(x?: number): void {
     const cam = this.world.camera;
     const other = this.world.players.find((p) => p !== this && p.state === 'play');
     this.x = x ?? (other ? other.x : cam.x + 64);
@@ -175,6 +179,17 @@ export class Player extends Actor {
     this.vx = 0;
     this.vy = 40;
     this.onGround = false;
+    this.groundSurface = null;
+    this.groundSolid = null;
+    this.crouching = false;
+    this.h = 26;
+    this.setState('respawn');
+  }
+
+  /** Place the player at the top of the screen to drop in. */
+  respawn(x?: number): void {
+    const cam = this.world.camera;
+    this.dropIn(x);
     this.weapon = getWeapon('pistol');
     this.ammo = Infinity;
     this.bombKind = 'grenade';
@@ -194,22 +209,37 @@ export class Player extends Actor {
     if (sv) {
       const v = this.world.spawn(sv, this.x, cam.y + 60) as unknown as Vehicle | null;
       if (v && (v as any).isVehicle) {
+        // Never hand it out inside a hull or a cliff.
+        if (v.flying) v.slideClear(140);
         this.setState('play');
         v.enter(this);
       }
     }
   }
 
-  /** Nearest x (within the view) that has floor under it, so respawns never drop into pits. */
+  /**
+   * Nearest x (within the view) where a drop from the top of the screen lands on safe floor, so
+   * respawns never drop into pits or deep water, nor start inside a cliff or a wall that rises
+   * above the top of the screen (they would fall through it).
+   */
   safeX(x: number): number {
     const T = this.world.terrain;
     const cam = this.world.camera;
-    for (let d = 0; d <= VIEW_W; d += 8) {
-      for (const s of d === 0 ? [0] : [d, -d]) {
-        const tx = x + s;
-        if (tx < cam.x + 16 || tx > cam.x + VIEW_W - 16) continue;
-        const fy = T.floorAt(tx, cam.y - 40, cam.y + 260);
-        if (fy && !T.waterAt(tx, fy.y - 2)?.deadly) return tx;
+    const dropY = cam.y - 4;
+    const lands = (tx: number): boolean => {
+      if (T.groundTopAt(tx) < dropY || T.solidOverlap({ x: tx - 6, y: dropY - 26, w: 12, h: 26 })) return false;
+      const fy = T.floorAt(tx, dropY, cam.y + 260);
+      return !!fy && !T.waterAt(tx, fy.y - 2)?.deadly;
+    };
+    // First choice: floor on both sides too, so steering during the drop cannot carry the player
+    // over the lip of a pit; then any floor at all.
+    for (const margin of [SAFE_DROP_MARGIN, 0]) {
+      for (let d = 0; d <= VIEW_W; d += 8) {
+        for (const s of d === 0 ? [0] : [d, -d]) {
+          const tx = x + s;
+          if (tx < cam.x + 16 || tx > cam.x + VIEW_W - 16) continue;
+          if (lands(tx) && (!margin || (lands(tx - margin) && lands(tx + margin)))) return tx;
+        }
       }
     }
     return x;
@@ -243,8 +273,13 @@ export class Player extends Actor {
     if (this.vehicle) this.exitVehicle(false);
   }
 
-  /** Killed by script (time over, crushed...). */
+  /** Killed by script (time over, crushed...). A vehicle is wrecked first, its pilot thrown out. */
   kill(): void {
+    if (this.state === 'vehicle') {
+      const v = this.vehicle;
+      if (v && !v.destroyed) v.startDestruction();
+      else this.exitVehicle(false);
+    }
     if (this.state === 'play' || this.state === 'respawn') {
       this.hp = 0;
       this.die({ amount: 99, kind: 'crush', dir: -this.facing });
@@ -264,10 +299,16 @@ export class Player extends Actor {
     // Fell into a pit: lose a life and come back on solid ground.
     this.world.emit({ type: 'playerDied', player: this });
     this.world.sfx('player_die', this.x);
-    this.loseLife();
+    this.finishDeath();
   }
 
   private finishDeath(): void {
+    // Went down in the same moment the mission was won (traded the final blow with the boss):
+    // no life lost - losing the last one here would end the game after the tally.
+    if (this.world.state === 'complete') {
+      this.respawn();
+      return;
+    }
     this.loseLife();
   }
 
@@ -308,6 +349,10 @@ export class Player extends Actor {
     v.onDriverExit?.(this);
     this.x = v.x;
     this.y = v.top + 2;
+    this.crouching = false;
+    this.h = 26;
+    // Under a low ceiling the body would start inside it: come out lower, in front of the hull.
+    for (let i = 0; i < 40 && this.y < v.y && this.bodyBlocked(); i++) this.y = Math.min(v.y, this.y + 2);
     this.exitCooldown = 0.8;
     if (this.state === 'vehicle') {
       this.setState('play');
@@ -316,6 +361,12 @@ export class Player extends Actor {
       if (jump) this.jump(260);
     }
     this.world.invalidateTargets();
+  }
+
+  /** Room above a crouching body to stand up (no solid in the band up to standing height)? */
+  private headroom(): boolean {
+    const hw = this.w / 2;
+    return !this.world.terrain.solidOverlap({ x: this.x - hw + 0.5, y: this.y - 26 + 0.5, w: this.w - 1, h: 26 - 17 - 1 }, this);
   }
 
   get canEnterVehicle(): boolean {
@@ -363,6 +414,8 @@ export class Player extends Actor {
       this.landT = 0.12;
       this.world.particles.dust(this.x, this.y, 6, this.dustColor());
       wsfx(this.world, 'land', this.x, { vol: 0.5 });
+      // Dropped back in after the mission was won: join the victory pose.
+      if (this.world.state === 'complete') this.celebrate();
     }
   }
 
@@ -389,11 +442,26 @@ export class Player extends Actor {
     if (this.x < lo) {
       this.x = lo;
       if (this.vx < 0) this.vx = 0;
+      this.shovedByScreen(1);
     }
     if (this.x > hi) {
       this.x = hi;
       if (this.vx > 0) this.vx = 0;
+      this.shovedByScreen(-1);
     }
+  }
+
+  /**
+   * The screen edge pushed us into a wall or a cliff (co-op partner scrolling on, arena camera):
+   * hop onto it when it is low, otherwise drop back in from the top of the screen next to the
+   * partner instead of being buried in the terrain (and falling through it to our death).
+   */
+  private shovedByScreen(dir: 1 | -1): void {
+    if (!this.bodyBlocked()) return;
+    if (this.climbOnto(dir, SCREEN_PUSH_CLIMB)) return;
+    const mate = this.world.players.find((p) => p !== this && (p.state === 'play' || p.state === 'vehicle'));
+    this.dropIn(mate ? mate.camX : undefined);
+    this.invuln = Math.max(this.invuln, 1.2);
   }
 
   private dustColor(): string {
@@ -421,7 +489,10 @@ export class Player extends Actor {
     }
 
     // Crouch & aim. Heavy weapons rotate slowly while firing so the bullets fan out.
-    this.crouching = inp.held('down') && this.onGround;
+    // No headroom to stand up under a low ceiling: stay down (standing up would put the head
+    // inside the solid, and a jump from there would pass right through it).
+    const cramped = this.onGround && !this.headroom();
+    this.crouching = (inp.held('down') && this.onGround) || (this.crouching && cramped);
     let aimTarget = 0;
     if (inp.held('up')) aimTarget = -Math.PI / 2;
     else if (inp.held('down') && !this.onGround) aimTarget = Math.PI / 2;
@@ -437,7 +508,9 @@ export class Player extends Actor {
 
     // Jump / drop-through.
     if (inp.pressed('jump') && this.onGround) {
-      if (inp.held('down') && this.onPlatform) {
+      if (this.crouching && cramped) {
+        // Crawl space: no room to jump.
+      } else if (inp.held('down') && this.onPlatform) {
         this.dropThrough();
       } else {
         this.jump(JUMP_SPEED * this.char.jumpMul * (this.inWater ? 0.85 : 1));

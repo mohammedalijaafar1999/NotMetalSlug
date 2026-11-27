@@ -332,12 +332,16 @@ export abstract class Vehicle extends Actor {
     const lo = cam.x + this.w / 2 + 2;
     const hi = cam.x + VIEW_W - this.w / 2 - 2;
     if (this.x < lo) {
+      const from = this.x;
       this.x = lo;
       if (this.vx < 0) this.vx = 0;
+      this.shovedByScreen(1, from);
     }
     if (this.x > hi) {
+      const from = this.x;
       this.x = hi;
       if (this.vx > 0) this.vx = 0;
+      this.shovedByScreen(-1, from);
     }
     if (this.flying) {
       const top = cam.y + this.h + 14;
@@ -351,6 +355,34 @@ export abstract class Vehicle extends Actor {
         if (this.vy > 0) this.vy = 0;
       }
     }
+  }
+
+  /**
+   * The screen edge (auto-scroll, a co-op partner, an arena camera) pushed us into terrain: flyers
+   * slide over or under it, ground vehicles climb low obstacles; otherwise stay pinned against the
+   * wall rather than being dragged through it.
+   */
+  private shovedByScreen(dir: 1 | -1, from: number): void {
+    if (!this.bodyBlocked()) return;
+    if (this.flying ? this.slideClear() : this.climbOnto(dir, 36)) return;
+    if (!this.bodyBlocked(from, this.y)) this.x = from;
+  }
+
+  /** Flyers: move to the nearest y (inside the view) where the hull is clear of terrain. */
+  slideClear(range = 96): boolean {
+    if (!this.bodyBlocked()) return true;
+    const cam = this.world.camera;
+    const top = cam.y + this.h + 14;
+    const bottom = cam.y + VIEW_H - 6;
+    for (let d = 1; d <= range; d++) {
+      for (const y of [this.y - d, this.y + d]) {
+        if (y < top || y > bottom || this.bodyBlocked(this.x, y)) continue;
+        if (this.vy * (y - this.y) < 0) this.vy = 0;
+        this.y = y;
+        return true;
+      }
+    }
+    return false;
   }
 
   override onFallOut(): void {
