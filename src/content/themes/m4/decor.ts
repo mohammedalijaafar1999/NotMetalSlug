@@ -1199,6 +1199,3 @@ export const M4_DECOR: Record<string, DecorRenderer> = {
     drawBaked(g, c, d.x - w / 2, d.y - 14);
   },
 };
-
-/** Sprites added by this module (for tests). */
-export const M4_DECOR_SPRITES = ['m4d_lamp', 'm4d_bollard', 'm4d_tires', 'm4d_fender', 'm4d_net', 'm4d_wreck', 'm4d_firebarrel', 'm4d_crates', 'm4d_sign', 'm4d_welcome', 'm4d_hook', 'm4d_crane'];
