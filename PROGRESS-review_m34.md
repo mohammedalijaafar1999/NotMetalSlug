@@ -10,6 +10,6 @@ Branch review/m34 (from claude/metal-slug-game-sogjdj). Owned: m3/m4 levels, the
 - [ ] Quality gates
 
 ## Findings
-(none yet)
+1. [major, FIXED] m3 climb: tier-6 sniper and tier-3 grenadier attacked from under the HUD band (camera keeps feet 138 px below top -> 3 tiers up = y 30). Fix: grenadier to tier 2, sniper range 40. Test: mission_m3 'climb: no ledge enemy attacks from under the HUD band'.
 
 ## Gotchas
