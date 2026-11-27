@@ -245,6 +245,35 @@ describe('ending', () => {
     const e = new EndingScene(s) as any;
     expect(e.squad.length).toBe(ids.length);
   });
+  it('ENTER (confirm + start) skips one phase at a time, START skips to the credits', () => {
+    const s = new GameSession({ characters: ['dex', 'juno'] });
+    const e = new EndingScene(s);
+    app.scenes.set(e, { fade: false });
+    run(1);
+    expect(e.phase).toBe(0);
+    const held: Set<string> = (input as any).keysDown;
+    const tapKey = (code: string) => {
+      held.add(code);
+      input.poll(DT);
+      app.scenes.update(DT);
+      held.delete(code);
+      input.poll(DT);
+      app.scenes.update(DT);
+    };
+    tapKey('Enter');
+    expect(e.phase).toBe(1);
+    tapKey('Enter');
+    expect(e.phase).toBe(2);
+    expect(e.creditsDone).toBe(false);
+    tapKey('Enter'); // not settled yet: no skipping the roll
+    expect(e.creditsDone).toBe(false);
+    expect(app.scenes.current).toBe(e);
+    const e2 = new EndingScene(s);
+    app.scenes.set(e2, { fade: false });
+    run(1);
+    tapKey('KeyP'); // a pure START key
+    expect(e2.phase).toBe(2);
+  });
 });
 
 describe('tally and mission data', () => {

@@ -26,6 +26,10 @@ import { C, PLAYER_COLORS, blink, enterMenu, footer, formatTime, panel, rect, te
 const T_BOOM = 6.2;
 const T_CELEBRATE = 9.5;
 const T_CREDITS = 23;
+/** The credit roll scrolls in the sky above the squad's heads (they stand on the hill at ~y 120+). */
+const ROLL_BOTTOM = 112;
+/** Scroll at which THE END has settled near the top (credits + results have gone by). */
+const settleScroll = (creditsH: number) => creditsH + 24 + 74 + ROLL_BOTTOM - 36;
 
 const EPILOGUE =
   'THE RUSTCOAT LEGION IS FINISHED. MARSHAL GRISTLE WAS LAST SEEN PADDLING A RUBBER DINGHY TOWARD THE HORIZON, SHAKING HIS FIST. THE MECHANICS OF PUERTO POLVORA ARE FREE AND ALREADY FIXING EVERYTHING. THE RUCKUS SQUAD HAS EARNED A VACATION.';
@@ -59,6 +63,7 @@ export class EndingScene implements Scene {
   private leaving = false;
   private musicPhase = '';
   private squad: { id: string; p2: boolean }[] = [];
+  private lastPhase = 0;
   private epi: string[] = [];
 
   constructor(readonly session: GameSession) {
@@ -104,7 +109,7 @@ export class EndingScene implements Scene {
 
   get creditsDone(): boolean {
     // Credits + results have scrolled by and THE END has settled.
-    return this.scroll > this.creditsH + 24 + 74 + 146 - 36;
+    return this.scroll > settleScroll(this.creditsH);
   }
 
   update(dt: number): void {
@@ -114,21 +119,27 @@ export class EndingScene implements Scene {
     const m = input.menu;
     const tap = !!uiInput.takeTap();
     const ph = this.phase;
+    // FIRE skips one phase at a time. A dedicated START skips to the credits / the end of the
+    // roll; ENTER counts as both, so it only acts as FIRE (no skipping two phases at once).
     if ((m.pressed('confirm') || tap) && this.time > 0.6) {
       if (ph === 0) this.jumpTo(T_CELEBRATE);
       else if (ph === 1) this.jumpTo(T_CREDITS);
       else if (this.creditsDone) this.next();
-    }
-    if (m.pressed('start') && this.time > 0.6) {
+    } else if (m.pressed('start') && this.time > 0.6) {
       if (ph < 2) this.jumpTo(T_CREDITS);
-      else this.scroll = Math.max(this.scroll, this.creditsH + 209);
+      else this.scroll = Math.max(this.scroll, settleScroll(this.creditsH) + 1);
+    }
+    // Leftover explosion smoke must not drift over the sunrise.
+    if (this.phase !== this.lastPhase) {
+      this.lastPhase = this.phase;
+      this.parts.clear();
     }
     if (ph === 0) this.updateDestruction(dt);
     else this.updateFireworks(dt);
     if (ph === 2) {
       const fast = m.held('confirm') || m.held('down');
       this.scroll += dt * (fast ? 70 : 18);
-      if (this.creditsDone && this.scroll > this.creditsH + 208 + 18 * 12) this.next();
+      if (this.creditsDone && this.scroll > settleScroll(this.creditsH) + 18 * 12) this.next();
     }
     if (this.bigFlash > 0) this.bigFlash -= dt;
     this.parts.update(dt, null);
@@ -217,7 +228,11 @@ export class EndingScene implements Scene {
     if (ph === 0) this.renderDestruction(g);
     else if (ph === 1) this.renderCelebration(g);
     else this.renderCredits(g);
-    if (this.bigFlash > 0) rect(g, 0, 0, VIEW_W, VIEW_H, '#ffffff', Math.min(1, this.bigFlash));
+    // The citadel's last blast: a white-out, or a soft warm glow with SCREEN FLASHES off.
+    if (this.bigFlash > 0) {
+      if (settings.flashes) rect(g, 0, 0, VIEW_W, VIEW_H, '#ffffff', Math.min(1, this.bigFlash));
+      else rect(g, 0, 0, VIEW_W, VIEW_H, '#ff9a4a', Math.min(0.3, this.bigFlash * 0.3));
+    }
   }
 
   private renderDestruction(g: CanvasRenderingContext2D): void {
@@ -322,7 +337,6 @@ export class EndingScene implements Scene {
     // Night lighting on the foreground.
     rect(g, 0, 120, VIEW_W, VIEW_H - 120, '#06041a', 0.55);
     // Roll (credits, then the final stats) in the sky above the hill.
-    const ROLL_BOTTOM = 146;
     g.save();
     g.beginPath();
     g.rect(0, 0, VIEW_W, ROLL_BOTTOM);
