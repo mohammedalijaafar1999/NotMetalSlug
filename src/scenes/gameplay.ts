@@ -142,7 +142,11 @@ export class GameplayScene implements Scene {
     w.add(p);
     w.players.push(p);
     if (dropIn) {
-      p.respawn();
+      // Land beside the partner (behind them when there is room), not on top of them, so the
+      // new player can spot their soldier at once.
+      const mate = w.players.find((o) => o !== p && o.state === 'play');
+      const behind = mate && mate.x - w.camera.x > 72;
+      p.respawn(mate ? mate.x + (behind ? -28 : 28) : undefined);
       return p;
     }
     if (this.def.startVehicle) {

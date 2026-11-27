@@ -259,6 +259,8 @@ describe('drop-in co-op', () => {
     const p2 = gp.world.players.find((p) => p.index === 1)!;
     expect(p2.invuln).toBeGreaterThan(RESPAWN_INVULN - 0.5);
     expect(Math.abs(p2.x - p1.x)).toBeLessThan(80);
+    // ...beside player 1, not hidden on top of them.
+    expect(Math.abs(p2.x - p1.x)).toBeGreaterThanOrEqual(16);
   });
 });
 
