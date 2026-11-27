@@ -60,6 +60,8 @@ export class Sprite {
   readonly def: SpriteDef;
   private baked: (Canvasish | null)[];
   private flashBaked: (Canvasish | null)[];
+  /** Mirrored copies (index frame*2 + flash), made on first flipped draw. */
+  private mirrorBaked: (Canvasish | null)[];
   private pixels: (PixelArt | null)[];
 
   constructor(def: SpriteDef) {
@@ -72,6 +74,7 @@ export class Sprite {
     this.frameCount = Math.max(1, def.frames ?? 1);
     this.baked = new Array(this.frameCount).fill(null);
     this.flashBaked = new Array(this.frameCount).fill(null);
+    this.mirrorBaked = new Array(this.frameCount * 2).fill(null);
     this.pixels = new Array(this.frameCount).fill(null);
   }
 
@@ -130,6 +133,25 @@ export class Sprite {
     return c;
   }
 
+  /** Horizontally mirrored frame (or its flash silhouette). */
+  mirrorCanvas(frame: number, flash = false): Canvasish {
+    const f = this.wrap(frame);
+    const i = f * 2 + (flash ? 1 : 0);
+    let c = this.mirrorBaked[i];
+    if (!c) {
+      const src = flash ? this.flashCanvas(f) : this.canvas(f);
+      c = document.createElement('canvas');
+      c.width = src.width;
+      c.height = src.height;
+      const ctx = c.getContext('2d')!;
+      ctx.translate(src.width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(src, 0, 0);
+      this.mirrorBaked[i] = c;
+    }
+    return c;
+  }
+
   /** Bake all frames now (avoid hitches later). */
   bake(): void {
     for (let i = 0; i < this.frameCount; i++) this.canvas(i);
@@ -140,26 +162,31 @@ export class Sprite {
    * Coordinates are rounded to whole pixels for crispness.
    */
   draw(g: CanvasRenderingContext2D, x: number, y: number, frame = 0, opts?: DrawOpts): void {
-    const img = opts?.flash ? this.flashCanvas(frame) : this.canvas(frame);
+    const alpha = opts?.alpha ?? 1;
+    if (alpha <= 0) return;
     const px = Math.round(x);
     const py = Math.round(y);
     // Padded canvas: origin shifts by +1.
     const ox = this.ox + 1;
     const oy = this.oy + 1;
-    const alpha = opts?.alpha ?? 1;
-    if (alpha <= 0) return;
-    const simple = !opts || (!opts.flip && !opts.rot && !opts.scale && !opts.flipY);
+    const simple = !opts || (!opts.rot && !opts.scale && !opts.flipY);
     if (simple) {
+      // Plain and mirrored draws are single blits (mirrored frames are cached, so facing left
+      // costs no save/translate/scale/restore).
+      const flip = !!opts?.flip;
+      const img = flip ? this.mirrorCanvas(frame, !!opts?.flash) : opts?.flash ? this.flashCanvas(frame) : this.canvas(frame);
+      const dx = flip ? px + ox - img.width : px - ox;
       if (alpha !== 1) {
         const prev = g.globalAlpha;
         g.globalAlpha = prev * alpha;
-        g.drawImage(img, px - ox, py - oy);
+        g.drawImage(img, dx, py - oy);
         g.globalAlpha = prev;
       } else {
-        g.drawImage(img, px - ox, py - oy);
+        g.drawImage(img, dx, py - oy);
       }
       return;
     }
+    const img = opts?.flash ? this.flashCanvas(frame) : this.canvas(frame);
     g.save();
     if (alpha !== 1) g.globalAlpha *= alpha;
     g.translate(px, py);

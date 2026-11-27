@@ -169,36 +169,91 @@ function drawRaw(g: CanvasRenderingContext2D, text: string, x: number, y: number
   }
 }
 
+const OUTLINE_OFFSETS = [
+  [-1, 0],
+  [1, 0],
+  [0, -1],
+  [0, 1],
+  [-1, -1],
+  [1, -1],
+  [-1, 1],
+  [1, 1],
+] as const;
+
+/** Glyph-by-glyph drawing: outline (8 offset copies) or drop shadow, then the text itself. */
+function drawGlyphs(g: CanvasRenderingContext2D, text: string, sx: number, sy: number, color: string, shadow: string | null, outline: string | null, scale: number, spacing: number): void {
+  if (outline) {
+    for (const [dx, dy] of OUTLINE_OFFSETS) drawRaw(g, text, sx + dx * scale, sy + dy * scale, outline, scale, spacing);
+  } else if (shadow) drawRaw(g, text, sx + scale, sy + scale, shadow, scale, spacing);
+  drawRaw(g, text, sx, sy, color, scale, spacing);
+}
+
+// Whole-string cache. Most HUD and menu text is outlined, i.e. 9 blits per glyph: a 2-player HUD
+// alone issued ~440 drawImage calls a frame, the biggest fixed rendering cost of every mission.
+// A baked string is a single blit. Strings are baked on their second request, so values that
+// change every frame (rolling tally scores) keep using the glyph path instead of churning canvases.
+const TEXT_CACHE_MAX = 320;
+interface BakedText {
+  c: HTMLCanvasElement;
+  /** Where the text's top-left sits inside the baked canvas (outline padding). */
+  pad: number;
+}
+const textCache = new Map<string, BakedText>();
+const textSeen = new Set<string>();
+
+function bakeText(text: string, color: string, shadow: string | null, outline: string | null, scale: number, spacing: number, w: number): BakedText | null {
+  if (typeof document === 'undefined') return null;
+  const pad = outline ? scale : 0;
+  const tail = outline ? pad : shadow ? scale : 0;
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, w + pad + tail);
+  c.height = FONT_H * scale + pad + tail;
+  const ctx = c.getContext('2d');
+  if (!ctx) return null;
+  ctx.imageSmoothingEnabled = false; // scaled glyphs stay crisp
+  drawGlyphs(ctx, text, pad, pad, color, shadow, outline, scale, spacing);
+  return { c, pad };
+}
+
+/** Cached strings currently held (tests / debug). */
+export function textCacheSize(): number {
+  return textCache.size;
+}
+
 /** Draw text with the pixel font. (x, y) is the top-left (or top-center/right per align). Returns width. */
 export function drawText(g: CanvasRenderingContext2D, text: string, x: number, y: number, opts: TextOpts = {}): number {
   const scale = Math.max(1, Math.round(opts.scale ?? 1));
   const spacing = opts.spacing ?? 1;
   const color = opts.color ?? '#ffffff';
   const w = textWidth(text, scale, spacing);
+  if (w <= 0) return w;
   let sx = Math.round(x);
   if (opts.align === 'center') sx = Math.round(x - w / 2);
   else if (opts.align === 'right') sx = Math.round(x - w);
   const sy = Math.round(y);
+  const outline = opts.outline || null;
+  const shadow = outline ? null : opts.shadow === undefined ? '#000000' : opts.shadow || null;
   const prevAlpha = g.globalAlpha;
   if (opts.alpha !== undefined) g.globalAlpha = prevAlpha * opts.alpha;
-  if (opts.outline) {
-    for (const [dx, dy] of [
-      [-1, 0],
-      [1, 0],
-      [0, -1],
-      [0, 1],
-      [-1, -1],
-      [1, -1],
-      [-1, 1],
-      [1, 1],
-    ]) {
-      drawRaw(g, text, sx + dx * scale, sy + dy * scale, opts.outline, scale, spacing);
+  const key = `${scale}|${spacing}|${color}|${outline ?? ''}|${shadow ?? ''}|${text}`;
+  let baked = textCache.get(key);
+  if (baked) {
+    // Keep recently used strings at the young end of the map (LRU).
+    textCache.delete(key);
+    textCache.set(key, baked);
+  } else if (textSeen.has(key)) {
+    textSeen.delete(key);
+    baked = bakeText(text, color, shadow, outline, scale, spacing, w) ?? undefined;
+    if (baked) {
+      textCache.set(key, baked);
+      if (textCache.size > TEXT_CACHE_MAX) textCache.delete(textCache.keys().next().value!);
     }
   } else {
-    const shadow = opts.shadow === undefined ? '#000000' : opts.shadow;
-    if (shadow) drawRaw(g, text, sx + scale, sy + scale, shadow, scale, spacing);
+    if (textSeen.size > 2048) textSeen.clear();
+    textSeen.add(key);
   }
-  drawRaw(g, text, sx, sy, color, scale, spacing);
+  if (baked) g.drawImage(baked.c, sx - baked.pad, sy - baked.pad);
+  else drawGlyphs(g, text, sx, sy, color, shadow, outline, scale, spacing);
   g.globalAlpha = prevAlpha;
   return w;
 }

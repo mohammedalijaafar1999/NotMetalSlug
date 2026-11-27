@@ -36,12 +36,42 @@ export interface Particle {
   alpha: number;
 }
 
+/** 1px line between integer points, one rect per run (uses the current fillStyle). */
+function pixelStreak(g: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number): void {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  if (dy === 0) {
+    g.fillRect(Math.min(x0, x1), y0, Math.abs(dx) + 1, 1);
+    return;
+  }
+  if (dx === 0) {
+    g.fillRect(x0, Math.min(y0, y1), 1, Math.abs(dy) + 1);
+    return;
+  }
+  const n = Math.max(Math.abs(dx), Math.abs(dy));
+  for (let i = 0; i <= n; i++) g.fillRect(Math.round(x0 + (dx * i) / n), Math.round(y0 + (dy * i) / n), 1, 1);
+}
+
+/** Crisp 1px ring sprites by color and radius (canvas arcs are anti-aliased). */
+const ringCache = new Map<string, HTMLCanvasElement | null>();
+function ringCanvas(color: string, r: number): HTMLCanvasElement | null {
+  const key = color + r;
+  let c = ringCache.get(key);
+  if (c === undefined) {
+    if (ringCache.size > 256) ringCache.clear();
+    c = typeof document === 'undefined' ? null : new PixelArt(r * 2 + 1, r * 2 + 1).ring(r + 0.5, r + 0.5, r + 0.5, color, 1.3).toCanvas();
+    ringCache.set(key, c);
+  }
+  return c;
+}
+
 export class Particles {
   list: Particle[] = [];
   max = 1400;
 
   add(p: Partial<Particle> & { x: number; y: number }): Particle | null {
-    if (this.list.length >= this.max) this.list.shift();
+    // At the cap, drop the oldest tenth in one go (shift() per particle is O(n) each).
+    if (this.list.length >= this.max) this.list.splice(0, Math.max(1, Math.ceil(this.max / 10)));
     const life = p.life ?? 0.5;
     const q: Particle = {
       kind: 'px',
@@ -68,8 +98,11 @@ export class Particles {
   }
 
   update(dt: number, terrain: Terrain | null): void {
-    const out: Particle[] = [];
-    for (const p of this.list) {
+    // Compact in place (no new array every step).
+    const list = this.list;
+    let live = 0;
+    for (let i = 0; i < list.length; i++) {
+      const p = list[i];
       p.life -= dt;
       if (p.life <= 0) continue;
       p.vy += p.gravity * dt;
@@ -95,9 +128,9 @@ export class Particles {
           }
         }
       }
-      out.push(p);
+      list[live++] = p;
     }
-    this.list = out;
+    list.length = live;
   }
 
   render(g: CanvasRenderingContext2D, front: boolean): void {
@@ -125,34 +158,36 @@ export class Particles {
           break;
         }
         case 'spark': {
+          // A crisp pixel streak behind the spark (a canvas stroke would be anti-aliased).
           g.globalAlpha = p.alpha * (1 - t * 0.6);
-          g.strokeStyle = p.color;
-          g.lineWidth = 1;
-          g.beginPath();
+          g.fillStyle = p.color;
           const len = 0.025;
-          g.moveTo(Math.round(p.x) + 0.5, Math.round(p.y) + 0.5);
-          g.lineTo(Math.round(p.x - p.vx * len) + 0.5, Math.round(p.y - p.vy * len) + 0.5);
-          g.stroke();
+          pixelStreak(g, Math.round(p.x), Math.round(p.y), Math.round(p.x - p.vx * len), Math.round(p.y - p.vy * len));
           break;
         }
         case 'debris': {
+          // A chip turned in 45-degree steps, drawn with axis-aligned rects: crisp, and no
+          // save/translate/rotate/restore per particle.
           g.globalAlpha = p.alpha * (p.life < 0.3 ? p.life / 0.3 : 1);
-          g.save();
-          g.translate(Math.round(p.x), Math.round(p.y));
-          g.rotate(Math.round(p.rot / (Math.PI / 4)) * (Math.PI / 4));
           g.fillStyle = p.color;
           const s = Math.max(1, Math.round(size));
-          g.fillRect(-s, -Math.max(1, s >> 1), s * 2, Math.max(1, s));
-          g.restore();
+          const th = Math.max(1, s >> 1);
+          const x = Math.round(p.x);
+          const y = Math.round(p.y);
+          const q = ((Math.round(p.rot / (Math.PI / 4)) % 8) + 8) % 8;
+          if (q % 4 === 0) g.fillRect(x - s, y - th, s * 2, Math.max(1, s));
+          else if (q % 4 === 2) g.fillRect(x - th, y - s, Math.max(1, s), s * 2);
+          else {
+            const dy = q % 4 === 1 ? 1 : -1;
+            for (let i = 0; i < s * 2; i++) g.fillRect(x - s + i, y + dy * (i - s) - (dy < 0 ? 1 : 0), 1, th);
+          }
           break;
         }
         case 'ring': {
           g.globalAlpha = p.alpha * (1 - t);
-          g.strokeStyle = p.color;
-          g.lineWidth = 1;
-          g.beginPath();
-          g.arc(Math.round(p.x), Math.round(p.y), Math.max(1, size), 0, Math.PI * 2);
-          g.stroke();
+          const r = Math.max(1, Math.round(size));
+          const c = ringCanvas(p.color, r);
+          if (c) g.drawImage(c, Math.round(p.x) - r, Math.round(p.y) - r);
           break;
         }
         case 'sprite': {
